@@ -7,13 +7,14 @@ import {
   timestamp,
   jsonb,
 } from "drizzle-orm/pg-core";
-import { userRoleEnum } from "../enums";
+import { userRoleEnum, coordinatorTypeEnum } from "../enums";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
   role: userRoleEnum("role").notNull(),
+  coordinatorType: coordinatorTypeEnum("coordinator_type"), // Only for coordinator role
   authProvider: varchar("auth_provider", { length: 100 }),
   authSubject: varchar("auth_subject", { length: 255 }),
   profileMeta: jsonb("profile_meta"), // branch, grad_year, phone, etc.

@@ -1,6 +1,7 @@
 # API Spec Plan (Nexus)
 
 ## Base
+
 - Base path: `/api/v1`
 - Auth: session/JWT via NextAuth/Auth.js
 - Response envelope (recommended): `{ data, meta, error }`
@@ -9,6 +10,7 @@
 ## Feature-wise API Plan
 
 ## 1) Contact Database (Company + HR Contacts CRUD)
+
 - `GET /companies`
   - List company masters with `search`, `industry`, `page`, `limit` filters.
 - `POST /companies`
@@ -31,6 +33,7 @@
   - Quick log for call/email/add-to-mail-request action.
 
 ## 2) Permissions + Export Controls
+
 - `GET /auth/me`
   - Returns current user profile + effective permissions.
 - `GET /admin/roles`
@@ -43,8 +46,9 @@
   - Export drive/placement reports.
 
 ## 3) Assign Companies to Coordinators/Reps
+
 - `POST /assignments`
-  - Assign a company/contact to user with `primary/secondary` flag.
+  - Assign a company/contact to user.
 - `POST /assignments/bulk`
   - Bulk assign multiple companies.
 - `PUT /assignments/:assignmentId/reassign`
@@ -53,6 +57,7 @@
   - Fetch assignment change history.
 
 ## 4) Coordinator-wise Assigned List + Marked Items
+
 - `GET /coordinators/me/assignments`
   - Dashboard list of assigned companies/contacts with statuses.
 - `PUT /coordinators/me/task-marks`
@@ -61,6 +66,7 @@
   - Fetch complete/flagged/follow-up markers.
 
 ## 5) Season Contacting Lifecycle + Audit
+
 - `GET /seasons`
   - List recruitment seasons (`intern`, `placement`) and active windows.
 - `POST /seasons`
@@ -77,6 +83,7 @@
   - Internal endpoint to trigger automation (task creation/notification) after status change.
 
 ## 6) Templates (Mailing Team Managed)
+
 - `GET /mail/templates`
   - List templates with status/version.
 - `POST /mail/templates`
@@ -93,6 +100,7 @@
   - Render preview with sample variables.
 
 ## 7) Mailing Team Pending Queue
+
 - `GET /mail/requests?status=pending`
   - Pending request queue for mailing team.
 - `GET /mail/requests/:requestId`
@@ -105,12 +113,14 @@
   - Schedule send time and throttling rules.
 
 ## 8) Two Mail Types: Template vs Custom
+
 - `POST /mail/requests`
   - Create mail request (`template` or `custom`).
 - `POST /mail/requests/:requestId/test-send`
   - Send preview/test email before final action.
 
 ## 9) Bulk Send via Filters
+
 - `POST /mail/requests/:requestId/recipients/preview`
   - Preview recipient sample using filter criteria (`branch`, `year`, `eligibility`, tags).
 - `POST /mail/requests/:requestId/send-bulk`
@@ -119,12 +129,14 @@
   - Current domain throttle counters/limits.
 
 ## 10) Custom Mail View Once Then Send
+
 - `POST /mail/requests/:requestId/view-once-confirm`
   - Confirm the final preview before send (safety checkpoint).
 - `POST /mail/requests/:requestId/send`
   - Final dispatch for approved custom mail.
 
 ## 11) Scheduling (OA + Interview)
+
 - `GET /drives?from=&to=&status=&seasonId=`
   - Calendar feed.
 - `POST /drives`
@@ -137,6 +149,7 @@
   - Conflict detection endpoint.
 
 ## 12) Blogs: Submit -> Approve -> Publish
+
 - `POST /blogs`
   - Student submits blog draft.
 - `GET /blogs?company=&tag=&page=`
@@ -149,18 +162,21 @@
   - Reject blog with note.
 
 ## 13) Student Company-wise History/Stats
+
 - `GET /companies/:companyId/stats`
   - Historical hiring stats, package trend, roles.
 - `GET /companies/:companyId/experiences`
   - Archived experiences for the company.
 
 ## 14) Coordinator Quick Actions
+
 - `POST /coordinators/me/call-logs`
   - Fast call logging from mobile/web against a `company_season_cycle_id`.
 - `POST /coordinators/me/mail-requests`
   - Shortcut endpoint to create mail request from assignment context.
 
 ## 15) Constraint Checks & Governance
+
 - `POST /governance/checks/blog`
   - PII/offensive-content screening result for blog drafts.
 - `POST /governance/checks/mailing`
@@ -171,6 +187,7 @@
   - Human override endpoint with mandatory reason and audit logging.
 
 ## 16) Inbox Classification + Misc Segregation
+
 - `POST /email/inbound`
   - Inbound webhook receiver (normalize, dedupe, enqueue classification).
 - `POST /email/classify/:emailId`
@@ -183,6 +200,7 @@
   - Thread timeline for context.
 
 ## Shared Platform APIs
+
 - `GET /notifications`
   - User notification feed.
 - `POST /notifications/mark-read`
@@ -195,9 +213,13 @@
   - AI assist draft generation for email/blog (human approval required).
 
 ## Suggested Endpoint Ownership (Role Scope)
+
 - `tpo_admin`: full access, approvals, exports, reassignment, overrides.
 - `coordinator`: CRUD limited to assigned entities, call logs, mail requests, drive updates.
-- `student_representative`: limited assignment support + view/write where granted.
-- `mailing_team`: templates, mail queue review/approve/send, inbox classification.
+  - `general`: Standard coordinator operations
+  - `student_representative`: Limited assignment support + view/write where granted
+  - `mailing_team`: Templates, mail queue review/approve/send, inbox classification
 - `student`: read-only intelligence endpoints + blog submission + follow/wishlist.
 - `tech_support`: configuration/ops endpoints, not business approvals.
+
+**Note:** `student_representative` and `mailing_team` are coordinator specializations with additional permissions layered on top of the base coordinator role.

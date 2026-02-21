@@ -100,7 +100,7 @@ List all contacts for a company.
 
 Add new HR contact to company.
 
-- **Auth Required**: Yes (tpo_admin, coordinator, student_representative)
+- **Auth Required**: Yes (tpo_admin, coordinator)
 - **Body**: `{ name, designation?, emails?, phones?, preferredContactMethod?, notes? }`
 
 #### `PUT /api/v1/contacts/:contactId`
@@ -126,7 +126,7 @@ Quick log for call/email/note action.
 Assign company/contact to user.
 
 - **Auth Required**: Yes (tpo_admin, coordinator)
-- **Body**: `{ itemType: "company"|"contact", itemId, assigneeUserId, assignmentRole: "primary"|"secondary", notes? }`
+- **Body**: `{ itemType: "company"|"contact", itemId, assigneeUserId, notes? }`
 
 #### `POST /api/v1/assignments/bulk`
 
@@ -195,7 +195,7 @@ List email templates.
 
 Create draft template.
 
-- **Auth Required**: Yes (tpo_admin, mailing_team)
+- **Auth Required**: Yes (tpo_admin or coordinator with mailing_team type)
 - **Body**: `{ name, slug, subject, bodyHtml, bodyText?, variables?, sendPolicy? }`
 
 #### `PUT /api/v1/mail/templates/:templateId`
@@ -226,7 +226,7 @@ Create mail request.
 
 Approve mail request for send.
 
-- **Auth Required**: Yes (tpo_admin, mailing_team)
+- **Auth Required**: Yes (tpo_admin or coordinator with mailing_team type)
 - **Body**: `{ sendAt? }` (optional scheduled time)
 
 #### `POST /api/v1/mail/requests/:requestId/reject`
@@ -328,10 +328,13 @@ Follow/unfollow company.
 
 - **tpo_admin**: Full system access
 - **coordinator**: Company/contact management, assignments, drive management
-- **student_representative**: Limited company/contact updates
-- **mailing_team**: Template and mail request management
+  - **general**: Standard coordinator with full company/contact management
+  - **student_representative**: Coordinator with limited assignment support and view/write permissions
+  - **mailing_team**: Coordinator specialized in template and mail request management
 - **student**: Blog submission, company following, read-only access
 - **tech_support**: System configuration (not business operations)
+
+**Note:** `student_representative` and `mailing_team` are special types of coordinators, not separate roles. All coordinators have a base set of permissions, with additional specialized access based on their `coordinator_type`.
 
 ## Audit Logging
 

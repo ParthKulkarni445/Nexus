@@ -4,10 +4,15 @@ import { pgEnum } from "drizzle-orm/pg-core";
 export const userRoleEnum = pgEnum("user_role", [
   "tpo_admin",
   "coordinator",
-  "student_representative",
-  "mailing_team",
   "student",
   "tech_support",
+]);
+
+// Coordinator types (specializations for coordinator role)
+export const coordinatorTypeEnum = pgEnum("coordinator_type", [
+  "general",
+  "student_representative",
+  "mailing_team",
 ]);
 
 // Season related
@@ -22,11 +27,6 @@ export const seasonContactStatusEnum = pgEnum("season_contact_status", [
 ]);
 
 // Assignment related
-export const assignmentRoleEnum = pgEnum("assignment_role", [
-  "primary",
-  "secondary",
-]);
-
 export const assignmentItemTypeEnum = pgEnum("assignment_item_type", [
   "company",
   "contact",

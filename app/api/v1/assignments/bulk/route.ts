@@ -19,7 +19,6 @@ const bulkAssignmentSchema = z.object({
       itemType: z.enum(["company", "contact"]),
       itemId: z.string().uuid(),
       assigneeUserId: z.string().uuid(),
-      assignmentRole: z.enum(["primary", "secondary"]),
       notes: z.string().optional(),
     })
   ),

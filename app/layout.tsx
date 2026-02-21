@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Nexus",
-  description: "Blank Next.js app",
+  title: {
+    default: "Nexus — TPO Portal",
+    template: "%s | Nexus",
+  },
+  description: "Training & Placement Office Management Portal",
 };
 
 export default function RootLayout({

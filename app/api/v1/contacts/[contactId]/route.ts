@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { getCurrentUser, hasRole } from "@/lib/api/auth";
+import { getCurrentUser, hasRoleOrCoordinatorType } from "@/lib/api/auth";
 import {
   success,
   unauthorized,
@@ -45,7 +45,7 @@ export async function PUT(
     return unauthorized();
   }
 
-  if (!hasRole(user, ["tpo_admin", "coordinator", "student_representative"])) {
+  if (!hasRoleOrCoordinatorType(user, ["tpo_admin", "coordinator"])) {
     return forbidden("Insufficient permissions to update contacts");
   }
 
@@ -104,7 +104,7 @@ export async function DELETE(
     return unauthorized();
   }
 
-  if (!hasRole(user, ["tpo_admin", "coordinator"])) {
+  if (!hasRoleOrCoordinatorType(user, ["tpo_admin", "coordinator"])) {
     return forbidden("Insufficient permissions to delete contacts");
   }
 

@@ -12,7 +12,6 @@ import {
 import {
   seasonContactStatusEnum,
   assignmentItemTypeEnum,
-  assignmentRoleEnum,
 } from "../enums";
 import { users } from "./users";
 
@@ -62,7 +61,6 @@ export const companyAssignments = pgTable("company_assignments", {
     .notNull()
     .references(() => users.id),
   assignedBy: uuid("assigned_by").references(() => users.id),
-  assignmentRole: assignmentRoleEnum("assignment_role").notNull(),
   notes: text("notes"),
   isActive: boolean("is_active").default(true).notNull(),
   assignedAt: timestamp("assigned_at", { withTimezone: true })
