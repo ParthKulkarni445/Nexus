@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import {
   Building2,
@@ -34,6 +34,7 @@ const navItems = [
 
 export default function TopNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -41,6 +42,12 @@ export default function TopNav() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   const isActive = (href: string) => pathname.startsWith(href);
+
+  async function handleSignOut() {
+    await fetch("/api/v1/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
 
   // Close user menu on outside click
   useEffect(() => {
@@ -203,7 +210,10 @@ export default function TopNav() {
                       ))}
                     </div>
                     <div className="border-t border-[#EDE8E8] py-1">
-                      <button className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                      <button
+                        onClick={handleSignOut}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      >
                         <LogOut size={14} />
                         Sign out
                       </button>
@@ -343,7 +353,10 @@ export default function TopNav() {
               </p>
             </div>
           </div>
-          <button className="mt-2 w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all text-[#D4B8B8] hover:text-white hover:bg-white/8">
+          <button
+            onClick={handleSignOut}
+            className="mt-2 w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all text-[#D4B8B8] hover:text-white hover:bg-white/8"
+          >
             <LogOut size={14} />
             Sign out
           </button>

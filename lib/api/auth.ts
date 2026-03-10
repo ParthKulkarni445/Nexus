@@ -1,7 +1,7 @@
-import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { getSessionUserId } from "@/lib/api/session";
 
 export type UserRole = "tpo_admin" | "coordinator" | "student" | "tech_support";
 
@@ -24,27 +24,14 @@ export interface AuthUser {
  * This is a placeholder - implement with NextAuth or your auth solution
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  // TODO: Implement actual authentication
-  // This would typically involve:
-  // 1. Getting the session from NextAuth
-  // 2. Validating JWT token
-  // 3. Fetching user from database
-
-  // Placeholder for development
-  const headersList = await headers();
-  const userId = headersList.get("x-user-id");
-
-  if (!userId) {
-    return null;
-  }
+  const userId = await getSessionUserId();
+  if (!userId) return null;
 
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
 
-  if (!user || !user.isActive) {
-    return null;
-  }
+  if (!user || !user.isActive) return null;
 
   return {
     id: user.id,
