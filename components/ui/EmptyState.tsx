@@ -1,4 +1,4 @@
-import { LucideIcon } from "lucide-react";
+﻿import { LucideIcon } from "lucide-react";
 import { ReactNode } from "react";
 
 interface EmptyStateProps {

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -9,7 +9,6 @@ import {
   Linkedin,
   Filter,
   Building2,
-  Users,
   CheckCircle2,
   Clock,
   MessageSquare,
@@ -22,10 +21,11 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import FilterSelect from "@/components/ui/FilterSelect";
 import EmptyState from "@/components/ui/EmptyState";
-import StatCard from "@/components/ui/StatCard";
+import SearchBar from "@/components/ui/SearchBar";
 
 // ─── Types & Mock Data ────────────────────────────────────────────────────────
 const MY_ID = "coordinator_ananya";
+const CURRENT_USER_NAME = "Ananya Mehta";
 
 const MOCK_OUTREACH = [
   {
@@ -96,8 +96,8 @@ const MOCK_OUTREACH = [
     status: "positive",
     season: "Placement 2025-26",
     seasonType: "placement",
-    assignedTo: "Rohan Sharma",
-    assignedId: "coordinator_rohan",
+    assignedTo: "Ananya Mehta",
+    assignedId: MY_ID,
     contact: {
       name: "Ajay Mishra",
       designation: "HR Manager",
@@ -116,8 +116,8 @@ const MOCK_OUTREACH = [
     status: "contacted",
     season: "Placement 2025-26",
     seasonType: "placement",
-    assignedTo: "Priya Singh",
-    assignedId: "coordinator_priya",
+    assignedTo: "Ananya Mehta",
+    assignedId: MY_ID,
     contact: {
       name: "Kavita Rao",
       designation: "Campus Relations",
@@ -136,8 +136,8 @@ const MOCK_OUTREACH = [
     status: "positive",
     season: "Placement 2025-26",
     seasonType: "placement",
-    assignedTo: "Vibha Kapoor",
-    assignedId: "coordinator_vibha",
+    assignedTo: "Ananya Mehta",
+    assignedId: MY_ID,
     contact: {
       name: "Ritu Bose",
       designation: "Office Recruiter",
@@ -156,8 +156,8 @@ const MOCK_OUTREACH = [
     status: "not_contacted",
     season: "Placement 2025-26",
     seasonType: "placement",
-    assignedTo: "Vibha Kapoor",
-    assignedId: "coordinator_vibha",
+    assignedTo: "Ananya Mehta",
+    assignedId: MY_ID,
     contact: {
       name: "Sunita Sharma",
       designation: "Recruiter",
@@ -176,8 +176,8 @@ const MOCK_OUTREACH = [
     status: "contacted",
     season: "Placement 2025-26",
     seasonType: "placement",
-    assignedTo: "Priya Singh",
-    assignedId: "coordinator_priya",
+    assignedTo: "Ananya Mehta",
+    assignedId: MY_ID,
     contact: {
       name: "Ashwin Patel",
       designation: "HR Lead",
@@ -196,12 +196,6 @@ const STATUS_OPTIONS = [
   { value: "positive", label: "Positive" },
   { value: "accepted", label: "Accepted" },
   { value: "rejected", label: "Rejected" },
-];
-const COORDINATOR_OPTIONS = [
-  { value: "Ananya Mehta", label: "Ananya Mehta" },
-  { value: "Rohan Sharma", label: "Rohan Sharma" },
-  { value: "Priya Singh", label: "Priya Singh" },
-  { value: "Vibha Kapoor", label: "Vibha Kapoor" },
 ];
 const SEASON_OPTIONS = [
   { value: "Placement 2025-26", label: "Placement 2025-26" },
@@ -250,7 +244,7 @@ function MailRequestModal({
                 onClick={() => setType(t)}
                 className={`flex-1 py-2.5 px-4 rounded-lg border text-sm font-medium transition-all ${
                   type === t
-                    ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                    ? "border-[#C41E3A] bg-[#FFF1F3] text-[#A8192F]"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
@@ -340,7 +334,7 @@ function QuickLogModal({
               onClick={() => setAction(a)}
               className={`flex-1 py-2 rounded-lg border text-xs font-medium capitalize transition-all ${
                 action === a
-                  ? "border-indigo-400 bg-indigo-50 text-indigo-700"
+                  ? "border-[#C41E3A] bg-[#FFF1F3] text-[#A8192F]"
                   : "border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}
             >
@@ -382,44 +376,9 @@ function QuickLogModal({
   );
 }
 
-function OutreachCard({
-  entry,
-  isMyCompany,
-}: {
-  entry: OutreachEntry;
-  isMyCompany: boolean;
-}) {
+function OutreachCard({ entry }: { entry: OutreachEntry }) {
   const [showMailModal, setShowMailModal] = useState(false);
   const [showLogModal, setShowLogModal] = useState(false);
-
-  if (!isMyCompany) {
-    return (
-      <div className="card p-4 flex items-center gap-4">
-        <div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-600 font-semibold text-sm shrink-0">
-          {entry.companyName.charAt(0)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <Link
-            href={`/companies/${entry.companyId}`}
-            className="font-medium text-slate-900 hover:text-indigo-600 transition-colors text-sm truncate block"
-          >
-            {entry.companyName}
-          </Link>
-          <p className="text-xs text-slate-400">{entry.industry}</p>
-        </div>
-        <StatusBadge status={entry.status} size="sm" />
-        <div className="flex items-center gap-1.5 text-xs text-slate-500">
-          <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-semibold">
-            {entry.assignedTo
-              .split(" ")
-              .map((n) => n[0])
-              .join("")}
-          </div>
-          <span className="hidden sm:inline">{entry.assignedTo}</span>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
@@ -427,13 +386,13 @@ function OutreachCard({
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-[#FFF1F3] border border-[#FFE4E9] flex items-center justify-center text-[#A8192F] font-semibold text-sm shrink-0">
               {entry.companyName.charAt(0)}
             </div>
             <div className="min-w-0">
               <Link
                 href={`/companies/${entry.companyId}`}
-                className="font-semibold text-slate-900 hover:text-indigo-600 transition-colors text-sm truncate block"
+                className="font-semibold text-slate-900 hover:text-[#C41E3A] transition-colors text-sm truncate block"
               >
                 {entry.companyName}
               </Link>
@@ -441,7 +400,7 @@ function OutreachCard({
                 <Badge size="sm" variant="gray">
                   {entry.industry}
                 </Badge>
-                <Badge size="sm" variant="purple">
+                <Badge size="sm" variant="danger">
                   {entry.season}
                 </Badge>
               </div>
@@ -451,7 +410,7 @@ function OutreachCard({
         </div>
 
         {/* Contact info */}
-        <div className="bg-slate-50 rounded-lg p-3 space-y-2 border border-slate-100">
+        <div className="bg-slate-100 rounded-lg p-3 space-y-2 border border-slate-300">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-800">
@@ -465,21 +424,21 @@ function OutreachCard({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <a
               href={`tel:${entry.contact.phone}`}
-              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-indigo-600 group"
+              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-[#C41E3A] group"
             >
               <Phone
                 size={12}
-                className="text-slate-400 group-hover:text-indigo-500 shrink-0"
+                className="text-slate-400 group-hover:text-[#C41E3A] shrink-0"
               />
               <span className="truncate">{entry.contact.phone}</span>
             </a>
             <a
               href={`mailto:${entry.contact.email}`}
-              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-indigo-600 group"
+              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-[#C41E3A] group"
             >
               <Mail
                 size={12}
-                className="text-slate-400 group-hover:text-indigo-500 shrink-0"
+                className="text-slate-400 group-hover:text-[#C41E3A] shrink-0"
               />
               <span className="truncate">{entry.contact.email}</span>
             </a>
@@ -515,7 +474,7 @@ function OutreachCard({
               </span>
             )}
             {entry.nextFollowUp && (
-              <span className="flex items-center gap-1 text-indigo-600">
+              <span className="flex items-center gap-1 text-[#C41E3A]">
                 <CheckCircle2 size={11} />
                 Follow-up:{" "}
                 {new Date(entry.nextFollowUp).toLocaleDateString("en-IN", {
@@ -567,225 +526,213 @@ function OutreachCard({
 }
 
 export default function OutreachPage() {
-  const [statusFilter, setStatusFilter] = useState("");
-  const [coordinatorFilter, setCoordinatorFilter] = useState("");
-  const [seasonFilter, setSeasonFilter] = useState("");
-  const [viewMode, setViewMode] = useState<"all" | "mine" | "others">("all");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [seasonFilter, setSeasonFilter] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
   const myEntries = useMemo(
     () => MOCK_OUTREACH.filter((e) => e.assignedId === MY_ID),
     [],
   );
-  const otherEntries = useMemo(
-    () => MOCK_OUTREACH.filter((e) => e.assignedId !== MY_ID),
-    [],
-  );
 
   const filtered = useMemo(() => {
-    let data =
-      viewMode === "mine"
-        ? myEntries
-        : viewMode === "others"
-          ? otherEntries
-          : MOCK_OUTREACH;
-    if (statusFilter) data = data.filter((e) => e.status === statusFilter);
-    if (coordinatorFilter)
-      data = data.filter((e) => e.assignedTo === coordinatorFilter);
-    if (seasonFilter) data = data.filter((e) => e.season === seasonFilter);
+    let data = myEntries;
+    if (search) {
+      const q = search.toLowerCase();
+      data = data.filter(
+        (e) =>
+          e.companyName.toLowerCase().includes(q) ||
+          e.industry.toLowerCase().includes(q) ||
+          e.contact.name.toLowerCase().includes(q),
+      );
+    }
+    if (statusFilter.length > 0)
+      data = data.filter((e) => statusFilter.includes(e.status));
+    if (seasonFilter.length > 0)
+      data = data.filter((e) => seasonFilter.includes(e.season));
     return data;
-  }, [
-    viewMode,
-    statusFilter,
-    coordinatorFilter,
-    seasonFilter,
-    myEntries,
-    otherEntries,
-  ]);
+  }, [search, statusFilter, seasonFilter, myEntries]);
+
+  const followUpsDue = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return myEntries.filter((e) => {
+      if (!e.nextFollowUp) return false;
+      const followUpDate = new Date(e.nextFollowUp);
+      followUpDate.setHours(0, 0, 0, 0);
+      return followUpDate <= today;
+    }).length;
+  }, [myEntries]);
 
   const stats = useMemo(
     () => ({
-      total: MOCK_OUTREACH.length,
-      mine: myEntries.length,
-      called: myEntries.filter((e) => e.lastContacted).length,
+      assigned: myEntries.length,
+      contacted: myEntries.filter((e) => e.lastContacted).length,
       pending: myEntries.filter((e) => e.status === "not_contacted").length,
+      followUpsDue,
     }),
-    [myEntries],
+    [myEntries, followUpsDue],
   );
 
-  return (
-    <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total This Season"
-          value={stats.total}
-          icon={Building2}
-          iconBg="bg-indigo-50"
-          iconColor="text-indigo-600"
-          subtitle="Companies in cycle"
-        />
-        <StatCard
-          title="My Companies"
-          value={stats.mine}
-          icon={Users}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
-          subtitle="Assigned to me"
-        />
-        <StatCard
-          title="Contacted"
-          value={stats.called}
-          icon={PhoneCall}
-          iconBg="bg-emerald-50"
-          iconColor="text-emerald-600"
-          subtitle="From my list"
-        />
-        <StatCard
-          title="Pending Outreach"
-          value={stats.pending}
-          icon={Clock}
-          iconBg="bg-amber-50"
-          iconColor="text-amber-600"
-          subtitle="Not yet contacted"
-        />
-      </div>
+  const activeFilterCount = statusFilter.length + seasonFilter.length;
 
-      {/* Filter bar */}
-      <div className="card overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            {/* View toggle */}
-            <div className="flex rounded-lg border border-slate-200 overflow-hidden shrink-0">
-              {(["all", "mine", "others"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setViewMode(v)}
-                  className={`px-4 py-2 text-sm font-medium transition-all capitalize ${
-                    viewMode === v
-                      ? "bg-indigo-500 text-white"
-                      : "bg-white text-slate-600 hover:bg-slate-50"
-                  }`}
+  return (
+    <div className="-mt-6 xl:mt-0 space-y-5 pl-4 pr-4 pb-6 animate-fade-in xl:h-full xl:overflow-y-auto hide-scrollbar">
+      <div className="relative z-0  pt-10 ">
+        <div
+          className="card relative overflow-hidden px-5 py-4 sm:px-6 sm:py-5"
+          style={{
+            // background: "#C41E3A",
+            background: "#FFFFFF",
+            borderColor: "#FFE4E9",
+          }}
+        >
+          {/* <div className="pointer-events-none absolute -top-10 -right-8 w-40 h-40 rounded-full bg-[#C41E3A]/12 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-10 left-8 w-36 h-36 rounded-full bg-[#FBBDC8]/30 blur-2xl" /> */}
+
+          <div className="relative z-10">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#C41E3A]">
+              Personal Outreach Desk
+            </p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              Hello {CURRENT_USER_NAME}, check the tasks lined up for you.
+            </h1>
+            <p className="mt-1.5 text-sm font-bold text-[#C41E3A]">
+              This page shows your assigned companies for calls, mails, and follow-ups.
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-5">
+              {[
+                {
+                  title: "Queue Size",
+                  value: stats.assigned,
+                  icon: Building2,
+                },
+                {
+                  title: "Contacted",
+                  value: stats.contacted,
+                  icon: PhoneCall,
+                },
+                {
+                  title: "Pending",
+                  value: stats.pending,
+                  icon: Clock,
+                },
+                {
+                  title: "Follow-ups Due",
+                  value: stats.followUpsDue,
+                  icon: CheckCircle2,
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-xl border border-[#A8192F] bg-[#C41E3A] px-3 py-2.5 shadow-sm"
                 >
-                  {v === "mine"
-                    ? "My Companies"
-                    : v === "others"
-                      ? "Others"
-                      : "All"}
-                </button>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold text-white uppercase tracking-wide">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-black leading-none">
+                        {item.value}
+                      </p>
+                    </div>
+                    <div className="w-8 h-8 rounded-lg bg-white border border-[#FFE4E9] flex items-center justify-center shrink-0">
+                      <item.icon size={20} color="#C41E3A" />
+                    </div>
+                  </div>
+                </div>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
 
-            <div className="flex-1" />
-
+      <div className="card overflow-hidden flex flex-col">
+        <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
+          <div className="flex items-center gap-2">
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search by company, industry, or contact..."
+              className="flex-1 min-w-0"
+            />
             <button
-              className={`btn btn-secondary btn-sm ${showFilters ? "bg-indigo-50 border-indigo-200 text-indigo-700" : ""}`}
+              className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
+                showFilters
+                  ? "bg-[#FFF1F3] border-[#FBBDC8] text-[#A8192F]"
+                  : ""
+              }`}
               onClick={() => setShowFilters((v) => !v)}
             >
               <Filter size={14} />
               Filters
+              {activeFilterCount > 0 && (
+                <span className="w-4 h-4 rounded-full bg-[#C41E3A] text-white text-[10px] flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
             </button>
           </div>
 
           {showFilters && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2 pt-1 pb-0.5 w-full">
               <FilterSelect
+                multiple
                 value={statusFilter}
                 onChange={setStatusFilter}
                 options={STATUS_OPTIONS}
-                placeholder="All Statuses"
-                className="w-40"
+                placeholder="Status"
+                className="flex-1 min-w-0"
               />
               <FilterSelect
-                value={coordinatorFilter}
-                onChange={setCoordinatorFilter}
-                options={COORDINATOR_OPTIONS}
-                placeholder="All Coordinators"
-                className="w-44"
-              />
-              <FilterSelect
+                multiple
                 value={seasonFilter}
                 onChange={setSeasonFilter}
                 options={SEASON_OPTIONS}
-                placeholder="All Seasons"
-                className="w-48"
+                placeholder="Season"
+                className="flex-1 min-w-0"
               />
-              {(statusFilter || coordinatorFilter || seasonFilter) && (
+              {activeFilterCount > 0 && (
                 <button
-                  className="btn btn-ghost btn-sm text-red-500"
+                  className="btn btn-ghost btn-sm text-red-500 hover:text-red-700 shrink-0"
                   onClick={() => {
-                    setStatusFilter("");
-                    setCoordinatorFilter("");
-                    setSeasonFilter("");
+                    setStatusFilter([]);
+                    setSeasonFilter([]);
                   }}
                 >
-                  Clear
+                  Clear all
                 </button>
               )}
             </div>
           )}
         </div>
+      </div>
 
-        <div className="p-4 space-y-6">
-          {/* My assigned companies section */}
-          {(viewMode === "all" || viewMode === "mine") && (
-            <div className="space-y-3">
-              {viewMode === "all" && (
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    My Assigned Companies
-                  </h3>
-                  <Badge variant="purple" size="sm">
-                    {myEntries.length}
-                  </Badge>
-                </div>
-              )}
-              {filtered.filter((e) => e.assignedId === MY_ID).length === 0 ? (
-                <EmptyState
-                  icon={Building2}
-                  title="No companies assigned"
-                  description="Contact your representative to get assigned companies."
-                />
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                  {filtered
-                    .filter((e) => e.assignedId === MY_ID)
-                    .map((entry) => (
-                      <OutreachCard
-                        key={entry.id}
-                        entry={entry}
-                        isMyCompany={true}
-                      />
-                    ))}
-                </div>
-              )}
-            </div>
-          )}
+      <div className="card overflow-hidden">
+        <div className="p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-800">Task List</h3>
+          </div>
 
-          {/* Other companies section */}
-          {(viewMode === "all" || viewMode === "others") && (
-            <div className="space-y-3">
-              {viewMode === "all" && (
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    Other Companies
-                  </h3>
-                  <Badge variant="gray" size="sm">
-                    {otherEntries.length}
-                  </Badge>
-                </div>
-              )}
-              <div className="space-y-2">
-                {filtered
-                  .filter((e) => e.assignedId !== MY_ID)
-                  .map((entry) => (
-                    <OutreachCard
-                      key={entry.id}
-                      entry={entry}
-                      isMyCompany={false}
-                    />
-                  ))}
-              </div>
+          {myEntries.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title="No companies assigned yet"
+              description="Once assignments are made to you, they will appear here for outreach actions."
+            />
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              icon={Filter}
+              title="No companies match these filters"
+              description="Try clearing filters to see your complete outreach queue."
+            />
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {filtered.map((entry) => (
+                <OutreachCard key={entry.id} entry={entry} />
+              ))}
             </div>
           )}
         </div>

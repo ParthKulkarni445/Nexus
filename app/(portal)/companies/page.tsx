@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -6,6 +6,7 @@ import {
   Plus,
   Download,
   Building2,
+  Info,
   Search,
   Filter,
   ChevronRight,
@@ -15,18 +16,15 @@ import {
   Pencil,
   Trash2,
   Eye,
-
-  Users,
-  CheckCircle2,
-  Phone,
+  PhoneCall,
 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
-import StatCard from "@/components/ui/StatCard";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterSelect from "@/components/ui/FilterSelect";
 import EmptyState from "@/components/ui/EmptyState";
+import ContactModal from "@/components/companies/ContactModal";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 type CycleStatus =
@@ -55,6 +53,8 @@ interface Company {
   status: CycleStatus;
   assignedTo: string;
   lastUpdated: string;
+  lastUpdatedBy: string;
+  updatedField: string;
   contacts: number;
   isWishlisted?: boolean;
 }
@@ -71,6 +71,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "accepted",
     assignedTo: "Ananya Mehta",
     lastUpdated: "2026-02-18",
+    lastUpdatedBy: "Ananya Mehta",
+    updatedField: "status",
     contacts: 3,
   },
   {
@@ -83,6 +85,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "positive",
     assignedTo: "Rohan Sharma",
     lastUpdated: "2026-02-17",
+    lastUpdatedBy: "Rohan Sharma",
+    updatedField: "priority",
     contacts: 2,
   },
   {
@@ -95,6 +99,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "contacted",
     assignedTo: "Priya Singh",
     lastUpdated: "2026-02-16",
+    lastUpdatedBy: "Priya Singh",
+    updatedField: "notes",
     contacts: 2,
   },
   {
@@ -107,6 +113,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "not_contacted",
     assignedTo: "Unassigned",
     lastUpdated: "2026-02-15",
+    lastUpdatedBy: "Vibha Kapoor",
+    updatedField: "website",
     contacts: 1,
   },
   {
@@ -119,6 +127,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "contacted",
     assignedTo: "Ananya Mehta",
     lastUpdated: "2026-02-14",
+    lastUpdatedBy: "Ananya Mehta",
+    updatedField: "status",
     contacts: 4,
   },
   {
@@ -131,6 +141,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "positive",
     assignedTo: "Vibha Kapoor",
     lastUpdated: "2026-02-13",
+    lastUpdatedBy: "Vibha Kapoor",
+    updatedField: "status",
     contacts: 2,
   },
   {
@@ -143,6 +155,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "not_contacted",
     assignedTo: "Unassigned",
     lastUpdated: "2026-02-12",
+    lastUpdatedBy: "Rohan Sharma",
+    updatedField: "industry",
     contacts: 1,
   },
   {
@@ -155,6 +169,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "rejected",
     assignedTo: "Rohan Sharma",
     lastUpdated: "2026-02-11",
+    lastUpdatedBy: "Rohan Sharma",
+    updatedField: "status",
     contacts: 2,
   },
   {
@@ -167,6 +183,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "contacted",
     assignedTo: "Priya Singh",
     lastUpdated: "2026-02-10",
+    lastUpdatedBy: "Priya Singh",
+    updatedField: "3 fields",
     contacts: 3,
   },
   {
@@ -179,6 +197,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "accepted",
     assignedTo: "Ananya Mehta",
     lastUpdated: "2026-02-09",
+    lastUpdatedBy: "Ananya Mehta",
+    updatedField: "status",
     contacts: 5,
   },
   {
@@ -191,6 +211,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "positive",
     assignedTo: "Vibha Kapoor",
     lastUpdated: "2026-02-08",
+    lastUpdatedBy: "Vibha Kapoor",
+    updatedField: "priority",
     contacts: 3,
   },
   {
@@ -203,6 +225,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "not_contacted",
     assignedTo: "Unassigned",
     lastUpdated: "2026-02-07",
+    lastUpdatedBy: "Priya Singh",
+    updatedField: "name",
     contacts: 1,
   },
   {
@@ -215,6 +239,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "contacted",
     assignedTo: "Rohan Sharma",
     lastUpdated: "2026-02-06",
+    lastUpdatedBy: "Rohan Sharma",
+    updatedField: "status",
     contacts: 2,
   },
   {
@@ -227,6 +253,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "positive",
     assignedTo: "Vibha Kapoor",
     lastUpdated: "2026-02-05",
+    lastUpdatedBy: "Vibha Kapoor",
+    updatedField: "2 fields",
     contacts: 3,
   },
   {
@@ -239,6 +267,8 @@ const MOCK_COMPANIES: Company[] = [
     status: "not_contacted",
     assignedTo: "Unassigned",
     lastUpdated: "2026-02-04",
+    lastUpdatedBy: "Ananya Mehta",
+    updatedField: "notes",
     contacts: 1,
   },
 ];
@@ -415,17 +445,24 @@ function DeleteModal({
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function CompaniesPage() {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [industryFilter, setIndustryFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [assigneeFilter, setAssigneeFilter] = useState("");
-  const [sortField, setSortField] = useState<keyof Company>("lastUpdated");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [industryFilter, setIndustryFilter] = useState<string[]>([]);
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
+  const [sortField, setSortField] = useState<keyof Company | null>(null);
+  const [sortDir, setSortDir] = useState<"none" | "asc" | "desc">("none");
   const [page, setPage] = useState(1);
   const [addEditOpen, setAddEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [contactTargetCompany, setContactTargetCompany] =
+    useState<Company | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [updateDetails, setUpdateDetails] = useState<{
+    company: Company;
+    position: { left: number; top: number };
+  } | null>(null);
 
   const PER_PAGE = 10;
 
@@ -439,20 +476,24 @@ export default function CompaniesPage() {
           c.industry.toLowerCase().includes(q),
       );
     }
-    if (statusFilter) data = data.filter((c) => c.status === statusFilter);
-    if (industryFilter)
-      data = data.filter((c) => c.industry === industryFilter);
-    if (priorityFilter)
-      data = data.filter((c) => c.priority === priorityFilter);
-    if (assigneeFilter)
-      data = data.filter((c) => c.assignedTo === assigneeFilter);
+    if (statusFilter.length > 0)
+      data = data.filter((c) => statusFilter.includes(c.status));
+    if (industryFilter.length > 0)
+      data = data.filter((c) => industryFilter.includes(c.industry));
+    if (priorityFilter.length > 0)
+      data = data.filter((c) => priorityFilter.includes(c.priority));
+    if (assigneeFilter.length > 0)
+      data = data.filter((c) => assigneeFilter.includes(c.assignedTo));
 
-    data = [...data].sort((a, b) => {
-      const aVal = String(a[sortField]);
-      const bVal = String(b[sortField]);
-      const cmp = aVal.localeCompare(bVal);
-      return sortDir === "asc" ? cmp : -cmp;
-    });
+    if (sortField && sortDir !== "none") {
+      data = [...data].sort((a, b) => {
+        const aVal = String(a[sortField]);
+        const bVal = String(b[sortField]);
+        const cmp = aVal.localeCompare(bVal);
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+    }
+
     return data;
   }, [
     search,
@@ -481,373 +522,707 @@ export default function CompaniesPage() {
   );
 
   const handleSort = (field: keyof Company) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
+    if (sortField !== field) {
       setSortField(field);
       setSortDir("asc");
+    } else if (sortDir === "asc") {
+      setSortDir("desc");
+    } else {
+      setSortField(null);
+      setSortDir("none");
     }
     setPage(1);
   };
 
+  const handleOpenUpdateDetails = (
+    company: Company,
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const popupWidth = 320;
+    const minLeft = popupWidth / 2 + 12;
+    const maxLeft = window.innerWidth - popupWidth / 2 - 12;
+    const centerLeft = rect.left + rect.width / 2;
+
+    setUpdateDetails({
+      company,
+      position: {
+        left: Math.min(maxLeft, Math.max(minLeft, centerLeft)),
+        top: rect.top - 10,
+      },
+    });
+  };
+
   const SortIcon = ({ field }: { field: keyof Company }) => {
-    if (sortField !== field)
-      return <ChevronUp size={12} className="text-slate-300" />;
+    if (sortField !== field || sortDir === "none") {
+      return (
+        <span className="flex flex-col -space-y-1">
+          <ChevronUp size={9} className="text-slate-400" />
+          <ChevronDown size={9} className="text-slate-400" />
+        </span>
+      );
+    }
     return sortDir === "asc" ? (
-      <ChevronUp size={12} className="text-indigo-500" />
+      <ChevronUp size={12} className="text-[#C41E3A]" />
     ) : (
-      <ChevronDown size={12} className="text-indigo-500" />
+      <ChevronDown size={12} className="text-[#C41E3A]" />
     );
   };
 
-  return (
-    <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Companies"
-          value={stats.total}
-          icon={Building2}
-          iconBg="bg-indigo-50"
-          iconColor="text-indigo-600"
-          subtitle="In master database"
-        />
-        <StatCard
-          title="Accepted / JD"
-          value={stats.accepted}
-          icon={CheckCircle2}
-          iconBg="bg-emerald-50"
-          iconColor="text-emerald-600"
-          change={`+2 this week`}
-          changeType="up"
-        />
-        <StatCard
-          title="Positive Response"
-          value={stats.positive}
-          icon={Users}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
-          subtitle="Including accepted"
-        />
-        <StatCard
-          title="Not Contacted"
-          value={stats.notContacted}
-          icon={Phone}
-          iconBg="bg-amber-50"
-          iconColor="text-amber-600"
-          subtitle="Needs outreach"
-        />
-      </div>
+  const activeFilterCount =
+    statusFilter.length +
+    industryFilter.length +
+    priorityFilter.length +
+    assigneeFilter.length;
 
-      {/* Table card */}
-      <div className="card overflow-hidden">
-        {/* Toolbar */}
-        <div className="px-4 py-3 border-b border-slate-100 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <SearchBar
-              value={search}
-              onChange={(v) => {
-                setSearch(v);
-                setPage(1);
-              }}
-              placeholder="Search companies..."
-              className="flex-1 min-w-0"
-            />
-            <div className="flex items-center gap-2 shrink-0">
+  return (
+    <div className="animate-fade-in xl:h-full">
+      <div className="flex flex-col xl:flex-row gap-5 xl:items-start xl:h-full">
+        {/* ── Left: Statistics card ─────────────────────────── */}
+        {(() => {
+          const statItems = [
+            {
+              label: "Total",
+              value: stats.total,
+              sub: "Companies",
+              accent: "#C41E3A",
+            },
+            {
+              label: "Accepted",
+              value: stats.accepted,
+              sub: "Confirmed JD",
+              accent: "#C41E3A",
+            },
+            {
+              label: "Positive",
+              value: stats.positive,
+              sub: "Responded well",
+              accent: "#C41E3A",
+            },
+            {
+              label: "Pending",
+              value: stats.notContacted,
+              sub: "Not contacted",
+              accent: "#C41E3A",
+            },
+          ];
+          const r = 46,
+            circ = 2 * Math.PI * r;
+          const filled =
+            stats.total > 0 ? (stats.accepted / stats.total) * circ : 0;
+          return (
+            <div className="card w-full xl:w-56 xl:shrink-0 xl:h-full xl:flex xl:flex-col overflow-hidden">
+              {/* Header */}
+              <div
+                className="px-4 py-3 border-b"
+                style={{
+                  borderColor: "var(--card-border)",
+                  background: "var(--primary)",
+                }}
+              >
+                <p
+                  className="text-xs text-center font-semibold uppercase tracking-widest"
+                  style={{ color: "#FFFFFF" }}
+                >
+                  Statistics
+                </p>
+              </div>
+
+              {/* ── Mobile: ring left + compact rows right (hidden on xl) ── */}
+              <div className="xl:hidden flex items-stretch">
+                {/* Left: circular progress ring (matches xl params) */}
+                <div
+                  className="flex flex-col items-center justify-center gap-2 py-4 shrink-0 w-60"
+                  style={{ borderRight: "1px solid var(--card-border)" }}
+                >
+                  <div className="relative flex items-center justify-center">
+                    <svg width="116" height="116" viewBox="0 0 116 116">
+                      <circle cx="58" cy="58" r={r + 6} fill="#FFF1F3" />
+                      <circle
+                        cx="58"
+                        cy="58"
+                        r={r}
+                        fill="white"
+                        stroke="#FFE4E9"
+                        strokeWidth="8"
+                      />
+                      <circle
+                        cx="58"
+                        cy="58"
+                        r={r}
+                        fill="none"
+                        stroke="#C41E3A"
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeDasharray={`${filled} ${circ - filled}`}
+                        strokeDashoffset={circ * 0.25}
+                        style={{ transition: "stroke-dasharray 0.6s ease" }}
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center">
+                      <span
+                        className="text-2xl font-extrabold leading-none"
+                        style={{ color: "var(--primary)" }}
+                      >
+                        {stats.total > 0
+                          ? Math.round((stats.accepted / stats.total) * 100)
+                          : 0}
+                        %
+                      </span>
+                      <span
+                        className="text-[11px] font-medium mt-0.5"
+                        style={{ color: "var(--muted)" }}
+                      >
+                        accepted
+                      </span>
+                    </div>
+                  </div>
+                  <p
+                    className="text-[11px] font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--muted)" }}
+                  >
+                    Accepted / Total
+                  </p>
+                </div>
+                {/* Right: compact rows */}
+                <div className="flex flex-col flex-1 divide-y divide-(--card-border)">
+                  {statItems.map(({ label, value, sub, accent }) => (
+                    <div
+                      key={label}
+                      className="flex items-center gap-2 px-3 py-2.5 flex-1"
+                    >
+                      <div
+                        className="w-1 self-stretch rounded-full shrink-0 my-0.5"
+                        style={{ background: accent }}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p
+                          className="text-[12px] font-bold uppercase tracking-wider leading-none"
+                          style={{ color: "#C41E3A" }}
+                        >
+                          {label}
+                        </p>
+                        {/* <p
+                          className="text-[10px] mt-0.5"
+                          style={{ color: "var(--muted)" }}
+                        >
+                          {sub}
+                        </p> */}
+                      </div>
+                      <span
+                        className="text-xl font-extrabold shrink-0"
+                        style={{ color: accent }}
+                      >
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── xl: ring + vertical rows (hidden below xl) ── */}
+              <div className="hidden xl:flex flex-col items-center pt-6 pb-5 px-4 gap-1">
+                <div className="relative flex items-center justify-center">
+                  <svg width="116" height="116" viewBox="0 0 116 116">
+                    <circle cx="58" cy="58" r={r + 6} fill="#FFF1F3" />
+                    <circle
+                      cx="58"
+                      cy="58"
+                      r={r}
+                      fill="white"
+                      stroke="#FFE4E9"
+                      strokeWidth="8"
+                    />
+                    <circle
+                      cx="58"
+                      cy="58"
+                      r={r}
+                      fill="none"
+                      stroke="#C41E3A"
+                      strokeWidth="8"
+                      strokeLinecap="round"
+                      strokeDasharray={`${filled} ${circ - filled}`}
+                      strokeDashoffset={circ * 0.25}
+                      style={{ transition: "stroke-dasharray 0.6s ease" }}
+                    />
+                  </svg>
+                  <div className="absolute flex flex-col items-center">
+                    <span
+                      className="text-2xl font-extrabold leading-none"
+                      style={{ color: "var(--primary)" }}
+                    >
+                      {stats.total > 0
+                        ? Math.round((stats.accepted / stats.total) * 100)
+                        : 0}
+                      %
+                    </span>
+                    <span
+                      className="text-[11px] font-medium mt-0.5"
+                      style={{ color: "var(--muted)" }}
+                    >
+                      accepted
+                    </span>
+                  </div>
+                </div>
+                <p
+                  className="text-[11px] font-semibold uppercase tracking-widest"
+                  style={{ color: "var(--muted)" }}
+                >
+                  Accepted / Total
+                </p>
+              </div>
+
+              <div className="hidden xl:flex xl:flex-col  xl:flex-1 gap-5 px-3 pb-3">
+                {statItems.map(({ label, value, sub }) => (
+                  <div
+                    key={label}
+                    className="flex items-center gap-3 px-3 flex-1 rounded-lg"
+                    style={{ background: "#C41E3A" }}
+                  >
+                    <div
+                      className="w-1 self-stretch rounded-full shrink-0 my-3"
+                      style={{ background: "#FFFFFF" }}
+                    />
+                    <div className="flex-1 min-w-0 py-3">
+                      <p
+                        className="text-[18px] font-bold uppercase tracking-wider leading-none"
+                        style={{ color: "#000000" }}
+                      >
+                        {label}
+                      </p>
+                      <p
+                        className="text-[12px] font-medium mt-0.5"
+                        style={{ color: "#FFFFFF" }}
+                      >
+                        {sub}
+                      </p>
+                    </div>
+                    <span
+                      className="text-2xl font-extrabold shrink-0"
+                      style={{ color: "#000000" }}
+                    >
+                      {value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Right: Table card ─────────────────────────────── */}
+        <div className="card overflow-hidden flex-1 min-w-0 xl:h-full flex flex-col">
+          {/* Toolbar */}
+          <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
+            <div className="flex items-center gap-2">
+              <SearchBar
+                value={search}
+                onChange={(v) => {
+                  setSearch(v);
+                  setPage(1);
+                }}
+                placeholder="Search companies..."
+                className="flex-1 min-w-0"
+              />
               <button
-                className={`btn btn-secondary btn-sm gap-1 ${showFilters ? "bg-indigo-50 border-indigo-200 text-indigo-700" : ""}`}
+                className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
+                  showFilters
+                    ? "bg-[#FFF1F3] border-[#FBBDC8] text-[#A8192F]"
+                    : ""
+                }`}
                 onClick={() => setShowFilters((v) => !v)}
               >
                 <Filter size={14} />
                 Filters
-                {(statusFilter ||
-                  industryFilter ||
-                  priorityFilter ||
-                  assigneeFilter) && (
-                  <span className="w-4 h-4 rounded-full bg-indigo-500 text-white text-[10px] flex items-center justify-center">
-                    {
-                      [
-                        statusFilter,
-                        industryFilter,
-                        priorityFilter,
-                        assigneeFilter,
-                      ].filter(Boolean).length
-                    }
+                {activeFilterCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-[#C41E3A] text-white text-[10px] flex items-center justify-center">
+                    {activeFilterCount}
                   </span>
                 )}
               </button>
-              <button className="btn btn-secondary btn-sm gap-1">
+              <div className="w-px h-5 bg-(--card-border) shrink-0" />
+              <button className="btn btn-secondary btn-sm gap-1.5 shrink-0">
                 <Download size={14} />
-                <span className="hidden sm:inline">Export</span>
+                Export
               </button>
               <button
-                className="btn btn-primary btn-sm gap-1"
+                className="btn btn-primary btn-sm gap-1.5 shrink-0"
                 onClick={() => {
                   setSelectedCompany(null);
                   setAddEditOpen(true);
                 }}
               >
                 <Plus size={14} />
-                <span className="hidden sm:inline">Add Company</span>
+                Add
               </button>
             </div>
-          </div>
 
-          {/* Filter row */}
-          {showFilters && (
-            <div className="flex flex-wrap gap-2 pt-1 pb-0.5">
-              <FilterSelect
-                value={statusFilter}
-                onChange={(v) => {
-                  setStatusFilter(v);
-                  setPage(1);
-                }}
-                options={STATUS_OPTIONS}
-                placeholder="All Statuses"
-                className="w-40"
-              />
-              <FilterSelect
-                value={industryFilter}
-                onChange={(v) => {
-                  setIndustryFilter(v);
-                  setPage(1);
-                }}
-                options={INDUSTRY_OPTIONS}
-                placeholder="All Industries"
-                className="w-40"
-              />
-              <FilterSelect
-                value={priorityFilter}
-                onChange={(v) => {
-                  setPriorityFilter(v);
-                  setPage(1);
-                }}
-                options={PRIORITY_OPTIONS}
-                placeholder="All Priorities"
-                className="w-44"
-              />
-              <FilterSelect
-                value={assigneeFilter}
-                onChange={(v) => {
-                  setAssigneeFilter(v);
-                  setPage(1);
-                }}
-                options={COORDINATOR_OPTIONS}
-                placeholder="All Coordinators"
-                className="w-44"
-              />
-              {(statusFilter ||
-                industryFilter ||
-                priorityFilter ||
-                assigneeFilter) && (
-                <button
-                  className="btn btn-ghost btn-sm text-red-500 hover:text-red-700"
-                  onClick={() => {
-                    setStatusFilter("");
-                    setIndustryFilter("");
-                    setPriorityFilter("");
-                    setAssigneeFilter("");
+            {/* Filter row */}
+            {showFilters && (
+              <div className="flex items-center gap-2 pt-1 pb-0.5 w-full">
+                <FilterSelect
+                  multiple
+                  value={statusFilter}
+                  onChange={(v) => {
+                    setStatusFilter(v);
                     setPage(1);
                   }}
-                >
-                  Clear all
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Result count */}
-        <div className="px-4 py-2 text-xs text-slate-500 border-b border-slate-50 bg-slate-50/50">
-          Showing {filtered.length}{" "}
-          {filtered.length === 1 ? "company" : "companies"}
-          {search && (
-            <>
-              {" "}
-              for &ldquo;<strong>{search}</strong>&rdquo;
-            </>
-          )}
-        </div>
-
-        {/* Table */}
-        <div className="overflow-x-auto">
-          {paginated.length === 0 ? (
-            <EmptyState
-              icon={Building2}
-              title="No companies found"
-              description="Try adjusting your search or filters"
-            />
-          ) : (
-            <table className="w-full text-sm min-w-160">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  {(
-                    [
-                      "name",
-                      "industry",
-                      "priority",
-                      "status",
-                      "assignedTo",
-                      "lastUpdated",
-                    ] as (keyof Company)[]
-                  ).map((f) => (
-                    <th
-                      key={f}
-                      className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap group cursor-pointer select-none"
-                      onClick={() => handleSort(f)}
-                    >
-                      <span className="flex items-center gap-1">
-                        {f === "name"
-                          ? "Company"
-                          : f === "assignedTo"
-                            ? "Assigned To"
-                            : f === "lastUpdated"
-                              ? "Last Updated"
-                              : f.charAt(0).toUpperCase() + f.slice(1)}
-                        <SortIcon field={f} />
-                      </span>
-                    </th>
-                  ))}
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {paginated.map((company) => (
-                  <tr
-                    key={company.id}
-                    className="table-row-hover transition-colors"
+                  options={STATUS_OPTIONS}
+                  placeholder="Status"
+                  className="flex-1 min-w-0"
+                />
+                <FilterSelect
+                  multiple
+                  value={industryFilter}
+                  onChange={(v) => {
+                    setIndustryFilter(v);
+                    setPage(1);
+                  }}
+                  options={INDUSTRY_OPTIONS}
+                  placeholder="Industry"
+                  className="flex-1 min-w-0"
+                />
+                <FilterSelect
+                  multiple
+                  value={priorityFilter}
+                  onChange={(v) => {
+                    setPriorityFilter(v);
+                    setPage(1);
+                  }}
+                  options={PRIORITY_OPTIONS}
+                  placeholder="Priority"
+                  className="flex-1 min-w-0"
+                />
+                <FilterSelect
+                  multiple
+                  value={assigneeFilter}
+                  onChange={(v) => {
+                    setAssigneeFilter(v);
+                    setPage(1);
+                  }}
+                  options={COORDINATOR_OPTIONS}
+                  placeholder="Coordinator"
+                  className="flex-1 min-w-0"
+                />
+                {activeFilterCount > 0 && (
+                  <button
+                    className="btn btn-ghost btn-sm text-red-500 hover:text-red-700 shrink-0"
+                    onClick={() => {
+                      setStatusFilter([]);
+                      setIndustryFilter([]);
+                      setPriorityFilter([]);
+                      setAssigneeFilter([]);
+                      setPage(1);
+                    }}
                   >
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/companies/${company.id}`}
-                        className="flex items-center gap-3 group"
+                    Clear all
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 overflow-auto">
+            {paginated.length === 0 ? (
+              <EmptyState
+                icon={Building2}
+                title="No companies found"
+                description="Try adjusting your search or filters"
+              />
+            ) : (
+              <table className="w-full text-sm min-w-160">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-100">
+                    {(
+                      [
+                        "name",
+                        "industry",
+                        "priority",
+                        "status",
+                        "assignedTo",
+                        "lastUpdated",
+                      ] as (keyof Company)[]
+                    ).map((f) => (
+                      <th
+                        key={f}
+                        className={`px-4 py-3 ${f === "lastUpdated" ? "text-center" : "text-left"} text-xs font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap group cursor-pointer select-none`}
+                        onClick={() => handleSort(f)}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-semibold text-xs shrink-0">
-                          {company.name.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
-                            {company.name}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {company.contacts} contacts
-                          </p>
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {company.industry}
-                    </td>
-                    <td className="px-4 py-3">
-                      {PRIORITY_BADGE[company.priority]}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={company.status} />
-                    </td>
-                    <td className="px-4 py-3">
-                      {company.assignedTo === "Unassigned" ? (
-                        <span className="text-slate-400 text-xs italic">
-                          Unassigned
+                        <span
+                          className={`flex items-center ${f === "lastUpdated" ? "justify-center" : "justify-left"} gap-1`}
+                        >
+                          {f === "name"
+                            ? "Company"
+                            : f === "assignedTo"
+                              ? "Assigned To"
+                              : f === "lastUpdated"
+                                ? "Last Updated"
+                                : f.charAt(0).toUpperCase() + f.slice(1)}
+                          <SortIcon field={f} />
                         </span>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-[10px] font-semibold shrink-0">
-                            {company.assignedTo
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {paginated.map((company) => (
+                    <tr
+                      key={company.id}
+                      className="table-row-hover transition-colors"
+                    >
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/companies/${company.id}`}
+                          className="flex items-center gap-3 group"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-[#FFF1F3] border border-[#FFE4E9] flex items-center justify-center text-[#C41E3A] font-semibold text-xs shrink-0">
+                            {company.name.charAt(0)}
                           </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900 group-hover:text-[#C41E3A] transition-colors truncate">
+                              {company.name}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {company.contacts} contacts
+                            </p>
+                          </div>
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {company.industry}
+                      </td>
+                      <td className="px-4 py-3">
+                        {PRIORITY_BADGE[company.priority]}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={company.status} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {company.assignedTo === "Unassigned" ? (
+                          <span className="text-slate-400 text-xs italic">
+                            Unassigned
+                          </span>
+                        ) : (
                           <span className="text-slate-700 text-sm">
                             {company.assignedTo}
                           </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-2">
+                          {new Date(company.lastUpdated).toLocaleDateString(
+                            "en-IN",
+                            { day: "numeric", month: "short", year: "numeric" },
+                          )}
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-200 text-slate-500 hover:text-[#C41E3A] hover:border-[#FBBDC8] hover:bg-[#FFF1F3] transition-colors"
+                            aria-label="Show update details"
+                            title="Show update details"
+                            onClick={(event) =>
+                              handleOpenUpdateDetails(company, event)
+                            }
+                          >
+                            <Info size={12} />
+                          </button>
                         </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
-                      {new Date(company.lastUpdated).toLocaleDateString(
-                        "en-IN",
-                        { day: "numeric", month: "short", year: "numeric" },
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1 relative">
-                        <Link
-                          href={`/companies/${company.id}`}
-                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-indigo-600"
-                          title="View"
-                        >
-                          <Eye size={15} />
-                        </Link>
-                        <button
-                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-indigo-600"
-                          title="Edit"
-                          onClick={() => {
-                            setSelectedCompany(company);
-                            setAddEditOpen(true);
-                          }}
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-red-500"
-                          title="Delete"
-                          onClick={() => {
-                            setSelectedCompany(company);
-                            setDeleteOpen(true);
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1 relative">
+                          <Link
+                            href={`/companies/${company.id}`}
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#C41E3A]"
+                            title="View"
+                          >
+                            <Eye size={15} />
+                          </Link>
+                          <button
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#C41E3A]"
+                            title="Edit"
+                            onClick={() => {
+                              setSelectedCompany(company);
+                              setAddEditOpen(true);
+                            }}
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#C41E3A]"
+                            title="Add Contact"
+                            onClick={() => {
+                              setContactTargetCompany(company);
+                              setContactModalOpen(true);
+                            }}
+                          >
+                            <span className="relative inline-flex items-center justify-center">
+                              <PhoneCall size={14} />
+                              <Plus
+                                size={9}
+                                className="absolute -right-1 -bottom-1 bg-white rounded-full"
+                              />
+                            </span>
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#C41E3A]"
+                            title="Delete"
+                            onClick={() => {
+                              setSelectedCompany(company);
+                              setDeleteOpen(true);
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
+          {/* Pagination */}
           <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-4">
             <p className="text-xs text-slate-500">
-              Page {page} of {totalPages} &mdash; {filtered.length} results
+              {filtered.length}{" "}
+              {filtered.length === 1 ? "company" : "companies"}
+              {totalPages > 1 && (
+                <>
+                  {" "}
+                  &mdash; page {page} of {totalPages}
+                </>
+              )}
             </p>
-            <div className="flex items-center gap-1">
-              <button
-                className="btn btn-secondary btn-sm btn-icon"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft size={14} />
-              </button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const p = i + 1;
-                return (
-                  <button
-                    key={p}
-                    className={`btn btn-sm w-8 h-8 p-0 justify-center ${page === p ? "btn-primary" : "btn-secondary"}`}
-                    onClick={() => setPage(p)}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-              <button
-                className="btn btn-secondary btn-sm btn-icon"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight size={14} />
-              </button>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                <button
+                  className="btn btn-secondary btn-sm btn-icon"
+                  disabled={page === 1}
+                  onClick={() => setPage((p) => p - 1)}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const p = i + 1;
+                  return (
+                    <button
+                      key={p}
+                      className={`btn btn-sm w-8 h-8 p-0 justify-center ${page === p ? "btn-primary" : "btn-secondary"}`}
+                      onClick={() => setPage(p)}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+                <button
+                  className="btn btn-secondary btn-sm btn-icon"
+                  disabled={page === totalPages}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* end table card */}
+      </div>
+      {/* end two-column */}
+
+      {updateDetails && (
+        <>
+          <button
+            type="button"
+            aria-label="Close update details"
+            className="fixed inset-0 z-40"
+            onClick={() => setUpdateDetails(null)}
+          />
+          <div
+            className="fixed z-50 w-80 max-w-[calc(100vw-24px)] animate-fade-in-opacity"
+            style={{
+              left: `${updateDetails.position.left}px`,
+              top: `${updateDetails.position.top}px`,
+              transform: "translate(-50%, -100%)",
+            }}
+          >
+            <div className="bg-white rounded-lg shadow-xl border border-slate-200 p-4">
+              <div className="pb-3 mb-3 border-b border-slate-100 flex items-center justify-between gap-2">
+                <h4 className="text-sm font-semibold text-slate-900">
+                  Last Update Details
+                </h4>
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 hover:text-slate-700"
+                  onClick={() => setUpdateDetails(null)}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="space-y-2.5">
+                <div className="flex items-start gap-3">
+                  <div className="w-20 shrink-0">
+                    <span className="text-xs font-medium text-slate-500">
+                      Date
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm text-slate-900">
+                      {new Date(
+                        updateDetails.company.lastUpdated,
+                      ).toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-20 shrink-0">
+                    <span className="text-xs font-medium text-slate-500">
+                      Updated by
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm text-slate-900 font-medium">
+                      {updateDetails.company.lastUpdatedBy}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3">
+                  <div className="w-20 shrink-0">
+                    <span className="text-xs font-medium text-slate-500">
+                      Field
+                    </span>
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-sm font-mono text-[#C41E3A] bg-[#FFF1F3] px-2 py-0.5 rounded">
+                      {updateDetails.company.updatedField}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                <div className="border-[6px] border-transparent border-t-white drop-shadow-sm"></div>
+                <div className="absolute -top-1.75 left-1/2 -translate-x-1/2">
+                  <div className="border-[7px] border-transparent border-t-slate-200"></div>
+                </div>
+              </div>
             </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
 
-      {/* Modals */}
       <AddEditModal
         isOpen={addEditOpen}
         onClose={() => setAddEditOpen(false)}
@@ -857,6 +1232,19 @@ export default function CompaniesPage() {
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         company={selectedCompany}
+      />
+      <ContactModal
+        isOpen={contactModalOpen}
+        onClose={() => {
+          setContactModalOpen(false);
+          setContactTargetCompany(null);
+        }}
+        contact={null}
+        title={
+          contactTargetCompany
+            ? `Add Contact - ${contactTargetCompany.name}`
+            : "Add Contact"
+        }
       />
     </div>
   );

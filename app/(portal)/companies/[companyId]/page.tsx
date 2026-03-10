@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import Link from "next/link";
@@ -27,6 +27,7 @@ import {
 import StatusBadge from "@/components/ui/StatusBadge";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import ContactModal from "@/components/companies/ContactModal";
 
 // ─── Mock data for a single company ───────────────────────────────────────────
 const MOCK_COMPANY = {
@@ -132,7 +133,7 @@ function ContactCard({
     <div className="card p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm shrink-0">
+          <div className="w-10 h-10 rounded-full bg-[#FFE4E9] flex items-center justify-center text-[#A8192F] font-semibold text-sm shrink-0">
             {contact.name
               .split(" ")
               .map((n) => n[0])
@@ -147,7 +148,7 @@ function ContactCard({
         <div className="flex gap-1">
           <button
             onClick={onEdit}
-            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-indigo-600"
+            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#C41E3A]"
           >
             <Pencil size={14} />
           </button>
@@ -163,21 +164,21 @@ function ContactCard({
       <div className="grid grid-cols-1 gap-2">
         <a
           href={`mailto:${contact.email}`}
-          className="flex items-center gap-2 text-sm text-slate-600 hover:text-indigo-600 group"
+          className="flex items-center gap-2 text-sm text-slate-600 hover:text-[#C41E3A] group"
         >
           <Mail
             size={14}
-            className="text-slate-400 group-hover:text-indigo-500 shrink-0"
+            className="text-slate-400 group-hover:text-[#C41E3A] shrink-0"
           />
           <span className="truncate">{contact.email}</span>
         </a>
         <a
           href={`tel:${contact.phone}`}
-          className="flex items-center gap-2 text-sm text-slate-600 hover:text-indigo-600 group"
+          className="flex items-center gap-2 text-sm text-slate-600 hover:text-[#C41E3A] group"
         >
           <Phone
             size={14}
-            className="text-slate-400 group-hover:text-indigo-500 shrink-0"
+            className="text-slate-400 group-hover:text-[#C41E3A] shrink-0"
           />
           <span>{contact.phone}</span>
         </a>
@@ -233,116 +234,6 @@ function ContactCard({
   );
 }
 
-function ContactModal({
-  isOpen,
-  onClose,
-  contact,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  contact: (typeof MOCK_CONTACTS)[0] | null;
-}) {
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={contact ? "Edit Contact" : "Add Contact"}
-      size="md"
-      footer={
-        <>
-          <button className="btn btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-          <button className="btn btn-primary" onClick={onClose}>
-            {contact ? "Save Changes" : "Add Contact"}
-          </button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Full Name *
-            </label>
-            <input
-              defaultValue={contact?.name}
-              className="input-base"
-              placeholder="e.g. Neha Joshi"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Designation
-            </label>
-            <input
-              defaultValue={contact?.designation}
-              className="input-base"
-              placeholder="e.g. HR Business Partner"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Email
-            </label>
-            <input
-              type="email"
-              defaultValue={contact?.email}
-              className="input-base"
-              placeholder="name@company.com"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Phone
-            </label>
-            <input
-              type="tel"
-              defaultValue={contact?.phone}
-              className="input-base"
-              placeholder="+91 98xxx xxxxx"
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              LinkedIn URL
-            </label>
-            <input
-              defaultValue={contact?.linkedin}
-              className="input-base"
-              placeholder="linkedin.com/in/..."
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Preferred Contact Method
-            </label>
-            <select
-              defaultValue={contact?.preferredMethod}
-              className="input-base"
-            >
-              <option value="email">Email</option>
-              <option value="phone">Phone</option>
-              <option value="linkedin">LinkedIn</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Notes
-          </label>
-          <textarea
-            rows={2}
-            className="input-base"
-            defaultValue={contact?.notes}
-            placeholder="Any notes about this contact..."
-          />
-        </div>
-      </div>
-    </Modal>
-  );
-}
-
 export default function CompanyDetailPage({
   params,
 }: {
@@ -385,12 +276,12 @@ export default function CompanyDetailPage({
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
+    <div className="p-4 lg:p-6 space-y-5 animate-fade-in xl:h-full xl:overflow-y-auto">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-slate-500">
         <Link
           href="/companies"
-          className="hover:text-indigo-600 transition-colors flex items-center gap-1"
+          className="hover:text-[#C41E3A] transition-colors flex items-center gap-1"
         >
           <ArrowLeft size={14} />
           Companies
@@ -402,7 +293,7 @@ export default function CompanyDetailPage({
       {/* Company Header Card */}
       <div className="card p-5 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-xl shrink-0">
+          <div className="w-14 h-14 rounded-2xl bg-[#FFF1F3] border border-[#FFE4E9] flex items-center justify-center text-[#A8192F] font-bold text-xl shrink-0">
             {MOCK_COMPANY.name.charAt(0)}
           </div>
 
@@ -438,7 +329,7 @@ export default function CompanyDetailPage({
                   href={`https://${MOCK_COMPANY.website}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-indigo-600 hover:underline"
+                  className="flex items-center gap-1.5 text-sm text-[#C41E3A] hover:underline"
                 >
                   <Globe size={13} />
                   {MOCK_COMPANY.website}
@@ -486,14 +377,14 @@ export default function CompanyDetailPage({
               className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all
                 ${
                   tab === t.key
-                    ? "border-indigo-500 text-indigo-600"
+                    ? "border-[#C41E3A] text-[#C41E3A]"
                     : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-200"
                 }`}
             >
               {t.label}
               <span
                 className={`text-xs rounded-full px-1.5 py-0.5 font-semibold
-                ${tab === t.key ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}
+                ${tab === t.key ? "bg-[#FFE4E9] text-[#A8192F]" : "bg-slate-100 text-slate-500"}`}
               >
                 {t.count}
               </span>
@@ -550,12 +441,12 @@ export default function CompanyDetailPage({
                     {/* Timeline line */}
                     <div className="flex flex-col items-center shrink-0">
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${idx === 0 ? "border-indigo-400 bg-indigo-50" : "border-slate-200 bg-white"}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${idx === 0 ? "border-[#C41E3A] bg-[#FFF1F3]" : "border-slate-200 bg-white"}`}
                       >
                         <Icon
                           size={14}
                           className={
-                            idx === 0 ? "text-indigo-500" : "text-slate-400"
+                            idx === 0 ? "text-[#C41E3A]" : "text-slate-400"
                           }
                         />
                       </div>
@@ -608,7 +499,7 @@ export default function CompanyDetailPage({
             <div className="space-y-3">
               {MOCK_ASSIGNMENTS.map((a) => (
                 <div key={a.id} className="card p-4 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-semibold text-sm shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-[#FFE4E9] flex items-center justify-center text-[#A8192F] font-semibold text-sm shrink-0">
                     {a.assignee
                       .split(" ")
                       .map((n) => n[0])

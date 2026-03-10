@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import EmptyState from "@/components/ui/EmptyState";
 import { BookOpen } from "lucide-react";

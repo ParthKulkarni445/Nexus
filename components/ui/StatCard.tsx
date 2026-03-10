@@ -1,4 +1,4 @@
-import { LucideIcon } from "lucide-react";
+﻿import { LucideIcon } from "lucide-react";
 
 interface StatCardProps {
   title: string;
@@ -17,8 +17,8 @@ export default function StatCard({
   change,
   changeType = "neutral",
   icon: Icon,
-  iconColor = "text-indigo-600",
-  iconBg = "bg-indigo-50",
+  iconColor = "text-[#C41E3A]",
+  iconBg = "bg-[#FFF1F3]",
   subtitle,
 }: StatCardProps) {
   const changeColors = {
@@ -28,7 +28,10 @@ export default function StatCard({
   };
 
   return (
-    <div className="card p-5 flex items-start gap-4 hover:shadow-sm transition-shadow">
+    <div
+      className="card p-5 flex items-start gap-4 hover:shadow-md transition-all hover:-translate-y-0.5"
+      style={{ borderLeft: "3px solid #C41E3A" }}
+    >
       <div
         className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}
       >

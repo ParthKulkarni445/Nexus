@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import {
@@ -19,13 +19,13 @@ import {
   Square,
   InboxIcon,
   CalendarCheck,
+  Sparkles,
 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import FilterSelect from "@/components/ui/FilterSelect";
 import EmptyState from "@/components/ui/EmptyState";
-import StatCard from "@/components/ui/StatCard";
 import SearchBar from "@/components/ui/SearchBar";
 
 // ─── Types & Mock Data ────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ const MOCK_MAILS: MailRequest[] = [
     previewText:
       "We would like to invite Google India for our upcoming campus placement season...",
     bodyHtml: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
-      <h2 style="color:#4F46E5">Campus Placement Invitation 2025-26</h2>
+      <h2 style="color:#C41E3A">Campus Placement Invitation 2025-26</h2>
       <p>Dear Hiring Team,</p>
       <p>We are pleased to invite <strong>Google India</strong> to participate in our campus placement drive for the batch of 2026.</p>
       <p>Our students are proficient in multiple technical domains and we are confident in the talent we can offer.</p>
@@ -319,7 +319,11 @@ function MailRow({
 
   return (
     <div
-      className={`border border-slate-100 rounded-xl overflow-hidden transition-all ${isSelected ? "border-indigo-200 bg-indigo-50/30" : "bg-white"}`}
+      className={`border rounded-xl overflow-hidden transition-all hover:shadow-sm ${
+        isSelected
+          ? "border-[#FBBDC8] bg-[#FFF1F3]/30"
+          : "bg-white border-[#FFE4E9]"
+      }`}
     >
       <div className="p-4 flex items-start gap-3">
         {/* Checkbox (only for pending templates) */}
@@ -327,10 +331,10 @@ function MailRow({
           {mail.status === "pending" && mail.type === "template" ? (
             <button
               onClick={onSelect}
-              className="text-slate-400 hover:text-indigo-600 transition-colors"
+              className="text-slate-400 hover:text-[#C41E3A] transition-colors"
             >
               {isSelected ? (
-                <CheckSquare size={16} className="text-indigo-500" />
+                <CheckSquare size={16} className="text-[#C41E3A]" />
               ) : (
                 <Square size={16} />
               )}
@@ -389,7 +393,7 @@ function MailRow({
               })}
             </span>
             {mail.templateName && (
-              <span className="flex items-center gap-1 text-indigo-600">
+              <span className="flex items-center gap-1 text-[#C41E3A]">
                 <LayoutTemplate size={11} />
                 {mail.templateName}
               </span>
@@ -424,14 +428,14 @@ function MailRow({
         {/* Actions */}
         <div className="flex items-center gap-1 shrink-0 flex-wrap">
           <button
-            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-indigo-600"
+            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#C41E3A]"
             onClick={() => setExpanded((v) => !v)}
             title="Preview"
           >
             {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
           <button
-            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-indigo-600"
+            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#C41E3A]"
             onClick={onPreview}
             title="Full preview"
           >
@@ -494,6 +498,73 @@ function MailRow({
   );
 }
 
+// ─── Pipeline Stage Component ─────────────────────────────────────────────────
+function PipelineStage({
+  label,
+  count,
+  total,
+  color,
+  icon: Icon,
+  isActive,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  total: number;
+  color: string;
+  icon: React.ElementType;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const percent = total > 0 ? (count / total) * 100 : 0;
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 min-w-0 px-3 py-3 rounded-xl border transition-all cursor-pointer group ${
+        isActive
+          ? "border-[#C41E3A] bg-[#FFF1F3] shadow-sm"
+          : "border-[#FFE4E9] bg-white hover:border-[#FBBDC8] hover:bg-[#FFF8F9]"
+      }`}
+    >
+      <div className="flex items-center gap-2 mb-2">
+        <div
+          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+            isActive ? "bg-[#C41E3A]" : "bg-[#FFF1F3]"
+          }`}
+        >
+          <Icon
+            size={14}
+            className={isActive ? "text-white" : "text-[#C41E3A]"}
+          />
+        </div>
+        <span
+          className={`text-[11px] font-semibold uppercase tracking-wide truncate ${
+            isActive ? "text-[#A8192F]" : "text-slate-500"
+          }`}
+        >
+          {label}
+        </span>
+      </div>
+      <div className="flex items-end justify-between gap-2">
+        <p className="text-2xl font-bold text-slate-900 leading-none">
+          {count}
+        </p>
+        <span className="text-[10px] text-slate-400 font-medium">
+          {percent.toFixed(0)}%
+        </span>
+      </div>
+      {/* Mini bar */}
+      <div className="mt-2 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${percent}%`, background: color }}
+        />
+      </div>
+    </button>
+  );
+}
+
 export default function MailingPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("pending");
@@ -529,9 +600,11 @@ export default function MailingPage() {
 
   const stats = useMemo(
     () => ({
+      total: MOCK_MAILS.length,
       pending: MOCK_MAILS.filter((m) => m.status === "pending").length,
       approved: MOCK_MAILS.filter((m) => m.status === "approved").length,
       sent: MOCK_MAILS.filter((m) => m.status === "sent").length,
+      rejected: MOCK_MAILS.filter((m) => m.status === "rejected").length,
       custom: MOCK_MAILS.filter(
         (m) => m.type === "custom" && m.status === "pending",
       ).length,
@@ -556,168 +629,267 @@ export default function MailingPage() {
   };
 
   return (
-    <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Pending Approval"
-          value={stats.pending}
-          icon={InboxIcon}
-          iconBg="bg-amber-50"
-          iconColor="text-amber-600"
-          subtitle="Awaiting review"
-        />
-        <StatCard
-          title="Custom Mails"
-          value={stats.custom}
-          icon={FileText}
-          iconBg="bg-red-50"
-          iconColor="text-red-600"
-          subtitle="Manual review required"
-        />
-        <StatCard
-          title="Approved"
-          value={stats.approved}
-          icon={CheckCircle2}
-          iconBg="bg-emerald-50"
-          iconColor="text-emerald-600"
-          subtitle="Ready to send"
-        />
-        <StatCard
-          title="Sent This Cycle"
-          value={stats.sent}
-          icon={Send}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
-          subtitle="Dispatched"
-        />
+    <div className="-mt-6 xl:mt-0 space-y-5 pl-4 pr-4 pb-6 animate-fade-in xl:h-full xl:overflow-y-auto hide-scrollbar">
+      {/* ── Hero header card (matching outreach style) ─────────────────── */}
+      <div className="relative z-0 pt-10">
+        <div
+          className="card relative overflow-hidden px-5 py-4 sm:px-6 sm:py-5"
+          style={{
+            background: "#FFFFFF",
+            borderColor: "#FFE4E9",
+          }}
+        >
+          <div className="relative z-10">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#C41E3A]">
+              Mail Dispatch Center
+            </p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              Review, approve, and dispatch outreach emails
+            </h1>
+            <p className="mt-1.5 text-sm font-bold text-[#C41E3A]">
+              Manage coordinator mail requests — approve templates in bulk or
+              review custom drafts individually.
+            </p>
+
+            {/* ── Pipeline stages (innovative stats replacement) ──── */}
+            <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <PipelineStage
+                label="Pending"
+                count={stats.pending}
+                total={stats.total}
+                color="#F59E0B"
+                icon={InboxIcon}
+                isActive={statusFilter === "pending"}
+                onClick={() =>
+                  setStatusFilter(
+                    statusFilter === "pending" ? "" : "pending",
+                  )
+                }
+              />
+              <PipelineStage
+                label="Approved"
+                count={stats.approved}
+                total={stats.total}
+                color="#10B981"
+                icon={CheckCircle2}
+                isActive={statusFilter === "approved"}
+                onClick={() =>
+                  setStatusFilter(
+                    statusFilter === "approved" ? "" : "approved",
+                  )
+                }
+              />
+              <PipelineStage
+                label="Sent"
+                count={stats.sent}
+                total={stats.total}
+                color="#3B82F6"
+                icon={Send}
+                isActive={statusFilter === "sent"}
+                onClick={() =>
+                  setStatusFilter(statusFilter === "sent" ? "" : "sent")
+                }
+              />
+              <PipelineStage
+                label="Rejected"
+                count={stats.rejected}
+                total={stats.total}
+                color="#EF4444"
+                icon={XCircle}
+                isActive={statusFilter === "rejected"}
+                onClick={() =>
+                  setStatusFilter(
+                    statusFilter === "rejected" ? "" : "rejected",
+                  )
+                }
+              />
+            </div>
+
+            {/* ── Overall progress bar ──────────────────────────── */}
+            <div className="mt-4 flex items-center gap-3">
+              <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden flex">
+                {stats.sent > 0 && (
+                  <div
+                    className="h-full bg-blue-500 transition-all duration-700"
+                    style={{
+                      width: `${(stats.sent / stats.total) * 100}%`,
+                    }}
+                  />
+                )}
+                {stats.approved > 0 && (
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-700"
+                    style={{
+                      width: `${(stats.approved / stats.total) * 100}%`,
+                    }}
+                  />
+                )}
+                {stats.pending > 0 && (
+                  <div
+                    className="h-full bg-amber-400 transition-all duration-700"
+                    style={{
+                      width: `${(stats.pending / stats.total) * 100}%`,
+                    }}
+                  />
+                )}
+                {stats.rejected > 0 && (
+                  <div
+                    className="h-full bg-red-400 transition-all duration-700"
+                    style={{
+                      width: `${(stats.rejected / stats.total) * 100}%`,
+                    }}
+                  />
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Sparkles size={12} className="text-[#C41E3A]" />
+                <span className="text-xs font-semibold text-slate-600">
+                  {stats.sent + stats.approved}/{stats.total} cleared
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Main card */}
-      <div className="card overflow-hidden">
-        {/* Toolbar */}
-        <div className="px-4 py-3 border-b border-slate-100 space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+      {/* ── Toolbar card ───────────────────────────────────────────────── */}
+      <div className="card overflow-hidden flex flex-col">
+        <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
+          <div className="flex items-center gap-2">
             <SearchBar
               value={search}
               onChange={setSearch}
-              placeholder="Search company, coordinator..."
-              className="flex-1"
+              placeholder="Search by company, coordinator, or subject..."
+              className="flex-1 min-w-0"
             />
-            <div className="flex items-center gap-2 shrink-0">
+            <button
+              className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
+                showFilters
+                  ? "bg-[#FFF1F3] border-[#FBBDC8] text-[#A8192F]"
+                  : ""
+              }`}
+              onClick={() => setShowFilters((v) => !v)}
+            >
+              <Filter size={14} />
+              Filters
+            </button>
+            {selectedIds.size > 0 && (
               <button
-                className={`btn btn-secondary btn-sm ${showFilters ? "bg-indigo-50 border-indigo-200 text-indigo-700" : ""}`}
-                onClick={() => setShowFilters((v) => !v)}
+                className="btn btn-success btn-sm gap-1 shrink-0"
+                onClick={() => setBulkApproveOpen(true)}
               >
-                <Filter size={14} />
-                Filter
+                <CheckCircle2 size={14} />
+                Approve Selected ({selectedIds.size})
               </button>
-              {selectedIds.size > 0 && (
-                <button
-                  className="btn btn-success btn-sm gap-1"
-                  onClick={() => setBulkApproveOpen(true)}
-                >
-                  <CheckCircle2 size={14} />
-                  Approve Selected ({selectedIds.size})
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Status quick tabs */}
-            {["", "pending", "approved", "sent", "rejected"].map((s) => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                className={`btn btn-sm ${statusFilter === s ? "btn-primary" : "btn-secondary"}`}
-              >
-                {s === "" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-                {s === "pending" && (
-                  <span className="ml-1 bg-amber-100 text-amber-700 text-[10px] rounded-full px-1.5 py-0.5 font-semibold">
-                    {stats.pending}
-                  </span>
-                )}
-              </button>
-            ))}
+            )}
           </div>
 
           {showFilters && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2 pt-1 pb-0.5 w-full">
               <FilterSelect
                 value={typeFilter}
                 onChange={setTypeFilter}
                 options={TYPE_OPTIONS}
                 placeholder="All Types"
-                className="w-36"
+                className="flex-1 min-w-0"
               />
               <FilterSelect
                 value={coordinatorFilter}
                 onChange={setCoordinatorFilter}
                 options={COORDINATOR_OPTIONS}
                 placeholder="All Coordinators"
-                className="w-44"
+                className="flex-1 min-w-0"
               />
-            </div>
-          )}
-        </div>
-
-        {/* Bulk select header for pending templates */}
-        {statusFilter === "pending" &&
-          pendingTemplates.length > 0 &&
-          !typeFilter && (
-            <div className="px-4 py-2 bg-indigo-50 border-b border-indigo-100 flex items-center gap-3 text-sm">
-              <button
-                onClick={selectAllTemplates}
-                className="flex items-center gap-2 text-indigo-700 font-medium hover:text-indigo-900 transition-colors"
-              >
-                {selectedIds.size === pendingTemplates.length ? (
-                  <CheckSquare size={15} />
-                ) : (
-                  <Square size={15} className="text-slate-400" />
-                )}
-                <span>
-                  {selectedIds.size === pendingTemplates.length
-                    ? "Deselect all"
-                    : `Select all templates (${pendingTemplates.length})`}
-                </span>
-              </button>
-              {selectedIds.size > 0 && (
-                <Badge variant="info" size="sm">
-                  {selectedIds.size} selected
-                </Badge>
+              {(typeFilter || coordinatorFilter) && (
+                <button
+                  className="btn btn-ghost btn-sm text-red-500 hover:text-red-700 shrink-0"
+                  onClick={() => {
+                    setTypeFilter("");
+                    setCoordinatorFilter("");
+                  }}
+                >
+                  Clear all
+                </button>
               )}
-              <span className="text-xs text-slate-500 ml-auto">
-                Bulk approve is available for template mails only
-              </span>
             </div>
-          )}
-
-        {/* Mail list */}
-        <div className="p-4 space-y-3">
-          {filtered.length === 0 ? (
-            <EmptyState
-              icon={Mail}
-              title="No mail requests"
-              description="No mails match the current filters."
-            />
-          ) : (
-            filtered.map((mail) => (
-              <MailRow
-                key={mail.id}
-                mail={mail}
-                isSelected={selectedIds.has(mail.id)}
-                onSelect={() => toggleSelect(mail.id)}
-                onPreview={() => setPreviewMail(mail)}
-                onApprove={() => {}}
-                onReject={() => setRejectMail(mail)}
-              />
-            ))
           )}
         </div>
       </div>
 
-      {/* Modals */}
+      {/* ── Main mail list card ────────────────────────────────────────── */}
+      <div className="card overflow-hidden">
+        <div className="p-4 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-800">
+              Mail Queue
+              {statusFilter && (
+                <span className="ml-2 text-xs font-normal text-slate-400">
+                  — showing {statusFilter}
+                </span>
+              )}
+            </h3>
+            <span className="text-xs text-slate-400">
+              {filtered.length} mail{filtered.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {/* Bulk select header for pending templates */}
+          {statusFilter === "pending" &&
+            pendingTemplates.length > 0 &&
+            !typeFilter && (
+              <div className="px-3 py-2 bg-[#FFF1F3] border border-[#FFE4E9] rounded-lg flex items-center gap-3 text-sm">
+                <button
+                  onClick={selectAllTemplates}
+                  className="flex items-center gap-2 text-[#A8192F] font-medium hover:text-[#7B0020] transition-colors"
+                >
+                  {selectedIds.size === pendingTemplates.length ? (
+                    <CheckSquare size={15} />
+                  ) : (
+                    <Square size={15} className="text-slate-400" />
+                  )}
+                  <span>
+                    {selectedIds.size === pendingTemplates.length
+                      ? "Deselect all"
+                      : `Select all templates (${pendingTemplates.length})`}
+                  </span>
+                </button>
+                {selectedIds.size > 0 && (
+                  <Badge variant="info" size="sm">
+                    {selectedIds.size} selected
+                  </Badge>
+                )}
+                <span className="text-xs text-slate-500 ml-auto hidden sm:inline">
+                  Bulk approve is available for template mails only
+                </span>
+              </div>
+            )}
+
+          {/* Mail list */}
+          <div className="space-y-3">
+            {filtered.length === 0 ? (
+              <EmptyState
+                icon={Mail}
+                title="No mail requests"
+                description="No mails match the current filters."
+              />
+            ) : (
+              filtered.map((mail) => (
+                <MailRow
+                  key={mail.id}
+                  mail={mail}
+                  isSelected={selectedIds.has(mail.id)}
+                  onSelect={() => toggleSelect(mail.id)}
+                  onPreview={() => setPreviewMail(mail)}
+                  onApprove={() => {}}
+                  onReject={() => setRejectMail(mail)}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Modals ─────────────────────────────────────────────────────── */}
       <PreviewModal mail={previewMail} onClose={() => setPreviewMail(null)} />
       <RejectModal mail={rejectMail} onClose={() => setRejectMail(null)} />
       <Modal

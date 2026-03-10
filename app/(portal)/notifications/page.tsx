@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import EmptyState from "@/components/ui/EmptyState";
 import { Bell } from "lucide-react";

@@ -122,6 +122,8 @@ export async function POST(request: NextRequest) {
       .values({
         ...validation,
         createdBy: user.id,
+        updatedBy: user.id,
+        updatedField: "created",
       })
       .returning();
 

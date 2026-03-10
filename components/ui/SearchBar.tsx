@@ -1,4 +1,4 @@
-import { Search, X } from "lucide-react";
+﻿import { Search, X } from "lucide-react";
 
 interface SearchBarProps {
   value: string;
@@ -24,7 +24,11 @@ export default function SearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="input-base pl-9 pr-8"
+        className="input-base"
+        style={{
+          paddingLeft: "2.25rem",
+          paddingRight: value ? "2rem" : undefined,
+        }}
       />
       {value && (
         <button

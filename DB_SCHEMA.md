@@ -62,6 +62,8 @@ Company master object (no season/process status here).
 - `domain`, `industry`, `website`
 - `priority`, `notes`
 - `created_by` (fk `users`)
+- `updated_by` (fk `users`, nullable)
+- `updated_field` (`text`, nullable) - tracks which field was last modified
 - `created_at`, `updated_at`
 
 ### 4) `recruitment_seasons`

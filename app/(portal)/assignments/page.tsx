@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -419,14 +419,37 @@ export default function AssignmentsPage() {
 
   return (
     <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
+      {/* ── Page header ───────────────────────────────────────── */}
+      <div
+        className="rounded-2xl px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        style={{
+          background:
+            "linear-gradient(135deg, #1A0A0A 0%, #2D1515 60%, #1A0A0A 100%)",
+        }}
+      >
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-8 h-8 rounded-lg bg-[#C41E3A]/20 border border-[#C41E3A]/30 flex items-center justify-center">
+              <Users size={16} className="text-[#FBBDC8]" />
+            </div>
+            <h2 className="text-white font-bold text-lg tracking-tight">
+              Assignments
+            </h2>
+          </div>
+          <p className="text-sm" style={{ color: "#D4B8B8" }}>
+            Manage company assignments to coordinators
+          </p>
+        </div>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Companies"
           value={stats.total}
           icon={Building2}
-          iconBg="bg-indigo-50"
-          iconColor="text-indigo-600"
+          iconBg="bg-[#FFF1F3]"
+          iconColor="text-[#C41E3A]"
           subtitle="This season"
         />
         <StatCard
@@ -460,7 +483,7 @@ export default function AssignmentsPage() {
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <BarChart3 size={16} className="text-indigo-500" />
+            <BarChart3 size={16} className="text-[#C41E3A]" />
             <h3 className="text-sm font-semibold text-slate-800">
               Distribution Overview
             </h3>
@@ -479,7 +502,7 @@ export default function AssignmentsPage() {
             {/* Pie chart */}
             <div>
               <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                <PieChartIcon size={13} className="text-indigo-500" />
+                <PieChartIcon size={13} className="text-[#C41E3A]" />
                 Assigned vs Unassigned
               </p>
               <div className="h-52">
@@ -517,7 +540,7 @@ export default function AssignmentsPage() {
             {/* Bar chart */}
             <div>
               <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                <BarChart3 size={13} className="text-indigo-500" />
+                <BarChart3 size={13} className="text-[#C41E3A]" />
                 Coordinator Load
               </p>
               <div className="h-52">
@@ -572,14 +595,14 @@ export default function AssignmentsPage() {
                 className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all
                   ${
                     tab === t.key
-                      ? "border-indigo-500 text-indigo-600"
+                      ? "border-[#C41E3A] text-[#C41E3A]"
                       : "border-transparent text-slate-500 hover:text-slate-800"
                   }`}
               >
                 {t.label}
                 <span
                   className={`text-xs rounded-full px-1.5 py-0.5 font-semibold
-                  ${tab === t.key ? "bg-indigo-100 text-indigo-700" : "bg-slate-100 text-slate-500"}`}
+                  ${tab === t.key ? "bg-[#FFE4E9] text-[#A8192F]" : "bg-slate-100 text-slate-500"}`}
                 >
                   {t.count}
                 </span>
@@ -621,7 +644,7 @@ export default function AssignmentsPage() {
             />
             {tab === "assigned" && (
               <button
-                className={`btn btn-secondary btn-sm shrink-0 ${showFilters ? "bg-indigo-50 border-indigo-200 text-indigo-700" : ""}`}
+                className={`btn btn-secondary btn-sm shrink-0 ${showFilters ? "bg-[#FFF1F3] border-[#FBBDC8] text-[#A8192F]" : ""}`}
                 onClick={() => setShowFilters((v) => !v)}
               >
                 <Filter size={14} />
@@ -682,7 +705,7 @@ export default function AssignmentsPage() {
                       onClick={() => toggleGroup(coordinatorName)}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-semibold">
+                        <div className="w-8 h-8 rounded-full bg-[#FFE4E9] flex items-center justify-center text-[#A8192F] text-xs font-semibold">
                           {coordinatorName
                             .split(" ")
                             .map((n) => n[0])
@@ -717,13 +740,13 @@ export default function AssignmentsPage() {
                             key={a.companyId}
                             className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors"
                           >
-                            <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-semibold shrink-0">
+                            <div className="w-8 h-8 rounded-lg bg-[#FFF1F3] border border-[#FFE4E9] flex items-center justify-center text-[#A8192F] text-xs font-semibold shrink-0">
                               {a.companyName.charAt(0)}
                             </div>
                             <div className="flex-1 min-w-0">
                               <Link
                                 href={`/companies/${a.companyId}`}
-                                className="text-sm font-medium text-slate-900 hover:text-indigo-600 transition-colors truncate block"
+                                className="text-sm font-medium text-slate-900 hover:text-[#C41E3A] transition-colors truncate block"
                               >
                                 {a.companyName}
                               </Link>
@@ -733,14 +756,14 @@ export default function AssignmentsPage() {
                             </div>
                             <StatusBadge status={a.status} size="sm" />
                             <button
-                              className="btn btn-ghost btn-sm gap-1 text-slate-500 hover:text-indigo-600 hidden sm:flex"
+                              className="btn btn-ghost btn-sm gap-1 text-slate-500 hover:text-[#C41E3A] hidden sm:flex"
                               onClick={() => setReassignModal(a.companyName)}
                             >
                               <RefreshCw size={13} />
                               Reassign
                             </button>
                             <button
-                              className="sm:hidden btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-indigo-600"
+                              className="sm:hidden btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#C41E3A]"
                               onClick={() => setReassignModal(a.companyName)}
                             >
                               <RefreshCw size={14} />
@@ -773,12 +796,12 @@ export default function AssignmentsPage() {
                 >
                   <button
                     onClick={() => toggleSelectUnassigned(c.companyId)}
-                    className="text-slate-300 group-hover:text-slate-400 hover:text-indigo-500! transition-colors shrink-0"
+                    className="text-slate-300 group-hover:text-slate-400 hover:text-[#C41E3A]! transition-colors shrink-0"
                   >
                     {selectedUnassigned.has(c.companyId) ? (
-                      <CheckCircle2 size={16} className="text-indigo-500" />
+                      <CheckCircle2 size={16} className="text-[#C41E3A]" />
                     ) : (
-                      <div className="w-4 h-4 rounded border border-slate-300 group-hover:border-indigo-300" />
+                      <div className="w-4 h-4 rounded border border-slate-300 group-hover:border-[#E53E5C]" />
                     )}
                   </button>
                   <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 text-xs font-semibold shrink-0">
@@ -787,7 +810,7 @@ export default function AssignmentsPage() {
                   <div className="flex-1 min-w-0">
                     <Link
                       href={`/companies/${c.companyId}`}
-                      className="text-sm font-medium text-slate-900 hover:text-indigo-600 transition-colors truncate block"
+                      className="text-sm font-medium text-slate-900 hover:text-[#C41E3A] transition-colors truncate block"
                     >
                       {c.companyName}
                     </Link>

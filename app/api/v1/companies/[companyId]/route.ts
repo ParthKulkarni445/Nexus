@@ -123,10 +123,20 @@ export async function PUT(
   const clientInfo = getClientInfo(headersList);
 
   try {
+    // Determine which field(s) were updated
+    const updatedFields = Object.keys(validation);
+    const updatedField = updatedFields.length > 0 
+      ? updatedFields.length === 1 
+        ? updatedFields[0] 
+        : `${updatedFields.length} fields`
+      : "unknown";
+
     const [updatedCompany] = await db
       .update(companies)
       .set({
         ...validation,
+        updatedBy: user.id,
+        updatedField,
         updatedAt: new Date(),
       })
       .where(eq(companies.id, companyId))

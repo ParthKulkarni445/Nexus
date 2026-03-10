@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Menu, Bell, Search } from "lucide-react";
 
@@ -44,11 +44,11 @@ export default function Header({ onMenuClick, title, subtitle }: HeaderProps) {
         {/* Notifications */}
         <button className="relative p-2 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
           <Bell size={18} />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-indigo-500 rounded-full"></span>
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#FFF1F3]0 rounded-full"></span>
         </button>
 
         {/* Avatar */}
-        <div className="w-8 h-8 rounded-full bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-600 text-xs font-semibold cursor-pointer hover:bg-indigo-200 transition-colors">
+        <div className="w-8 h-8 rounded-full bg-[#FFE4E9] border border-[#FBBDC8] flex items-center justify-center text-[#C41E3A] text-xs font-semibold cursor-pointer hover:bg-[#FBBDC8] transition-colors">
           AD
         </div>
       </div>

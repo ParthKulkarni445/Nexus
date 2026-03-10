@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+﻿import { ReactNode } from "react";
 
 interface BadgeProps {
   children: ReactNode;
@@ -16,21 +16,21 @@ interface BadgeProps {
 
 const variantMap: Record<string, string> = {
   default: "bg-slate-100 text-slate-700 border border-slate-200",
-  success: "bg-emerald-50 text-emerald-700 border border-emerald-200",
-  warning: "bg-amber-50 text-amber-700 border border-amber-200",
-  danger: "bg-red-50 text-red-700 border border-red-200",
-  info: "bg-blue-50 text-blue-700 border border-blue-200",
-  purple: "bg-indigo-50 text-indigo-700 border border-indigo-200",
+  success: "bg-[#C41E3A] text-white border border-[#A8192F]",
+  warning: "bg-[#FFE4E9] text-[#A8192F] border border-[#FBBDC8]",
+  danger: "bg-[#FFF1F3] text-[#C41E3A] border border-[#C41E3A]",
+  info: "bg-[#FFF1F3] text-[#C41E3A] border border-[#FBBDC8]",
+  purple: "bg-[#FFF1F3] text-[#C41E3A] border border-[#FBBDC8]",
   gray: "bg-slate-100 text-slate-500 border border-slate-200",
 };
 
 const dotMap: Record<string, string> = {
-  default: "bg-slate-500",
-  success: "bg-emerald-500",
-  warning: "bg-amber-500",
-  danger: "bg-red-500",
-  info: "bg-blue-500",
-  purple: "bg-indigo-500",
+  default: "bg-slate-400",
+  success: "bg-white",
+  warning: "bg-[#A8192F]",
+  danger: "bg-[#C41E3A]",
+  info: "bg-[#C41E3A]",
+  purple: "bg-[#C41E3A]",
   gray: "bg-slate-400",
 };
 
