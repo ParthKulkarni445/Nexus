@@ -42,7 +42,17 @@ const MOCK_COMPANY = {
   createdAt: "2025-06-01",
 };
 
-const MOCK_CONTACTS = [
+const MOCK_CONTACTS: {
+  id: string;
+  name: string;
+  designation: string;
+  email: string;
+  phone: string;
+  linkedin: string;
+  preferredMethod: "email" | "phone" | "linkedin";
+  notes: string;
+  lastContacted: string;
+}[] = [
   {
     id: "ct1",
     name: "Neha Joshi",
@@ -133,7 +143,7 @@ function ContactCard({
     <div className="card p-4 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-[#FFE4E9] flex items-center justify-center text-[#A8192F] font-semibold text-sm shrink-0">
+          <div className="w-10 h-10 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-semibold text-sm shrink-0">
             {contact.name
               .split(" ")
               .map((n) => n[0])
@@ -148,13 +158,13 @@ function ContactCard({
         <div className="flex gap-1">
           <button
             onClick={onEdit}
-            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#C41E3A]"
+            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#2563EB]"
           >
             <Pencil size={14} />
           </button>
           <button
             onClick={onDelete}
-            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-red-500"
+            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-blue-500"
           >
             <Trash2 size={14} />
           </button>
@@ -164,21 +174,21 @@ function ContactCard({
       <div className="grid grid-cols-1 gap-2">
         <a
           href={`mailto:${contact.email}`}
-          className="flex items-center gap-2 text-sm text-slate-600 hover:text-[#C41E3A] group"
+          className="flex items-center gap-2 text-sm text-slate-600 hover:text-[#2563EB] group"
         >
           <Mail
             size={14}
-            className="text-slate-400 group-hover:text-[#C41E3A] shrink-0"
+            className="text-slate-400 group-hover:text-[#2563EB] shrink-0"
           />
           <span className="truncate">{contact.email}</span>
         </a>
         <a
           href={`tel:${contact.phone}`}
-          className="flex items-center gap-2 text-sm text-slate-600 hover:text-[#C41E3A] group"
+          className="flex items-center gap-2 text-sm text-slate-600 hover:text-[#2563EB] group"
         >
           <Phone
             size={14}
-            className="text-slate-400 group-hover:text-[#C41E3A] shrink-0"
+            className="text-slate-400 group-hover:text-[#2563EB] shrink-0"
           />
           <span>{contact.phone}</span>
         </a>
@@ -281,7 +291,7 @@ export default function CompanyDetailPage({
       <div className="flex items-center gap-2 text-sm text-slate-500">
         <Link
           href="/companies"
-          className="hover:text-[#C41E3A] transition-colors flex items-center gap-1"
+          className="hover:text-[#2563EB] transition-colors flex items-center gap-1"
         >
           <ArrowLeft size={14} />
           Companies
@@ -293,7 +303,7 @@ export default function CompanyDetailPage({
       {/* Company Header Card */}
       <div className="card p-5 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-[#FFF1F3] border border-[#FFE4E9] flex items-center justify-center text-[#A8192F] font-bold text-xl shrink-0">
+          <div className="w-14 h-14 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-bold text-xl shrink-0">
             {MOCK_COMPANY.name.charAt(0)}
           </div>
 
@@ -329,7 +339,7 @@ export default function CompanyDetailPage({
                   href={`https://${MOCK_COMPANY.website}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-sm text-[#C41E3A] hover:underline"
+                  className="flex items-center gap-1.5 text-sm text-[#2563EB] hover:underline"
                 >
                   <Globe size={13} />
                   {MOCK_COMPANY.website}
@@ -377,14 +387,14 @@ export default function CompanyDetailPage({
               className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all
                 ${
                   tab === t.key
-                    ? "border-[#C41E3A] text-[#C41E3A]"
+                    ? "border-[#2563EB] text-[#2563EB]"
                     : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-200"
                 }`}
             >
               {t.label}
               <span
                 className={`text-xs rounded-full px-1.5 py-0.5 font-semibold
-                ${tab === t.key ? "bg-[#FFE4E9] text-[#A8192F]" : "bg-slate-100 text-slate-500"}`}
+                ${tab === t.key ? "bg-[#DBEAFE] text-[#1D4ED8]" : "bg-slate-100 text-slate-500"}`}
               >
                 {t.count}
               </span>
@@ -441,12 +451,12 @@ export default function CompanyDetailPage({
                     {/* Timeline line */}
                     <div className="flex flex-col items-center shrink-0">
                       <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${idx === 0 ? "border-[#C41E3A] bg-[#FFF1F3]" : "border-slate-200 bg-white"}`}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${idx === 0 ? "border-[#2563EB] bg-[#EFF6FF]" : "border-slate-200 bg-white"}`}
                       >
                         <Icon
                           size={14}
                           className={
-                            idx === 0 ? "text-[#C41E3A]" : "text-slate-400"
+                            idx === 0 ? "text-[#2563EB]" : "text-slate-400"
                           }
                         />
                       </div>
@@ -499,7 +509,7 @@ export default function CompanyDetailPage({
             <div className="space-y-3">
               {MOCK_ASSIGNMENTS.map((a) => (
                 <div key={a.id} className="card p-4 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-[#FFE4E9] flex items-center justify-center text-[#A8192F] font-semibold text-sm shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-semibold text-sm shrink-0">
                     {a.assignee
                       .split(" ")
                       .map((n) => n[0])

@@ -82,7 +82,7 @@ export default function TopNav() {
             {/* Mobile hamburger — left corner */}
             <button
               onClick={() => setMobileOpen((v) => !v)}
-              className="lg:hidden p-2 rounded-lg text-[#D4B8B8] hover:text-white hover:bg-white/8 transition-all -ml-1"
+              className="lg:hidden p-2 rounded-lg text-[#93C5FD] hover:text-white hover:bg-white/8 transition-all -ml-1"
             >
               {mobileOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
@@ -130,7 +130,7 @@ export default function TopNav() {
               {/* Search toggle */}
               <button
                 onClick={() => setSearchOpen((v) => !v)}
-                className="p-2 rounded-lg text-[#D4B8B8] hover:text-white hover:bg-white/8 transition-all"
+                className="p-2 rounded-lg text-[#93C5FD] hover:text-white hover:bg-white/8 transition-all"
                 aria-label="Search"
               >
                 <Search size={17} />
@@ -139,7 +139,7 @@ export default function TopNav() {
               {/* Notification bell */}
               <Link
                 href="/notifications"
-                className="relative p-2 rounded-lg text-[#D4B8B8] hover:text-white hover:bg-white/8 transition-all"
+                className="relative p-2 rounded-lg text-[#93C5FD] hover:text-white hover:bg-white/8 transition-all"
               >
                 <Bell size={17} />
                 <span
@@ -158,7 +158,7 @@ export default function TopNav() {
                   className="flex items-center gap-2 pl-2 pr-1.5 py-1.5 rounded-lg hover:bg-white/8 transition-all group"
                 >
                   <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-red-600
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-blue-600
                     text-xs font-bold shrink-0"
                     style={{ background: "#FFFFFF" }}
                   >
@@ -170,28 +170,28 @@ export default function TopNav() {
                     </p>
                     <p
                       className="text-[10px] leading-tight"
-                      style={{ color: "#D4B8B8" }}
+                      style={{ color: "#93C5FD" }}
                     >
                       tpo_admin
                     </p>
                   </div>
                   <ChevronDown
                     size={13}
-                    className={`text-[#D4B8B8] transition-transform duration-150 ${userMenuOpen ? "rotate-180" : ""}`}
+                    className={`text-[#93C5FD] transition-transform duration-150 ${userMenuOpen ? "rotate-180" : ""}`}
                   />
                 </button>
 
                 {/* Dropdown */}
                 {userMenuOpen && (
                   <div
-                    className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-[#EDE8E8] shadow-xl z-50 overflow-hidden animate-slide-down"
-                    style={{ boxShadow: "0 8px 32px rgba(26,10,10,0.12)" }}
+                    className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-[#E2E8F0] shadow-xl z-50 overflow-hidden animate-slide-down"
+                    style={{ boxShadow: "0 8px 32px rgba(15,23,42,0.12)" }}
                   >
-                    <div className="px-3 py-2.5 border-b border-[#EDE8E8]">
-                      <p className="text-xs font-semibold text-[#1A0A0A]">
+                    <div className="px-3 py-2.5 border-b border-[#E2E8F0]">
+                      <p className="text-xs font-semibold text-[#0F172A]">
                         TPO Admin
                       </p>
-                      <p className="text-xs text-[#7A6262]">
+                      <p className="text-xs text-[#64748B]">
                         tpo.admin@college.edu
                       </p>
                     </div>
@@ -202,17 +202,17 @@ export default function TopNav() {
                       ].map(({ label, icon: Icon }) => (
                         <button
                           key={label}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[#1A0A0A] hover:bg-[#FFF1F3] hover:text-[#C41E3A] transition-colors"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[#0F172A] hover:bg-[#EFF6FF] hover:text-[#2563EB] transition-colors"
                         >
                           <Icon size={14} />
                           {label}
                         </button>
                       ))}
                     </div>
-                    <div className="border-t border-[#EDE8E8] py-1">
+                    <div className="border-t border-[#E2E8F0] py-1">
                       <button
                         onClick={handleSignOut}
-                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors"
                       >
                         <LogOut size={14} />
                         Sign out
@@ -230,15 +230,15 @@ export default function TopNav() {
               <div className="relative">
                 <Search
                   size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7A6262] pointer-events-none"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B] pointer-events-none"
                 />
                 <input
                   ref={searchRef}
                   type="text"
                   placeholder="Search companies, contacts, drives..."
-                  className="w-full pl-9 pr-4 py-2.5 rounded-lg text-sm bg-white/10 text-white placeholder:text-[#D4B8B8] border border-white/15 focus:outline-none focus:ring-2 focus:border-transparent"
+                  className="w-full pl-9 pr-4 py-2.5 rounded-lg text-sm bg-white/10 text-white placeholder:text-[#93C5FD] border border-white/15 focus:outline-none focus:ring-2 focus:border-transparent"
                   style={
-                    { "--tw-ring-color": "#C41E3A" } as React.CSSProperties
+                    { "--tw-ring-color": "#2563EB" } as React.CSSProperties
                   }
                   onKeyDown={(e) => {
                     if (e.key === "Escape") setSearchOpen(false);
@@ -256,7 +256,7 @@ export default function TopNav() {
       {mobileOpen && (
         <div
           className="lg:hidden fixed inset-0 z-50"
-          style={{ background: "rgba(26,10,10,0.55)" }}
+          style={{ background: "rgba(15,23,42,0.55)" }}
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -270,7 +270,7 @@ export default function TopNav() {
           width: "240px",
           background: "var(--nav-bg)",
           borderRight: "1px solid var(--nav-border)",
-          boxShadow: "4px 0 24px rgba(26,10,10,0.25)",
+          boxShadow: "4px 0 24px rgba(15,23,42,0.25)",
         }}
       >
         {/* Drawer header — brand + close */}
@@ -291,7 +291,7 @@ export default function TopNav() {
           </Link>
           <button
             onClick={() => setMobileOpen(false)}
-            className="p-1.5 rounded-lg text-[#D4B8B8] hover:text-white hover:bg-white/10 transition-all"
+            className="p-1.5 rounded-lg text-[#93C5FD] hover:text-white hover:bg-white/10 transition-all"
           >
             <X size={17} />
           </button>
@@ -309,7 +309,7 @@ export default function TopNav() {
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   active
                     ? "text-white"
-                    : "text-[#D4B8B8] hover:text-white hover:bg-white/8"
+                    : "text-[#93C5FD] hover:text-white hover:bg-white/8"
                 }`}
                 style={
                   active
@@ -339,7 +339,7 @@ export default function TopNav() {
             style={{ background: "rgba(255,255,255,0.08)" }}
           >
             <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-[#C41E3A] text-xs font-bold shrink-0"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-[#2563EB] text-xs font-bold shrink-0"
               style={{ background: "#FFFFFF" }}
             >
               AD
@@ -348,14 +348,14 @@ export default function TopNav() {
               <p className="text-sm font-semibold text-white leading-tight truncate">
                 TPO Admin
               </p>
-              <p className="text-[11px] truncate" style={{ color: "#D4B8B8" }}>
+              <p className="text-[11px] truncate" style={{ color: "#93C5FD" }}>
                 tpo.admin@college.edu
               </p>
             </div>
           </div>
           <button
             onClick={handleSignOut}
-            className="mt-2 w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all text-[#D4B8B8] hover:text-white hover:bg-white/8"
+            className="mt-2 w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all text-[#93C5FD] hover:text-white hover:bg-white/8"
           >
             <LogOut size={14} />
             Sign out

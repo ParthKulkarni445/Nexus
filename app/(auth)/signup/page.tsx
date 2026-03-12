@@ -19,7 +19,7 @@ const strengthMeta: Record<
   0 | 1 | 2 | 3 | 4,
   { label: string; color: string }
 > = {
-  0: { label: "", color: "#EDE8E8" },
+  0: { label: "", color: "#E2E8F0" },
   1: { label: "Weak", color: "#DC2626" },
   2: { label: "Fair", color: "#D97706" },
   3: { label: "Good", color: "#059669" },
@@ -89,7 +89,7 @@ export default function SignupPage() {
       <div
         className="hidden lg:flex lg:w-[46%] flex-col justify-between p-14 relative overflow-hidden shrink-0"
         style={{
-          background: "linear-gradient(145deg, #C41E3A 0%, #8B1220 100%)",
+          background: "linear-gradient(145deg, #2563EB 0%, #1E3A8A 100%)",
         }}
       >
         {/* Decorative rings */}
@@ -142,35 +142,35 @@ export default function SignupPage() {
       </div>
 
       {/* ── Right form panel ────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-14 bg-[#FAF9F9]">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-14">
         {/* Mobile logo */}
         <div className="lg:hidden flex items-center gap-2 mb-10 select-none">
           <OrbitIcon size={26} className="text-black" />
-          <span className="font-black text-[#C41E3A]">
+          <span className="font-black text-[#2563EB]">
             <span className="text-2xl leading-none">N</span>
             <span className="text-lg leading-none">EXUS</span>
           </span>
         </div>
 
-        <div className="w-full max-w-sm">
+        <div className="card w-full max-w-sm p-8">
           {/* Heading */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-[#1A0A0A]">
+            <h1 className="text-2xl font-bold text-[#0F172A]">
               Create your account
             </h1>
-            <p className="text-sm text-[#7A6262] mt-1">
+            <p className="text-sm text-[#64748B] mt-1">
               Join Nexus and start your placement journey
             </p>
           </div>
 
           {/* Error banner */}
           {apiError && (
-            <div className="mb-5 flex items-start gap-3 px-4 py-3.5 rounded-xl bg-[#FEF2F2] border border-[#FBBDC8] animate-fade-in">
+            <div className="mb-5 flex items-start gap-3 px-4 py-3.5 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] animate-fade-in">
               <AlertCircle
                 size={15}
-                className="text-[#C41E3A] shrink-0 mt-0.5"
+                className="text-[#2563EB] shrink-0 mt-0.5"
               />
-              <p className="text-sm text-[#C41E3A]">{apiError}</p>
+              <p className="text-sm text-[#2563EB]">{apiError}</p>
             </div>
           )}
 
@@ -180,7 +180,7 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="name"
-                className="block text-sm font-medium text-[#1A0A0A] mb-1.5"
+                className="block text-sm font-medium text-[#0F172A] mb-1.5"
               >
                 Full name
               </label>
@@ -201,7 +201,7 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-[#1A0A0A] mb-1.5"
+                className="block text-sm font-medium text-[#0F172A] mb-1.5"
               >
                 Email address
               </label>
@@ -221,7 +221,7 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-[#1A0A0A] mb-1.5"
+                className="block text-sm font-medium text-[#0F172A] mb-1.5"
               >
                 Password
               </label>
@@ -241,7 +241,7 @@ export default function SignupPage() {
                   type="button"
                   tabIndex={-1}
                   onClick={() => setShowPwd((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A6262] hover:text-[#1A0A0A] transition-colors p-0.5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#0F172A] transition-colors p-0.5"
                   aria-label={showPwd ? "Hide password" : "Show password"}
                 >
                   {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -258,7 +258,7 @@ export default function SignupPage() {
                         className="flex-1 h-1 rounded-full transition-all duration-300"
                         style={{
                           background:
-                            strength >= i ? meta.color : "#EDE8E8",
+                            strength >= i ? meta.color : "#E2E8F0",
                         }}
                       />
                     ))}
@@ -279,7 +279,7 @@ export default function SignupPage() {
             <div>
               <label
                 htmlFor="confirm"
-                className="block text-sm font-medium text-[#1A0A0A] mb-1.5"
+                className="block text-sm font-medium text-[#0F172A] mb-1.5"
               >
                 Confirm password
               </label>
@@ -298,7 +298,7 @@ export default function SignupPage() {
                   type="button"
                   tabIndex={-1}
                   onClick={() => setShowConfirm((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7A6262] hover:text-[#1A0A0A] transition-colors p-0.5"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-[#0F172A] transition-colors p-0.5"
                   aria-label={showConfirm ? "Hide password" : "Show password"}
                 >
                   {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -327,17 +327,17 @@ export default function SignupPage() {
 
           {/* Divider */}
           <div className="my-6 flex items-center gap-3">
-            <div className="flex-1 h-px bg-[#EDE8E8]" />
-            <span className="text-xs text-[#7A6262]">or</span>
-            <div className="flex-1 h-px bg-[#EDE8E8]" />
+            <div className="flex-1 h-px bg-[#E2E8F0]" />
+            <span className="text-xs text-[#64748B]">or</span>
+            <div className="flex-1 h-px bg-[#E2E8F0]" />
           </div>
 
           {/* Login link */}
-          <p className="text-center text-sm text-[#7A6262]">
+          <p className="text-center text-sm text-[#64748B]">
             Already have an account?{" "}
             <Link
               href="/login"
-              className="font-semibold text-[#C41E3A] hover:underline"
+              className="font-semibold text-[#2563EB] hover:underline"
             >
               Sign in
             </Link>

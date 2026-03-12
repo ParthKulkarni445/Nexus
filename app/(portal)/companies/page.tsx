@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -26,7 +26,7 @@ import FilterSelect from "@/components/ui/FilterSelect";
 import EmptyState from "@/components/ui/EmptyState";
 import ContactModal from "@/components/companies/ContactModal";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// --- Types -------------------------------------------------------------------
 type CycleStatus =
   | "not_contacted"
   | "contacted"
@@ -59,7 +59,7 @@ interface Company {
   isWishlisted?: boolean;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// --- Mock Data ----------------------------------------------------------------
 const MOCK_COMPANIES: Company[] = [
   {
     id: "c1",
@@ -433,7 +433,7 @@ function DeleteModal({
           Are you sure you want to delete <strong>{company?.name}</strong>? This
           action is irreversible and will create an audit log entry.
         </p>
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-xs text-red-700">
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-700">
           All associated contacts, assignments, and history will be permanently
           removed.
         </div>
@@ -442,7 +442,7 @@ function DeleteModal({
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// --- Main Component -----------------------------------------------------------
 export default function CompaniesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
@@ -563,9 +563,9 @@ export default function CompaniesPage() {
       );
     }
     return sortDir === "asc" ? (
-      <ChevronUp size={12} className="text-[#C41E3A]" />
+      <ChevronUp size={12} className="text-[#2563EB]" />
     ) : (
-      <ChevronDown size={12} className="text-[#C41E3A]" />
+      <ChevronDown size={12} className="text-[#2563EB]" />
     );
   };
 
@@ -576,34 +576,34 @@ export default function CompaniesPage() {
     assigneeFilter.length;
 
   return (
-    <div className="animate-fade-in xl:h-full">
+    <div className="animate-fade-in xl:h-full pb-6 pt-6">
       <div className="flex flex-col xl:flex-row gap-5 xl:items-start xl:h-full">
-        {/* ── Left: Statistics card ─────────────────────────── */}
+        {/* -- Left: Statistics card --------------------------- */}
         {(() => {
           const statItems = [
             {
               label: "Total",
               value: stats.total,
               sub: "Companies",
-              accent: "#C41E3A",
+              accent: "#2563EB",
             },
             {
               label: "Accepted",
               value: stats.accepted,
               sub: "Confirmed JD",
-              accent: "#C41E3A",
+              accent: "#2563EB",
             },
             {
               label: "Positive",
               value: stats.positive,
               sub: "Responded well",
-              accent: "#C41E3A",
+              accent: "#2563EB",
             },
             {
               label: "Pending",
               value: stats.notContacted,
               sub: "Not contacted",
-              accent: "#C41E3A",
+              accent: "#2563EB",
             },
           ];
           const r = 46,
@@ -617,7 +617,7 @@ export default function CompaniesPage() {
                 className="px-4 py-3 border-b"
                 style={{
                   borderColor: "var(--card-border)",
-                  background: "var(--primary)",
+                  background: "#2563EB",
                 }}
               >
                 <p
@@ -628,7 +628,7 @@ export default function CompaniesPage() {
                 </p>
               </div>
 
-              {/* ── Mobile: ring left + compact rows right (hidden on xl) ── */}
+              {/* -- Mobile: ring left + compact rows right (hidden on xl) -- */}
               <div className="xl:hidden flex items-stretch">
                 {/* Left: circular progress ring (matches xl params) */}
                 <div
@@ -637,13 +637,13 @@ export default function CompaniesPage() {
                 >
                   <div className="relative flex items-center justify-center">
                     <svg width="116" height="116" viewBox="0 0 116 116">
-                      <circle cx="58" cy="58" r={r + 6} fill="#FFF1F3" />
+                      <circle cx="58" cy="58" r={r + 6} fill="#EFF6FF" />
                       <circle
                         cx="58"
                         cy="58"
                         r={r}
                         fill="white"
-                        stroke="#FFE4E9"
+                        stroke="#DBEAFE"
                         strokeWidth="8"
                       />
                       <circle
@@ -651,7 +651,7 @@ export default function CompaniesPage() {
                         cy="58"
                         r={r}
                         fill="none"
-                        stroke="#C41E3A"
+                        stroke="#2563EB"
                         strokeWidth="8"
                         strokeLinecap="round"
                         strokeDasharray={`${filled} ${circ - filled}`}
@@ -662,7 +662,7 @@ export default function CompaniesPage() {
                     <div className="absolute flex flex-col items-center">
                       <span
                         className="text-2xl font-extrabold leading-none"
-                        style={{ color: "var(--primary)" }}
+                        style={{ color: "#2563EB" }}
                       >
                         {stats.total > 0
                           ? Math.round((stats.accepted / stats.total) * 100)
@@ -698,7 +698,7 @@ export default function CompaniesPage() {
                       <div className="flex-1 min-w-0">
                         <p
                           className="text-[12px] font-bold uppercase tracking-wider leading-none"
-                          style={{ color: "#C41E3A" }}
+                          style={{ color: "#2563EB" }}
                         >
                           {label}
                         </p>
@@ -720,17 +720,17 @@ export default function CompaniesPage() {
                 </div>
               </div>
 
-              {/* ── xl: ring + vertical rows (hidden below xl) ── */}
+              {/* -- xl: ring + vertical rows (hidden below xl) -- */}
               <div className="hidden xl:flex flex-col items-center pt-6 pb-5 px-4 gap-1">
                 <div className="relative flex items-center justify-center">
                   <svg width="116" height="116" viewBox="0 0 116 116">
-                    <circle cx="58" cy="58" r={r + 6} fill="#FFF1F3" />
+                    <circle cx="58" cy="58" r={r + 6} fill="#EFF6FF" />
                     <circle
                       cx="58"
                       cy="58"
                       r={r}
                       fill="white"
-                      stroke="#FFE4E9"
+                      stroke="#DBEAFE"
                       strokeWidth="8"
                     />
                     <circle
@@ -738,7 +738,7 @@ export default function CompaniesPage() {
                       cy="58"
                       r={r}
                       fill="none"
-                      stroke="#C41E3A"
+                      stroke="#2563EB"
                       strokeWidth="8"
                       strokeLinecap="round"
                       strokeDasharray={`${filled} ${circ - filled}`}
@@ -749,7 +749,7 @@ export default function CompaniesPage() {
                   <div className="absolute flex flex-col items-center">
                     <span
                       className="text-2xl font-extrabold leading-none"
-                      style={{ color: "var(--primary)" }}
+                      style={{ color: "#2563EB" }}
                     >
                       {stats.total > 0
                         ? Math.round((stats.accepted / stats.total) * 100)
@@ -777,7 +777,7 @@ export default function CompaniesPage() {
                   <div
                     key={label}
                     className="flex items-center gap-3 px-3 flex-1 rounded-lg"
-                    style={{ background: "#C41E3A" }}
+                    style={{ background: "#2563EB" }}
                   >
                     <div
                       className="w-1 self-stretch rounded-full shrink-0 my-3"
@@ -810,7 +810,7 @@ export default function CompaniesPage() {
           );
         })()}
 
-        {/* ── Right: Table card ─────────────────────────────── */}
+        {/* -- Right: Table card ------------------------------- */}
         <div className="card overflow-hidden flex-1 min-w-0 xl:h-full flex flex-col">
           {/* Toolbar */}
           <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
@@ -827,7 +827,7 @@ export default function CompaniesPage() {
               <button
                 className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
                   showFilters
-                    ? "bg-[#FFF1F3] border-[#FBBDC8] text-[#A8192F]"
+                    ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]"
                     : ""
                 }`}
                 onClick={() => setShowFilters((v) => !v)}
@@ -835,7 +835,7 @@ export default function CompaniesPage() {
                 <Filter size={14} />
                 Filters
                 {activeFilterCount > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-[#C41E3A] text-white text-[10px] flex items-center justify-center">
+                  <span className="w-4 h-4 rounded-full bg-[#2563EB] text-white text-[10px] flex items-center justify-center">
                     {activeFilterCount}
                   </span>
                 )}
@@ -906,7 +906,7 @@ export default function CompaniesPage() {
                 />
                 {activeFilterCount > 0 && (
                   <button
-                    className="btn btn-ghost btn-sm text-red-500 hover:text-red-700 shrink-0"
+                    className="btn btn-ghost btn-sm text-slate-500 hover:text-slate-700 shrink-0"
                     onClick={() => {
                       setStatusFilter([]);
                       setIndustryFilter([]);
@@ -979,11 +979,11 @@ export default function CompaniesPage() {
                           href={`/companies/${company.id}`}
                           className="flex items-center gap-3 group"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-[#FFF1F3] border border-[#FFE4E9] flex items-center justify-center text-[#C41E3A] font-semibold text-xs shrink-0">
+                          <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#2563EB] font-semibold text-xs shrink-0">
                             {company.name.charAt(0)}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-medium text-slate-900 group-hover:text-[#C41E3A] transition-colors truncate">
+                            <p className="font-medium text-slate-900 group-hover:text-[#2563EB] transition-colors truncate">
                               {company.name}
                             </p>
                             <p className="text-xs text-slate-400">
@@ -1020,7 +1020,7 @@ export default function CompaniesPage() {
                           )}
                           <button
                             type="button"
-                            className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-200 text-slate-500 hover:text-[#C41E3A] hover:border-[#FBBDC8] hover:bg-[#FFF1F3] transition-colors"
+                            className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-200 text-slate-500 hover:text-[#2563EB] hover:border-[#BFDBFE] hover:bg-[#EFF6FF] transition-colors"
                             aria-label="Show update details"
                             title="Show update details"
                             onClick={(event) =>
@@ -1035,13 +1035,13 @@ export default function CompaniesPage() {
                         <div className="flex items-center justify-center gap-1 relative">
                           <Link
                             href={`/companies/${company.id}`}
-                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#C41E3A]"
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
                             title="View"
                           >
                             <Eye size={15} />
                           </Link>
                           <button
-                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#C41E3A]"
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
                             title="Edit"
                             onClick={() => {
                               setSelectedCompany(company);
@@ -1051,7 +1051,7 @@ export default function CompaniesPage() {
                             <Pencil size={15} />
                           </button>
                           <button
-                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#C41E3A]"
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
                             title="Add Contact"
                             onClick={() => {
                               setContactTargetCompany(company);
@@ -1067,7 +1067,7 @@ export default function CompaniesPage() {
                             </span>
                           </button>
                           <button
-                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#C41E3A]"
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
                             title="Delete"
                             onClick={() => {
                               setSelectedCompany(company);
@@ -1205,7 +1205,7 @@ export default function CompaniesPage() {
                     </span>
                   </div>
                   <div className="flex-1">
-                    <span className="text-sm font-mono text-[#C41E3A] bg-[#FFF1F3] px-2 py-0.5 rounded">
+                    <span className="text-sm font-mono text-[#2563EB] bg-[#EFF6FF] px-2 py-0.5 rounded">
                       {updateDetails.company.updatedField}
                     </span>
                   </div>

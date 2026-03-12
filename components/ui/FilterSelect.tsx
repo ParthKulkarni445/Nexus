@@ -95,7 +95,7 @@ export default function FilterSelect({
                       type="checkbox"
                       checked={checked}
                       onChange={() => toggleValue(option.value)}
-                      className="accent-[#C41E3A]"
+                      className="accent-[#2563EB]"
                     />
                     <span className="text-sm text-slate-700 truncate">
                       {option.label}
@@ -110,7 +110,7 @@ export default function FilterSelect({
               </span>
               <button
                 type="button"
-                className="text-xs text-[#C41E3A] hover:text-[#A8192F]"
+                className="text-xs text-[#2563EB] hover:text-[#1D4ED8]"
                 onClick={() => onChange([])}
               >
                 Clear

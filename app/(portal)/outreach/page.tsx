@@ -23,7 +23,7 @@ import FilterSelect from "@/components/ui/FilterSelect";
 import EmptyState from "@/components/ui/EmptyState";
 import SearchBar from "@/components/ui/SearchBar";
 
-// ─── Types & Mock Data ────────────────────────────────────────────────────────
+// --- Types & Mock Data --------------------------------------------------------
 const MY_ID = "coordinator_ananya";
 const CURRENT_USER_NAME = "Ananya Mehta";
 
@@ -244,7 +244,7 @@ function MailRequestModal({
                 onClick={() => setType(t)}
                 className={`flex-1 py-2.5 px-4 rounded-lg border text-sm font-medium transition-all ${
                   type === t
-                    ? "border-[#C41E3A] bg-[#FFF1F3] text-[#A8192F]"
+                    ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
@@ -334,7 +334,7 @@ function QuickLogModal({
               onClick={() => setAction(a)}
               className={`flex-1 py-2 rounded-lg border text-xs font-medium capitalize transition-all ${
                 action === a
-                  ? "border-[#C41E3A] bg-[#FFF1F3] text-[#A8192F]"
+                  ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]"
                   : "border-slate-200 text-slate-600 hover:bg-slate-50"
               }`}
             >
@@ -386,13 +386,13 @@ function OutreachCard({ entry }: { entry: OutreachEntry }) {
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-lg bg-[#FFF1F3] border border-[#FFE4E9] flex items-center justify-center text-[#A8192F] font-semibold text-sm shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-semibold text-sm shrink-0">
               {entry.companyName.charAt(0)}
             </div>
             <div className="min-w-0">
               <Link
                 href={`/companies/${entry.companyId}`}
-                className="font-semibold text-slate-900 hover:text-[#C41E3A] transition-colors text-sm truncate block"
+                className="font-semibold text-slate-900 hover:text-[#2563EB] transition-colors text-sm truncate block"
               >
                 {entry.companyName}
               </Link>
@@ -424,21 +424,21 @@ function OutreachCard({ entry }: { entry: OutreachEntry }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <a
               href={`tel:${entry.contact.phone}`}
-              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-[#C41E3A] group"
+              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-[#2563EB] group"
             >
               <Phone
                 size={12}
-                className="text-slate-400 group-hover:text-[#C41E3A] shrink-0"
+                className="text-slate-400 group-hover:text-[#2563EB] shrink-0"
               />
               <span className="truncate">{entry.contact.phone}</span>
             </a>
             <a
               href={`mailto:${entry.contact.email}`}
-              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-[#C41E3A] group"
+              className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-[#2563EB] group"
             >
               <Mail
                 size={12}
-                className="text-slate-400 group-hover:text-[#C41E3A] shrink-0"
+                className="text-slate-400 group-hover:text-[#2563EB] shrink-0"
               />
               <span className="truncate">{entry.contact.email}</span>
             </a>
@@ -474,7 +474,7 @@ function OutreachCard({ entry }: { entry: OutreachEntry }) {
               </span>
             )}
             {entry.nextFollowUp && (
-              <span className="flex items-center gap-1 text-[#C41E3A]">
+              <span className="flex items-center gap-1 text-[#2563EB]">
                 <CheckCircle2 size={11} />
                 Follow-up:{" "}
                 {new Date(entry.nextFollowUp).toLocaleDateString("en-IN", {
@@ -495,7 +495,7 @@ function OutreachCard({ entry }: { entry: OutreachEntry }) {
             </button>
             <a
               href={`tel:${entry.contact.phone}`}
-              className="btn btn-success btn-sm gap-1"
+              className="btn btn-primary btn-sm gap-1"
             >
               <Phone size={13} />
               Call
@@ -583,22 +583,22 @@ export default function OutreachPage() {
         <div
           className="card relative overflow-hidden px-5 py-4 sm:px-6 sm:py-5"
           style={{
-            // background: "#C41E3A",
+            // background: "#2563EB",
             background: "#FFFFFF",
-            borderColor: "#FFE4E9",
+            borderColor: "#DBEAFE",
           }}
         >
-          {/* <div className="pointer-events-none absolute -top-10 -right-8 w-40 h-40 rounded-full bg-[#C41E3A]/12 blur-2xl" />
-          <div className="pointer-events-none absolute -bottom-10 left-8 w-36 h-36 rounded-full bg-[#FBBDC8]/30 blur-2xl" /> */}
+          {/* <div className="pointer-events-none absolute -top-10 -right-8 w-40 h-40 rounded-full bg-[#2563EB]/12 blur-2xl" />
+          <div className="pointer-events-none absolute -bottom-10 left-8 w-36 h-36 rounded-full bg-[#BFDBFE]/30 blur-2xl" /> */}
 
           <div className="relative z-10">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#C41E3A]">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#2563EB]">
               Personal Outreach Desk
             </p>
             <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Hello {CURRENT_USER_NAME}, check the tasks lined up for you.
             </h1>
-            <p className="mt-1.5 text-sm font-bold text-[#C41E3A]">
+            <p className="mt-1.5 text-sm font-bold text-[#2563EB]">
               This page shows your assigned companies for calls, mails, and follow-ups.
             </p>
 
@@ -627,7 +627,7 @@ export default function OutreachPage() {
               ].map((item) => (
                 <div
                   key={item.title}
-                  className="rounded-xl border border-[#A8192F] bg-[#C41E3A] px-3 py-2.5 shadow-sm"
+                  className="rounded-xl border border-[#1D4ED8] bg-[#2563EB] px-3 py-2.5 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -638,8 +638,8 @@ export default function OutreachPage() {
                         {item.value}
                       </p>
                     </div>
-                    <div className="w-8 h-8 rounded-lg bg-white border border-[#FFE4E9] flex items-center justify-center shrink-0">
-                      <item.icon size={20} color="#C41E3A" />
+                    <div className="w-8 h-8 rounded-lg bg-white border border-[#DBEAFE] flex items-center justify-center shrink-0">
+                      <item.icon size={20} color="#2563EB" />
                     </div>
                   </div>
                 </div>
@@ -649,7 +649,7 @@ export default function OutreachPage() {
         </div>
       </div>
 
-      <div className="card overflow-hidden flex flex-col">
+      <div className="card overflow-visible flex flex-col">
         <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
           <div className="flex items-center gap-2">
             <SearchBar
@@ -661,7 +661,7 @@ export default function OutreachPage() {
             <button
               className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
                 showFilters
-                  ? "bg-[#FFF1F3] border-[#FBBDC8] text-[#A8192F]"
+                  ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]"
                   : ""
               }`}
               onClick={() => setShowFilters((v) => !v)}
@@ -669,7 +669,7 @@ export default function OutreachPage() {
               <Filter size={14} />
               Filters
               {activeFilterCount > 0 && (
-                <span className="w-4 h-4 rounded-full bg-[#C41E3A] text-white text-[10px] flex items-center justify-center">
+                <span className="w-4 h-4 rounded-full bg-[#2563EB] text-white text-[10px] flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
@@ -696,7 +696,7 @@ export default function OutreachPage() {
               />
               {activeFilterCount > 0 && (
                 <button
-                  className="btn btn-ghost btn-sm text-red-500 hover:text-red-700 shrink-0"
+                  className="btn btn-ghost btn-sm text-slate-500 hover:text-slate-700 shrink-0"
                   onClick={() => {
                     setStatusFilter([]);
                     setSeasonFilter([]);

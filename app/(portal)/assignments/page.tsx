@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
@@ -7,14 +7,12 @@ import {
   Building2,
   CheckCircle2,
   AlertCircle,
-  Plus,
   Filter,
   ChevronDown,
   ChevronUp,
   UserCheck,
   UserPlus,
   RefreshCw,
-  Briefcase,
   BarChart3,
   PieChart as PieChartIcon,
 } from "lucide-react";
@@ -36,10 +34,9 @@ import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import FilterSelect from "@/components/ui/FilterSelect";
 import EmptyState from "@/components/ui/EmptyState";
-import StatCard from "@/components/ui/StatCard";
 import SearchBar from "@/components/ui/SearchBar";
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// --- Mock Data ----------------------------------------------------------------
 const COORDINATORS = [
   { id: "c_ananya", name: "Ananya Mehta", avatar: "AM" },
   { id: "c_rohan", name: "Rohan Sharma", avatar: "RS" },
@@ -183,8 +180,8 @@ const COORDINATOR_OPTIONS = COORDINATORS.map((c) => ({
   label: c.name,
 }));
 
-const PIE_COLORS = ["#6366F1", "#E2E8F0"];
-const BAR_COLORS = ["#6366F1", "#10B981", "#F59E0B", "#3B82F6"];
+const PIE_COLORS = ["#2563EB", "#E2E8F0"];
+const BAR_COLORS = ["#2563EB", "#3B82F6", "#BFDBFE", "#DBEAFE"];
 
 function AssignModal({
   isOpen,
@@ -221,7 +218,7 @@ function AssignModal({
     >
       <div className="space-y-4">
         {isBulk && (
-          <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 text-sm text-slate-600">
+          <div className="bg-[#EFF6FF] border border-[#DBEAFE] rounded-lg px-3 py-2.5 text-sm text-slate-600">
             Assigning <strong>{companies.length} companies</strong> to a
             coordinator.
           </div>
@@ -320,8 +317,8 @@ function ReassignModal({
 export default function AssignmentsPage() {
   const [tab, setTab] = useState<"assigned" | "unassigned">("assigned");
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [coordinatorFilter, setCoordinatorFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [coordinatorFilter, setCoordinatorFilter] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [assignModal, setAssignModal] = useState<{
     companies: typeof UNASSIGNED_COMPANIES;
@@ -363,9 +360,10 @@ export default function AssignmentsPage() {
           a.coordinatorName.toLowerCase().includes(q),
       );
     }
-    if (statusFilter) data = data.filter((a) => a.status === statusFilter);
-    if (coordinatorFilter)
-      data = data.filter((a) => a.coordinatorId === coordinatorFilter);
+    if (statusFilter.length > 0)
+      data = data.filter((a) => statusFilter.includes(a.status));
+    if (coordinatorFilter.length > 0)
+      data = data.filter((a) => coordinatorFilter.includes(a.coordinatorId));
     return data;
   }, [search, statusFilter, coordinatorFilter]);
 
@@ -377,6 +375,7 @@ export default function AssignmentsPage() {
     }
     return data;
   }, [search]);
+  const activeFilterCount = statusFilter.length + coordinatorFilter.length;
 
   // Group assigned by coordinator
   const groupedByCoordinator = useMemo(() => {
@@ -418,201 +417,110 @@ export default function AssignmentsPage() {
   ];
 
   return (
-    <div className="p-4 lg:p-6 space-y-5 animate-fade-in">
-      {/* ── Page header ───────────────────────────────────────── */}
-      <div
-        className="rounded-2xl px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-        style={{
-          background:
-            "linear-gradient(135deg, #1A0A0A 0%, #2D1515 60%, #1A0A0A 100%)",
-        }}
-      >
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-8 h-8 rounded-lg bg-[#C41E3A]/20 border border-[#C41E3A]/30 flex items-center justify-center">
-              <Users size={16} className="text-[#FBBDC8]" />
-            </div>
-            <h2 className="text-white font-bold text-lg tracking-tight">
-              Assignments
-            </h2>
-          </div>
-          <p className="text-sm" style={{ color: "#D4B8B8" }}>
-            Manage company assignments to coordinators
-          </p>
-        </div>
-      </div>
+    <div className="-mt-6 xl:mt-0 space-y-5 pl-4 pr-4 pb-6 animate-fade-in xl:h-full xl:overflow-y-auto hide-scrollbar">
+      {/* -- Hero header card (matching outreach / mailing style) ------ */}
+      <div className="relative z-0 pt-10">
+        <div
+          className="card relative overflow-hidden px-5 py-4 sm:px-6 sm:py-5"
+          style={{
+            background: "#FFFFFF",
+            borderColor: "#DBEAFE",
+          }}
+        >
+          <div className="relative z-10">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#2563EB]">
+              Coordinator Assignments
+            </p>
+            <h1 className="mt-1 text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              Manage company assignments to coordinators
+            </h1>
+            <p className="mt-1.5 text-sm font-bold text-[#2563EB]">
+              Assign, reassign, and track company-coordinator mappings for the
+              current placement season.
+            </p>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Companies"
-          value={stats.total}
-          icon={Building2}
-          iconBg="bg-[#FFF1F3]"
-          iconColor="text-[#C41E3A]"
-          subtitle="This season"
-        />
-        <StatCard
-          title="Assigned"
-          value={stats.assigned}
-          icon={UserCheck}
-          iconBg="bg-emerald-50"
-          iconColor="text-emerald-600"
-          change={`${Math.round((stats.assigned / stats.total) * 100)}% coverage`}
-          changeType="up"
-        />
-        <StatCard
-          title="Unassigned"
-          value={stats.unassigned}
-          icon={AlertCircle}
-          iconBg="bg-amber-50"
-          iconColor="text-amber-600"
-          subtitle="Needs assignment"
-        />
-        <StatCard
-          title="Coordinators"
-          value={COORDINATORS.length}
-          icon={Users}
-          iconBg="bg-blue-50"
-          iconColor="text-blue-600"
-          subtitle="Active this season"
-        />
-      </div>
-
-      {/* Charts */}
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <BarChart3 size={16} className="text-[#C41E3A]" />
-            <h3 className="text-sm font-semibold text-slate-800">
-              Distribution Overview
-            </h3>
-          </div>
-          <button
-            onClick={() => setShowCharts((v) => !v)}
-            className="btn btn-ghost btn-sm gap-1 text-slate-500"
-          >
-            {showCharts ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            {showCharts ? "Hide" : "Show"}
-          </button>
-        </div>
-
-        {showCharts && (
-          <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Pie chart */}
-            <div>
-              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                <PieChartIcon size={13} className="text-[#C41E3A]" />
-                Assigned vs Unassigned
-              </p>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={80}
-                      paddingAngle={4}
-                      dataKey="value"
-                    >
-                      {pieData.map((_, idx) => (
-                        <Cell key={idx} fill={PIE_COLORS[idx]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: "8px",
-                        border: "1px solid #E2E8F0",
-                        fontSize: "12px",
-                      }}
-                    />
-                    <Legend
-                      wrapperStyle={{ fontSize: "12px" }}
-                      iconType="circle"
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Bar chart */}
-            <div>
-              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                <BarChart3 size={13} className="text-[#C41E3A]" />
-                Coordinator Load
-              </p>
-              <div className="h-52">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={stats.byCoord}
-                    margin={{ top: 0, right: 10, left: -20, bottom: 0 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                    <XAxis
-                      dataKey="name"
-                      tick={{ fontSize: 12, fill: "#64748B" }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      tick={{ fontSize: 11, fill: "#94A3B8" }}
-                      axisLine={false}
-                      tickLine={false}
-                      allowDecimals={false}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: "8px",
-                        border: "1px solid #E2E8F0",
-                        fontSize: "12px",
-                      }}
-                      cursor={{ fill: "#F1F5F9" }}
-                    />
-                    <Bar
-                      dataKey="companies"
-                      name="Companies"
-                      radius={[4, 4, 0, 0]}
-                      fill="#6366F1"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Main table/list card */}
-      <div className="card overflow-hidden">
-        <div className="border-b border-slate-100 flex items-center justify-between px-4">
-          <div className="flex">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all
-                  ${
-                    tab === t.key
-                      ? "border-[#C41E3A] text-[#C41E3A]"
-                      : "border-transparent text-slate-500 hover:text-slate-800"
-                  }`}
-              >
-                {t.label}
-                <span
-                  className={`text-xs rounded-full px-1.5 py-0.5 font-semibold
-                  ${tab === t.key ? "bg-[#FFE4E9] text-[#A8192F]" : "bg-slate-100 text-slate-500"}`}
+            <div className="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-5">
+              {[
+                {
+                  title: "Total Companies",
+                  value: stats.total,
+                  icon: Building2,
+                },
+                {
+                  title: "Assigned",
+                  value: stats.assigned,
+                  icon: UserCheck,
+                },
+                {
+                  title: "Unassigned",
+                  value: stats.unassigned,
+                  icon: AlertCircle,
+                },
+                {
+                  title: "Coordinators",
+                  value: COORDINATORS.length,
+                  icon: Users,
+                },
+              ].map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-xl border border-[#1D4ED8] bg-[#2563EB] px-3 py-2.5 shadow-sm"
                 >
-                  {t.count}
-                </span>
-              </button>
-            ))}
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold text-white uppercase tracking-wide">
+                        {item.title}
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-black leading-none">
+                        {item.value}
+                      </p>
+                    </div>
+                    <div className="w-8 h-8 rounded-lg bg-white border border-[#DBEAFE] flex items-center justify-center shrink-0">
+                      <item.icon size={20} color="#2563EB" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="shrink-0">
+        </div>
+      </div>
+
+      {/* -- Toolbar card ---------------------------------------------- */}
+      <div className="card overflow-visible flex flex-col">
+        <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
+          <div className="flex items-center gap-2">
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder={
+                tab === "assigned"
+                  ? "Search company or coordinator..."
+                  : "Search company..."
+              }
+              className="flex-1 min-w-0"
+            />
+            {tab === "assigned" && (
+              <button
+                className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
+                  showFilters
+                    ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]"
+                    : ""
+                }`}
+                onClick={() => setShowFilters((v) => !v)}
+              >
+                <Filter size={14} />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-[#2563EB] text-white text-[10px] flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+            )}
             {tab === "unassigned" && selectedUnassigned.size > 0 && (
               <button
-                className="btn btn-primary btn-sm gap-1"
+                className="btn btn-primary btn-sm gap-1 shrink-0"
                 onClick={() =>
                   setAssignModal({
                     companies: UNASSIGNED_COMPANIES.filter((c) =>
@@ -627,212 +535,419 @@ export default function AssignmentsPage() {
               </button>
             )}
           </div>
-        </div>
 
-        {/* Search & filters */}
-        <div className="px-4 py-3 border-b border-slate-50 space-y-3">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <SearchBar
-              value={search}
-              onChange={(v) => setSearch(v)}
-              placeholder={
-                tab === "assigned"
-                  ? "Search company or coordinator..."
-                  : "Search company..."
-              }
-              className="flex-1"
-            />
-            {tab === "assigned" && (
-              <button
-                className={`btn btn-secondary btn-sm shrink-0 ${showFilters ? "bg-[#FFF1F3] border-[#FBBDC8] text-[#A8192F]" : ""}`}
-                onClick={() => setShowFilters((v) => !v)}
-              >
-                <Filter size={14} />
-                Filters
-              </button>
-            )}
-          </div>
           {showFilters && tab === "assigned" && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2 pt-1 pb-0.5 w-full">
               <FilterSelect
+                multiple
                 value={statusFilter}
                 onChange={setStatusFilter}
                 options={STATUS_OPTIONS}
-                placeholder="All Statuses"
-                className="w-40"
+                placeholder="Status"
+                className="z-20 flex-1 min-w-0"
               />
               <FilterSelect
+                multiple
                 value={coordinatorFilter}
                 onChange={setCoordinatorFilter}
                 options={COORDINATOR_OPTIONS}
-                placeholder="All Coordinators"
-                className="w-44"
+                placeholder="Coordinator"
+                className="z-20 flex-1 min-w-0"
               />
-              {(statusFilter || coordinatorFilter) && (
+              {(statusFilter.length > 0 || coordinatorFilter.length > 0) && (
                 <button
-                  className="btn btn-ghost btn-sm text-red-500"
+                  className="btn btn-ghost btn-sm text-slate-500 hover:text-slate-700 shrink-0"
                   onClick={() => {
-                    setStatusFilter("");
-                    setCoordinatorFilter("");
+                    setStatusFilter([]);
+                    setCoordinatorFilter([]);
                   }}
                 >
-                  Clear
+                  Clear all
                 </button>
               )}
             </div>
           )}
         </div>
+      </div>
 
-        {/* Assigned tab content */}
-        {tab === "assigned" && (
-          <div className="p-4 space-y-3">
-            {Object.keys(groupedByCoordinator).length === 0 ? (
-              <EmptyState
-                icon={Users}
-                title="No assignments found"
-                description="Try adjusting the filters."
-              />
-            ) : (
-              Object.entries(groupedByCoordinator).map(
-                ([coordinatorName, entries]) => (
-                  <div
-                    key={coordinatorName}
-                    className="border border-slate-200 rounded-xl overflow-hidden"
+      {/* -- Two-column layout: List (left) + Stats/Charts (right) --- */}
+      <div className="flex flex-col xl:flex-row gap-5">
+        {/* -- LEFT COLUMN: Assignment List ---------------------------- */}
+        <div className="flex-1 min-w-0">
+          <div className="card overflow-hidden">
+            {/* Tab header */}
+            <div className="border-b border-[#DBEAFE] flex items-center justify-between px-4">
+              <div className="flex">
+                {TABS.map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => setTab(t.key)}
+                    className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all
+                      ${
+                        tab === t.key
+                          ? "border-[#2563EB] text-[#2563EB]"
+                          : "border-transparent text-slate-500 hover:text-slate-800"
+                      }`}
                   >
-                    {/* Group header */}
-                    <button
-                      className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition-colors"
-                      onClick={() => toggleGroup(coordinatorName)}
+                    {t.label}
+                    <span
+                      className={`text-xs rounded-full px-1.5 py-0.5 font-semibold
+                      ${tab === t.key ? "bg-[#DBEAFE] text-[#1D4ED8]" : "bg-slate-100 text-slate-500"}`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#FFE4E9] flex items-center justify-center text-[#A8192F] text-xs font-semibold">
-                          {coordinatorName
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </div>
-                        <div className="text-left">
-                          <p className="text-sm font-semibold text-slate-800">
-                            {coordinatorName}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {entries.length} companies assigned
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="purple" size="sm">
-                          {entries.length}
-                        </Badge>
-                        {expandedGroups.has(coordinatorName) ? (
-                          <ChevronUp size={16} className="text-slate-400" />
-                        ) : (
-                          <ChevronDown size={16} className="text-slate-400" />
-                        )}
-                      </div>
-                    </button>
+                      {t.count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-                    {/* Group rows */}
-                    {expandedGroups.has(coordinatorName) && (
-                      <div className="divide-y divide-slate-50">
-                        {entries.map((a) => (
-                          <div
-                            key={a.companyId}
-                            className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors"
-                          >
-                            <div className="w-8 h-8 rounded-lg bg-[#FFF1F3] border border-[#FFE4E9] flex items-center justify-center text-[#A8192F] text-xs font-semibold shrink-0">
-                              {a.companyName.charAt(0)}
+            {/* Assigned tab content */}
+            {tab === "assigned" && (
+              <div className="p-4 space-y-3">
+                {Object.keys(groupedByCoordinator).length === 0 ? (
+                  <EmptyState
+                    icon={Users}
+                    title="No assignments found"
+                    description="Try adjusting the filters."
+                  />
+                ) : (
+                  Object.entries(groupedByCoordinator).map(
+                    ([coordinatorName, entries]) => (
+                      <div
+                        key={coordinatorName}
+                        className="border border-[#DBEAFE] rounded-xl overflow-hidden"
+                      >
+                        {/* Group header */}
+                        <button
+                          className="w-full flex items-center justify-between px-4 py-3 bg-[#F5F9FF] hover:bg-[#EFF6FF] transition-colors"
+                          onClick={() => toggleGroup(coordinatorName)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold">
+                              {coordinatorName
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <Link
-                                href={`/companies/${a.companyId}`}
-                                className="text-sm font-medium text-slate-900 hover:text-[#C41E3A] transition-colors truncate block"
-                              >
-                                {a.companyName}
-                              </Link>
-                              <p className="text-xs text-slate-400">
-                                {a.industry} · {a.season}
+                            <div className="text-left">
+                              <p className="text-sm font-semibold text-slate-800">
+                                {coordinatorName}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {entries.length} companies assigned
                               </p>
                             </div>
-                            <StatusBadge status={a.status} size="sm" />
-                            <button
-                              className="btn btn-ghost btn-sm gap-1 text-slate-500 hover:text-[#C41E3A] hidden sm:flex"
-                              onClick={() => setReassignModal(a.companyName)}
-                            >
-                              <RefreshCw size={13} />
-                              Reassign
-                            </button>
-                            <button
-                              className="sm:hidden btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#C41E3A]"
-                              onClick={() => setReassignModal(a.companyName)}
-                            >
-                              <RefreshCw size={14} />
-                            </button>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ),
-              )
-            )}
-          </div>
-        )}
+                          <div className="flex items-center gap-2">
+                            <Badge variant="danger" size="sm">
+                              {entries.length}
+                            </Badge>
+                            {expandedGroups.has(coordinatorName) ? (
+                              <ChevronUp size={16} className="text-slate-400" />
+                            ) : (
+                              <ChevronDown
+                                size={16}
+                                className="text-slate-400"
+                              />
+                            )}
+                          </div>
+                        </button>
 
-        {/* Unassigned tab content */}
-        {tab === "unassigned" && (
-          <div className="p-4 space-y-2">
-            {filteredUnassigned.length === 0 ? (
-              <EmptyState
-                icon={CheckCircle2}
-                title="All companies are assigned!"
-                description="Every company in this season has been assigned to a coordinator."
-              />
-            ) : (
-              filteredUnassigned.map((c) => (
-                <div
-                  key={c.companyId}
-                  className="flex items-center gap-4 p-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors group"
-                >
-                  <button
-                    onClick={() => toggleSelectUnassigned(c.companyId)}
-                    className="text-slate-300 group-hover:text-slate-400 hover:text-[#C41E3A]! transition-colors shrink-0"
-                  >
-                    {selectedUnassigned.has(c.companyId) ? (
-                      <CheckCircle2 size={16} className="text-[#C41E3A]" />
-                    ) : (
-                      <div className="w-4 h-4 rounded border border-slate-300 group-hover:border-[#E53E5C]" />
-                    )}
-                  </button>
-                  <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500 text-xs font-semibold shrink-0">
-                    {c.companyName.charAt(0)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <Link
-                      href={`/companies/${c.companyId}`}
-                      className="text-sm font-medium text-slate-900 hover:text-[#C41E3A] transition-colors truncate block"
+                        {/* Group rows */}
+                        {expandedGroups.has(coordinatorName) && (
+                          <div className="divide-y divide-[#EFF6FF]">
+                            {entries.map((a) => (
+                              <div
+                                key={a.companyId}
+                                className="flex items-center gap-4 px-4 py-3 hover:bg-[#F5F9FF] transition-colors"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
+                                  {a.companyName.charAt(0)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <Link
+                                    href={`/companies/${a.companyId}`}
+                                    className="text-sm font-medium text-slate-900 hover:text-[#2563EB] transition-colors truncate block"
+                                  >
+                                    {a.companyName}
+                                  </Link>
+                                  <p className="text-xs text-slate-400">
+                                    {a.industry} · {a.season}
+                                  </p>
+                                </div>
+                                <StatusBadge status={a.status} size="sm" />
+                                <button
+                                  className="btn btn-ghost btn-sm gap-1 text-slate-500 hover:text-[#2563EB] hidden sm:flex"
+                                  onClick={() =>
+                                    setReassignModal(a.companyName)
+                                  }
+                                >
+                                  <RefreshCw size={13} />
+                                  Reassign
+                                </button>
+                                <button
+                                  className="sm:hidden btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#2563EB]"
+                                  onClick={() =>
+                                    setReassignModal(a.companyName)
+                                  }
+                                >
+                                  <RefreshCw size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ),
+                  )
+                )}
+              </div>
+            )}
+
+            {/* Unassigned tab content */}
+            {tab === "unassigned" && (
+              <div className="p-4 space-y-2">
+                {filteredUnassigned.length === 0 ? (
+                  <EmptyState
+                    icon={CheckCircle2}
+                    title="All companies are assigned!"
+                    description="Every company in this season has been assigned to a coordinator."
+                  />
+                ) : (
+                  filteredUnassigned.map((c) => (
+                    <div
+                      key={c.companyId}
+                      className="flex items-center gap-4 p-3 border border-[#DBEAFE] rounded-xl hover:bg-[#F5F9FF] transition-colors group"
                     >
-                      {c.companyName}
-                    </Link>
-                    <p className="text-xs text-slate-400">{c.industry}</p>
-                  </div>
-                  <Badge variant="warning" size="sm" dot>
-                    Unassigned
-                  </Badge>
-                  <button
-                    className="btn btn-primary btn-sm gap-1 shrink-0"
-                    onClick={() =>
-                      setAssignModal({ companies: [c], bulk: false })
-                    }
-                  >
-                    <UserPlus size={13} />
-                    <span className="hidden sm:inline">Assign</span>
-                  </button>
-                </div>
-              ))
+                      <button
+                        onClick={() => toggleSelectUnassigned(c.companyId)}
+                        className="text-slate-300 group-hover:text-slate-400 hover:text-[#2563EB]! transition-colors shrink-0"
+                      >
+                        {selectedUnassigned.has(c.companyId) ? (
+                          <CheckCircle2 size={16} className="text-[#2563EB]" />
+                        ) : (
+                          <div className="w-4 h-4 rounded border border-slate-300 group-hover:border-[#3B82F6]" />
+                        )}
+                      </button>
+                      <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
+                        {c.companyName.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          href={`/companies/${c.companyId}`}
+                          className="text-sm font-medium text-slate-900 hover:text-[#2563EB] transition-colors truncate block"
+                        >
+                          {c.companyName}
+                        </Link>
+                        <p className="text-xs text-slate-400">{c.industry}</p>
+                      </div>
+                      <Badge variant="warning" size="sm" dot>
+                        Unassigned
+                      </Badge>
+                      <button
+                        className="btn btn-primary btn-sm gap-1 shrink-0"
+                        onClick={() =>
+                          setAssignModal({ companies: [c], bulk: false })
+                        }
+                      >
+                        <UserPlus size={13} />
+                        <span className="hidden sm:inline">Assign</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             )}
           </div>
-        )}
+        </div>
+
+        {/* -- RIGHT COLUMN: Charts & Stats --------------------------- */}
+        <div className="xl:w-[380px] shrink-0 space-y-5">
+          {/* Quick stats cards */}
+          <div className="grid grid-cols-2 gap-3">
+            <div
+              className="card p-4 hover:shadow-md transition-all hover:-translate-y-0.5"
+              style={{ borderLeft: "3px solid #2563EB" }}
+            >
+              <p className="text-xs text-slate-500 font-medium">Coverage</p>
+              <p className="text-2xl font-bold text-slate-900 mt-0.5">
+                {Math.round((stats.assigned / stats.total) * 100)}%
+              </p>
+              <p className="text-[11px] text-emerald-600 mt-1">
+                {stats.assigned}/{stats.total} companies
+              </p>
+            </div>
+            <div
+              className="card p-4 hover:shadow-md transition-all hover:-translate-y-0.5"
+              style={{ borderLeft: "3px solid #3B82F6" }}
+            >
+              <p className="text-xs text-slate-500 font-medium">Avg Load</p>
+              <p className="text-2xl font-bold text-slate-900 mt-0.5">
+                {(stats.assigned / COORDINATORS.length).toFixed(1)}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-1">per coordinator</p>
+            </div>
+          </div>
+
+          {/* Pie chart card */}
+          <div className="card overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#DBEAFE]">
+              <div className="flex items-center gap-2">
+                <PieChartIcon size={14} className="text-[#2563EB]" />
+                <h3 className="text-sm font-semibold text-slate-800">
+                  Assignment Ratio
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowCharts((v) => !v)}
+                className="btn btn-ghost btn-sm gap-1 text-slate-500"
+              >
+                {showCharts ? (
+                  <ChevronUp size={14} />
+                ) : (
+                  <ChevronDown size={14} />
+                )}
+              </button>
+            </div>
+
+            {showCharts && (
+              <div className="p-4">
+                <div className="h-48">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={72}
+                        paddingAngle={4}
+                        dataKey="value"
+                      >
+                        {pieData.map((_, idx) => (
+                          <Cell key={idx} fill={PIE_COLORS[idx]} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "8px",
+                          border: "1px solid #DBEAFE",
+                          fontSize: "12px",
+                        }}
+                      />
+                      <Legend
+                        wrapperStyle={{ fontSize: "12px" }}
+                        iconType="circle"
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Bar chart card */}
+          <div className="card overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#DBEAFE]">
+              <BarChart3 size={14} className="text-[#2563EB]" />
+              <h3 className="text-sm font-semibold text-slate-800">
+                Coordinator Load
+              </h3>
+            </div>
+
+            {showCharts && (
+              <div className="p-4">
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={stats.byCoord}
+                      margin={{ top: 0, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#EFF6FF" />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 12, fill: "#64748B" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11, fill: "#94A3B8" }}
+                        axisLine={false}
+                        tickLine={false}
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "8px",
+                          border: "1px solid #DBEAFE",
+                          fontSize: "12px",
+                        }}
+                        cursor={{ fill: "#F5F9FF" }}
+                      />
+                      <Bar
+                        dataKey="companies"
+                        name="Companies"
+                        radius={[6, 6, 0, 0]}
+                      >
+                        {stats.byCoord.map((_, idx) => (
+                          <Cell
+                            key={idx}
+                            fill={BAR_COLORS[idx % BAR_COLORS.length]}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Coordinator breakdown */}
+          <div className="card overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-[#DBEAFE]">
+              <Users size={14} className="text-[#2563EB]" />
+              <h3 className="text-sm font-semibold text-slate-800">
+                Coordinator Summary
+              </h3>
+            </div>
+            <div className="divide-y divide-[#EFF6FF]">
+              {COORDINATORS.map((c) => {
+                const count = MOCK_ASSIGNMENTS.filter(
+                  (a) => a.coordinatorId === c.id,
+                ).length;
+                const percent =
+                  stats.assigned > 0
+                    ? Math.round((count / stats.assigned) * 100)
+                    : 0;
+                return (
+                  <div
+                    key={c.id}
+                    className="flex items-center gap-3 px-4 py-3 hover:bg-[#F5F9FF] transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
+                      {c.avatar}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-800 truncate">
+                        {c.name}
+                      </p>
+                      <div className="mt-1 h-1.5 bg-[#EFF6FF] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#2563EB] rounded-full transition-all"
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-slate-700 tabular-nums">
+                      {count}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Modals */}

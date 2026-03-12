@@ -17,20 +17,20 @@ export default function StatCard({
   change,
   changeType = "neutral",
   icon: Icon,
-  iconColor = "text-[#C41E3A]",
-  iconBg = "bg-[#FFF1F3]",
+  iconColor = "text-[#2563EB]",
+  iconBg = "bg-[#EFF6FF]",
   subtitle,
 }: StatCardProps) {
   const changeColors = {
     up: "text-emerald-600",
-    down: "text-red-500",
+    down: "text-blue-500",
     neutral: "text-slate-500",
   };
 
   return (
     <div
       className="card p-5 flex items-start gap-4 hover:shadow-md transition-all hover:-translate-y-0.5"
-      style={{ borderLeft: "3px solid #C41E3A" }}
+      style={{ borderLeft: "3px solid #2563EB" }}
     >
       <div
         className={`w-10 h-10 rounded-xl ${iconBg} flex items-center justify-center shrink-0`}
