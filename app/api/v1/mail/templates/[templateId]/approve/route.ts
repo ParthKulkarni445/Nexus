@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { getCurrentUser, hasRole } from "@/lib/api/auth";
+import { Prisma } from "@prisma/client";
+import { getCurrentUser, hasRoleOrCoordinatorType } from "@/lib/api/auth";
 import {
   success,
   unauthorized,
@@ -9,14 +10,8 @@ import {
 } from "@/lib/api/response";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { emailTemplates } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
-/**
- * POST /api/v1/mail/templates/:templateId/approve
- * Approve draft template
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ templateId: string }> }
@@ -27,8 +22,13 @@ export async function POST(
     return unauthorized();
   }
 
-  if (!hasRole(user, ["tpo_admin"])) {
-    return forbidden("Only administrators can approve templates");
+  if (
+    !hasRoleOrCoordinatorType(user, ["tpo_admin"], [
+      "mailing_team",
+      "student_representative",
+    ])
+  ) {
+    return forbidden("Only mailing team or student representatives can approve templates");
   }
 
   const { templateId } = await params;
@@ -36,21 +36,15 @@ export async function POST(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [approvedTemplate] = await db
-      .update(emailTemplates)
-      .set({
+    const approvedTemplate = await db.emailTemplate.update({
+      where: { id: templateId },
+      data: {
         status: "approved",
         approvedBy: user.id,
         updatedAt: new Date(),
-      })
-      .where(eq(emailTemplates.id, templateId))
-      .returning();
+      },
+    });
 
-    if (!approvedTemplate) {
-      return notFound("Template not found");
-    }
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "approve_email_template",
@@ -60,7 +54,14 @@ export async function POST(
     });
 
     return success(approvedTemplate);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Template not found");
+    }
+
     console.error("Error approving template:", error);
     return serverError();
   }

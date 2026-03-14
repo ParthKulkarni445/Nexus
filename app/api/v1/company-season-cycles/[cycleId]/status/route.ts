@@ -11,22 +11,19 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import {
-  companySeasonCycles,
-  companySeasonStatusHistory,
-} from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const updateStatusSchema = z.object({
-  status: z.enum(["not_contacted", "contacted", "positive", "accepted", "rejected"]),
+  status: z.enum([
+    "not_contacted",
+    "contacted",
+    "positive",
+    "accepted",
+    "rejected",
+  ]),
   note: z.string().optional(),
 });
 
-/**
- * PUT /api/v1/company-season-cycles/:cycleId/status
- * Transition status with note
- */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ cycleId: string }> }
@@ -52,35 +49,36 @@ export async function PUT(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    // Get current cycle
-    const currentCycle = await db.query.companySeasonCycles.findFirst({
-      where: eq(companySeasonCycles.id, cycleId),
+    const currentCycle = await db.companySeasonCycle.findUnique({
+      where: { id: cycleId },
     });
 
     if (!currentCycle) {
       return notFound("Company season cycle not found");
     }
 
-    // Create status history entry
-    await db.insert(companySeasonStatusHistory).values({
-      companySeasonCycleId: cycleId,
-      fromStatus: currentCycle.status,
-      toStatus: validation.status,
-      changedBy: user.id,
-      changeNote: validation.note,
+    const updatedCycle = await db.$transaction(async (tx) => {
+      await tx.companySeasonStatusHistory.create({
+        data: {
+          companySeasonCycleId: cycleId,
+          fromStatus: currentCycle.status,
+          toStatus: validation.status,
+          changedBy: user.id,
+          changeNote: validation.note,
+        },
+      });
+
+      return tx.companySeasonCycle.update({
+        where: { id: cycleId },
+        data: {
+          status: validation.status,
+          updatedBy: user.id,
+          updatedField: "status",
+          updatedAt: new Date(),
+        },
+      });
     });
 
-    // Update cycle status
-    const [updatedCycle] = await db
-      .update(companySeasonCycles)
-      .set({
-        status: validation.status,
-        updatedAt: new Date(),
-      })
-      .where(eq(companySeasonCycles.id, cycleId))
-      .returning();
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "update_cycle_status",

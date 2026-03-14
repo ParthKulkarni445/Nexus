@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
   success,
@@ -9,14 +10,8 @@ import {
 } from "@/lib/api/response";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { drives } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
-/**
- * POST /api/v1/drives/:driveId/confirm
- * Confirm schedule and trigger student notifications
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ driveId: string }> }
@@ -36,23 +31,14 @@ export async function POST(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [confirmedDrive] = await db
-      .update(drives)
-      .set({
+    const confirmedDrive = await db.drive.update({
+      where: { id: driveId },
+      data: {
         status: "confirmed",
         updatedAt: new Date(),
-      })
-      .where(eq(drives.id, driveId))
-      .returning();
+      },
+    });
 
-    if (!confirmedDrive) {
-      return notFound("Drive not found");
-    }
-
-    // TODO: Trigger notifications to students
-    // This would involve creating notification records for relevant students
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "confirm_drive",
@@ -65,7 +51,14 @@ export async function POST(
       message: "Drive confirmed successfully",
       drive: confirmedDrive,
     });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Drive not found");
+    }
+
     console.error("Error confirming drive:", error);
     return serverError();
   }

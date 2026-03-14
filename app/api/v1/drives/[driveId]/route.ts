@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
@@ -11,8 +12,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { drives } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const updateDriveSchema = z.object({
@@ -25,10 +24,6 @@ const updateDriveSchema = z.object({
   notes: z.string().optional(),
 });
 
-/**
- * PUT /api/v1/drives/:driveId
- * Update drive details/status
- */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ driveId: string }> }
@@ -54,29 +49,16 @@ export async function PUT(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const updateData: any = {
-      ...validation,
-      updatedAt: new Date(),
-    };
+    const updatedDrive = await db.drive.update({
+      where: { id: driveId },
+      data: {
+        ...validation,
+        startAt: validation.startAt ? new Date(validation.startAt) : undefined,
+        endAt: validation.endAt ? new Date(validation.endAt) : undefined,
+        updatedAt: new Date(),
+      },
+    });
 
-    if (validation.startAt) {
-      updateData.startAt = new Date(validation.startAt);
-    }
-    if (validation.endAt) {
-      updateData.endAt = new Date(validation.endAt);
-    }
-
-    const [updatedDrive] = await db
-      .update(drives)
-      .set(updateData)
-      .where(eq(drives.id, driveId))
-      .returning();
-
-    if (!updatedDrive) {
-      return notFound("Drive not found");
-    }
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "update_drive",
@@ -87,7 +69,14 @@ export async function PUT(
     });
 
     return success(updatedDrive);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Drive not found");
+    }
+
     console.error("Error updating drive:", error);
     return serverError();
   }

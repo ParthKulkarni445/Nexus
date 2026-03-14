@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Plus,
   Download,
   Building2,
   Info,
-  Search,
   Filter,
   ChevronRight,
   ChevronLeft,
@@ -24,7 +23,7 @@ import Modal from "@/components/ui/Modal";
 import SearchBar from "@/components/ui/SearchBar";
 import FilterSelect from "@/components/ui/FilterSelect";
 import EmptyState from "@/components/ui/EmptyState";
-import ContactModal from "@/components/companies/ContactModal";
+import ContactModal from "../../../components/companies/ContactModal";
 
 // --- Types -------------------------------------------------------------------
 type CycleStatus =
@@ -33,23 +32,56 @@ type CycleStatus =
   | "positive"
   | "accepted"
   | "rejected";
-type Industry =
-  | "IT"
-  | "Finance"
-  | "Analytics"
-  | "Consulting"
-  | "FMCG"
-  | "Core Engineering"
-  | "Healthcare"
-  | "Media";
+type CompanyPriority = "high" | "medium" | "low";
+
+interface ApiResponse<T> {
+  data?: T;
+  meta?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+  };
+  error?: {
+    message?: string;
+    code?: string;
+  };
+}
+
+interface CompanyRecord {
+  id: string;
+  name: string;
+  slug: string;
+  industry: string | null;
+  website: string | null;
+  priority: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  currentStatus?: CycleStatus | null;
+  contactsCount?: number | null;
+  assignedTo?: string | null;
+  lastUpdated?: string | null;
+  lastUpdatedBy?: string | null;
+  updatedField?: string | null;
+}
+
+interface CompanyFormValues {
+  name: string;
+  industry: string;
+  priority: CompanyPriority;
+  website: string;
+  notes: string;
+}
 
 interface Company {
   id: string;
   name: string;
   slug: string;
-  industry: Industry;
+  industry: string;
   website?: string;
-  priority: "high" | "medium" | "low";
+  priority: CompanyPriority;
+  notes?: string;
   status: CycleStatus;
   assignedTo: string;
   lastUpdated: string;
@@ -59,219 +91,101 @@ interface Company {
   isWishlisted?: boolean;
 }
 
-// --- Mock Data ----------------------------------------------------------------
-const MOCK_COMPANIES: Company[] = [
-  {
-    id: "c1",
-    name: "Google India",
-    slug: "google-india",
-    industry: "IT",
-    website: "google.com",
-    priority: "high",
-    status: "accepted",
-    assignedTo: "Ananya Mehta",
-    lastUpdated: "2026-02-18",
-    lastUpdatedBy: "Ananya Mehta",
-    updatedField: "status",
-    contacts: 3,
-  },
-  {
-    id: "c2",
-    name: "Microsoft",
-    slug: "microsoft",
-    industry: "IT",
-    website: "microsoft.com",
-    priority: "high",
-    status: "positive",
-    assignedTo: "Rohan Sharma",
-    lastUpdated: "2026-02-17",
-    lastUpdatedBy: "Rohan Sharma",
-    updatedField: "priority",
-    contacts: 2,
-  },
-  {
-    id: "c3",
-    name: "Goldman Sachs",
-    slug: "goldman-sachs",
-    industry: "Finance",
-    website: "goldmansachs.com",
-    priority: "high",
-    status: "contacted",
-    assignedTo: "Priya Singh",
-    lastUpdated: "2026-02-16",
-    lastUpdatedBy: "Priya Singh",
-    updatedField: "notes",
-    contacts: 2,
-  },
-  {
-    id: "c4",
-    name: "Deloitte",
-    slug: "deloitte",
-    industry: "Consulting",
-    website: "deloitte.com",
-    priority: "medium",
-    status: "not_contacted",
-    assignedTo: "Unassigned",
-    lastUpdated: "2026-02-15",
-    lastUpdatedBy: "Vibha Kapoor",
-    updatedField: "website",
-    contacts: 1,
-  },
-  {
-    id: "c5",
-    name: "Amazon (AWS)",
-    slug: "amazon-aws",
-    industry: "IT",
-    website: "aws.amazon.com",
-    priority: "high",
-    status: "contacted",
-    assignedTo: "Ananya Mehta",
-    lastUpdated: "2026-02-14",
-    lastUpdatedBy: "Ananya Mehta",
-    updatedField: "status",
-    contacts: 4,
-  },
-  {
-    id: "c6",
-    name: "McKinsey & Company",
-    slug: "mckinsey",
-    industry: "Consulting",
-    website: "mckinsey.com",
-    priority: "high",
-    status: "positive",
-    assignedTo: "Vibha Kapoor",
-    lastUpdated: "2026-02-13",
-    lastUpdatedBy: "Vibha Kapoor",
-    updatedField: "status",
-    contacts: 2,
-  },
-  {
-    id: "c7",
-    name: "HUL",
-    slug: "hul",
-    industry: "FMCG",
-    website: "hul.co.in",
-    priority: "medium",
-    status: "not_contacted",
-    assignedTo: "Unassigned",
-    lastUpdated: "2026-02-12",
-    lastUpdatedBy: "Rohan Sharma",
-    updatedField: "industry",
-    contacts: 1,
-  },
-  {
-    id: "c8",
-    name: "Zomato",
-    slug: "zomato",
-    industry: "IT",
-    website: "zomato.com",
-    priority: "medium",
-    status: "rejected",
-    assignedTo: "Rohan Sharma",
-    lastUpdated: "2026-02-11",
-    lastUpdatedBy: "Rohan Sharma",
-    updatedField: "status",
-    contacts: 2,
-  },
-  {
-    id: "c9",
-    name: "PhonePe",
-    slug: "phonepe",
-    industry: "Finance",
-    website: "phonepe.com",
-    priority: "medium",
-    status: "contacted",
-    assignedTo: "Priya Singh",
-    lastUpdated: "2026-02-10",
-    lastUpdatedBy: "Priya Singh",
-    updatedField: "3 fields",
-    contacts: 3,
-  },
-  {
-    id: "c10",
-    name: "Tata Consultancy",
-    slug: "tcs",
-    industry: "IT",
-    website: "tcs.com",
-    priority: "medium",
-    status: "accepted",
-    assignedTo: "Ananya Mehta",
-    lastUpdated: "2026-02-09",
-    lastUpdatedBy: "Ananya Mehta",
-    updatedField: "status",
-    contacts: 5,
-  },
-  {
-    id: "c11",
-    name: "Infosys",
-    slug: "infosys",
-    industry: "IT",
-    website: "infosys.com",
-    priority: "medium",
-    status: "positive",
-    assignedTo: "Vibha Kapoor",
-    lastUpdated: "2026-02-08",
-    lastUpdatedBy: "Vibha Kapoor",
-    updatedField: "priority",
-    contacts: 3,
-  },
-  {
-    id: "c12",
-    name: "L&T Technology",
-    slug: "lnt-tech",
-    industry: "Core Engineering",
-    website: "ltts.com",
-    priority: "low",
-    status: "not_contacted",
-    assignedTo: "Unassigned",
-    lastUpdated: "2026-02-07",
-    lastUpdatedBy: "Priya Singh",
-    updatedField: "name",
-    contacts: 1,
-  },
-  {
-    id: "c13",
-    name: "Accenture",
-    slug: "accenture",
-    industry: "Consulting",
-    website: "accenture.com",
-    priority: "medium",
-    status: "contacted",
-    assignedTo: "Rohan Sharma",
-    lastUpdated: "2026-02-06",
-    lastUpdatedBy: "Rohan Sharma",
-    updatedField: "status",
-    contacts: 2,
-  },
-  {
-    id: "c14",
-    name: "Flipkart",
-    slug: "flipkart",
-    industry: "IT",
-    website: "flipkart.com",
-    priority: "high",
-    status: "positive",
-    assignedTo: "Vibha Kapoor",
-    lastUpdated: "2026-02-05",
-    lastUpdatedBy: "Vibha Kapoor",
-    updatedField: "2 fields",
-    contacts: 3,
-  },
-  {
-    id: "c15",
-    name: "Mu Sigma",
-    slug: "mu-sigma",
-    industry: "Analytics",
-    website: "mu-sigma.com",
-    priority: "medium",
-    status: "not_contacted",
-    assignedTo: "Unassigned",
-    lastUpdated: "2026-02-04",
-    lastUpdatedBy: "Ananya Mehta",
-    updatedField: "notes",
-    contacts: 1,
-  },
-];
+const PRIORITY_TO_NUMBER: Record<CompanyPriority, number> = {
+  high: 3,
+  medium: 2,
+  low: 1,
+};
+
+function numberToPriority(
+  priority: number | null | undefined,
+): CompanyPriority {
+  if ((priority ?? 0) >= 3) {
+    return "high";
+  }
+  if ((priority ?? 0) >= 2) {
+    return "medium";
+  }
+  return "low";
+}
+
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 255);
+}
+
+function normalizeWebsite(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+function extractDomain(website: string | undefined) {
+  if (!website) {
+    return undefined;
+  }
+  try {
+    return new URL(website).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
+function mapCompanyRecord(record: CompanyRecord): Company {
+  const status =
+    record.currentStatus &&
+    STATUS_OPTIONS.some((item) => item.value === record.currentStatus)
+      ? record.currentStatus
+      : "not_contacted";
+
+  return {
+    id: record.id,
+    name: record.name,
+    slug: record.slug,
+    industry: record.industry ?? "Unknown",
+    website: record.website ?? undefined,
+    priority: numberToPriority(record.priority),
+    notes: record.notes ?? undefined,
+    status,
+    assignedTo: record.assignedTo ?? "Unassigned",
+    lastUpdated: record.lastUpdated ?? record.updatedAt ?? record.createdAt,
+    lastUpdatedBy: record.lastUpdatedBy ?? "System",
+    updatedField: record.updatedField ?? "company",
+    contacts: record.contactsCount ?? 0,
+  };
+}
+
+async function requestJson<T>(url: string, init?: RequestInit) {
+  const response = await fetch(url, {
+    credentials: "include",
+    ...init,
+  });
+  const text = await response.text();
+  let body: ApiResponse<T> = {};
+
+  if (text) {
+    try {
+      body = JSON.parse(text) as ApiResponse<T>;
+    } catch {
+      body = {};
+    }
+  }
+
+  if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
+    throw new Error(body.error?.message ?? "Request failed");
+  }
+
+  return body;
+}
 
 const INDUSTRY_OPTIONS = [
   { value: "IT", label: "IT" },
@@ -294,14 +208,6 @@ const PRIORITY_OPTIONS = [
   { value: "medium", label: "Medium Priority" },
   { value: "low", label: "Low Priority" },
 ];
-const COORDINATOR_OPTIONS = [
-  { value: "Ananya Mehta", label: "Ananya Mehta" },
-  { value: "Rohan Sharma", label: "Rohan Sharma" },
-  { value: "Priya Singh", label: "Priya Singh" },
-  { value: "Vibha Kapoor", label: "Vibha Kapoor" },
-  { value: "Unassigned", label: "Unassigned" },
-];
-
 const PRIORITY_BADGE: Record<string, React.ReactNode> = {
   high: (
     <Badge variant="danger" size="sm">
@@ -320,15 +226,66 @@ const PRIORITY_BADGE: Record<string, React.ReactNode> = {
   ),
 };
 
+function CompaniesTableSkeleton() {
+  return (
+    <div className="p-4 space-y-3 min-w-160">
+      {Array.from({ length: 7 }, (_, index) => (
+        <div
+          key={index}
+          className="grid grid-cols-[minmax(0,2.2fr)_1fr_0.8fr_0.9fr_1fr_1.1fr_0.9fr] items-center gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="shimmer h-8 w-8 rounded-lg shrink-0" />
+            <div className="min-w-0 space-y-2">
+              <div className="shimmer h-4 w-32 rounded-full" />
+              <div className="shimmer h-3 w-20 rounded-full" />
+            </div>
+          </div>
+          <div className="shimmer h-4 w-20 rounded-full" />
+          <div className="shimmer h-6 w-16 rounded-full" />
+          <div className="shimmer h-6 w-24 rounded-full" />
+          <div className="shimmer h-4 w-24 rounded-full" />
+          <div className="flex justify-center">
+            <div className="shimmer h-4 w-24 rounded-full" />
+          </div>
+          <div className="flex justify-center gap-2">
+            <div className="shimmer h-8 w-8 rounded-lg" />
+            <div className="shimmer h-8 w-8 rounded-lg" />
+            <div className="shimmer h-8 w-8 rounded-lg" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AddEditModal({
   isOpen,
   onClose,
   company,
+  onSubmit,
+  submitting,
+  errorMessage,
 }: {
   isOpen: boolean;
   onClose: () => void;
   company: Company | null;
+  onSubmit: (values: CompanyFormValues) => Promise<void>;
+  submitting: boolean;
+  errorMessage: string | null;
 }) {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    await onSubmit({
+      name: String(formData.get("name") ?? ""),
+      industry: String(formData.get("industry") ?? ""),
+      priority: String(formData.get("priority") ?? "medium") as CompanyPriority,
+      website: String(formData.get("website") ?? ""),
+      notes: String(formData.get("notes") ?? ""),
+    });
+  };
+
   return (
     <Modal
       isOpen={isOpen}
@@ -337,33 +294,60 @@ function AddEditModal({
       size="lg"
       footer={
         <>
-          <button className="btn btn-secondary" onClick={onClose}>
+          <button
+            className="btn btn-secondary"
+            onClick={onClose}
+            disabled={submitting}
+          >
             Cancel
           </button>
-          <button className="btn btn-primary" onClick={onClose}>
+          <button
+            className="btn btn-primary"
+            form="company-form"
+            type="submit"
+            disabled={submitting}
+          >
             {company ? "Save Changes" : "Add Company"}
           </button>
         </>
       }
     >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <form
+        id="company-form"
+        onSubmit={handleSubmit}
+        className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+      >
+        {errorMessage && (
+          <div className="sm:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        )}
         <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-slate-700 mb-1">
             Company Name *
           </label>
           <input
-            defaultValue={company?.name}
+            name="name"
+            defaultValue={company?.name ?? ""}
             className="input-base"
             placeholder="e.g. Google India"
+            required
           />
         </div>
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
             Industry
           </label>
-          <select defaultValue={company?.industry} className="input-base">
-            {INDUSTRY_OPTIONS.map((o) => (
-              <option key={o.value}>{o.label}</option>
+          <select
+            name="industry"
+            defaultValue={company?.industry ?? ""}
+            className="input-base"
+          >
+            <option value="">Select industry</option>
+            {INDUSTRY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
             ))}
           </select>
         </div>
@@ -371,7 +355,11 @@ function AddEditModal({
           <label className="block text-sm font-medium text-slate-700 mb-1">
             Priority
           </label>
-          <select defaultValue={company?.priority} className="input-base">
+          <select
+            name="priority"
+            defaultValue={company?.priority ?? "medium"}
+            className="input-base"
+          >
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
@@ -382,7 +370,8 @@ function AddEditModal({
             Website
           </label>
           <input
-            defaultValue={company?.website}
+            name="website"
+            defaultValue={company?.website ?? ""}
             className="input-base"
             placeholder="e.g. company.com"
           />
@@ -394,10 +383,12 @@ function AddEditModal({
           <textarea
             rows={3}
             className="input-base"
+            name="notes"
+            defaultValue={company?.notes ?? ""}
             placeholder="Add notes about this company..."
           />
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }
@@ -406,10 +397,16 @@ function DeleteModal({
   isOpen,
   onClose,
   company,
+  onConfirm,
+  submitting,
+  errorMessage,
 }: {
   isOpen: boolean;
   onClose: () => void;
   company: Company | null;
+  onConfirm: () => Promise<void>;
+  submitting: boolean;
+  errorMessage: string | null;
 }) {
   return (
     <Modal
@@ -419,16 +416,29 @@ function DeleteModal({
       size="sm"
       footer={
         <>
-          <button className="btn btn-secondary" onClick={onClose}>
+          <button
+            className="btn btn-secondary"
+            onClick={onClose}
+            disabled={submitting}
+          >
             Cancel
           </button>
-          <button className="btn btn-danger" onClick={onClose}>
+          <button
+            className="btn btn-danger"
+            onClick={() => void onConfirm()}
+            disabled={submitting}
+          >
             Delete Company
           </button>
         </>
       }
     >
       <div className="space-y-3">
+        {errorMessage && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {errorMessage}
+          </div>
+        )}
         <p className="text-sm text-slate-600">
           Are you sure you want to delete <strong>{company?.name}</strong>? This
           action is irreversible and will create an audit log entry.
@@ -444,6 +454,9 @@ function DeleteModal({
 
 // --- Main Component -----------------------------------------------------------
 export default function CompaniesPage() {
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [industryFilter, setIndustryFilter] = useState<string[]>([]);
@@ -455,6 +468,10 @@ export default function CompaniesPage() {
   const [addEditOpen, setAddEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [upsertingCompany, setUpsertingCompany] = useState(false);
+  const [deletingCompany, setDeletingCompany] = useState(false);
+  const [creatingContact, setCreatingContact] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [contactTargetCompany, setContactTargetCompany] =
     useState<Company | null>(null);
@@ -465,15 +482,175 @@ export default function CompaniesPage() {
   } | null>(null);
 
   const PER_PAGE = 10;
+  const API_LIMIT = 100;
+
+  const fetchCompanies = async () => {
+    setLoading(true);
+    setListError(null);
+    try {
+      const allRows: CompanyRecord[] = [];
+      let currentPage = 1;
+      let totalPages = 1;
+
+      while (currentPage <= totalPages) {
+        const response = await requestJson<CompanyRecord[]>(
+          `/api/v1/companies?page=${currentPage}&limit=${API_LIMIT}`,
+        );
+
+        const pageRows = response.data ?? [];
+        allRows.push(...pageRows);
+
+        totalPages = response.meta?.totalPages ?? currentPage;
+        if (
+          response.meta?.totalPages === undefined &&
+          pageRows.length < API_LIMIT
+        ) {
+          break;
+        }
+
+        currentPage += 1;
+      }
+
+      setCompanies(allRows.map(mapCompanyRecord));
+    } catch (error) {
+      setListError(
+        error instanceof Error ? error.message : "Failed to load companies",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchCompanies();
+  }, []);
+
+  const handleAddOrEditCompany = async (values: CompanyFormValues) => {
+    setModalError(null);
+    setUpsertingCompany(true);
+    try {
+      const website = normalizeWebsite(values.website);
+      const payload = {
+        name: values.name.trim(),
+        slug: slugify(values.name),
+        industry: values.industry || undefined,
+        website,
+        domain: extractDomain(website),
+        priority: PRIORITY_TO_NUMBER[values.priority],
+        notes: values.notes.trim() || undefined,
+      };
+
+      if (!payload.name) {
+        throw new Error("Company name is required");
+      }
+
+      if (selectedCompany) {
+        await requestJson(`/api/v1/companies/${selectedCompany.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await requestJson("/api/v1/companies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      setAddEditOpen(false);
+      setSelectedCompany(null);
+      await fetchCompanies();
+    } catch (error) {
+      setModalError(
+        error instanceof Error ? error.message : "Unable to save company",
+      );
+    } finally {
+      setUpsertingCompany(false);
+    }
+  };
+
+  const handleDeleteCompany = async () => {
+    if (!selectedCompany) {
+      return;
+    }
+
+    setModalError(null);
+    setDeletingCompany(true);
+    try {
+      await requestJson(`/api/v1/companies/${selectedCompany.id}`, {
+        method: "DELETE",
+      });
+      setDeleteOpen(false);
+      setSelectedCompany(null);
+      await fetchCompanies();
+    } catch (error) {
+      setModalError(
+        error instanceof Error ? error.message : "Unable to delete company",
+      );
+    } finally {
+      setDeletingCompany(false);
+    }
+  };
+
+  const handleAddContact = async (contact: {
+    name?: string;
+    designation?: string;
+    email?: string;
+    phone?: string;
+    linkedin?: string;
+    preferredMethod?: "email" | "phone" | "linkedin";
+    notes?: string;
+  }) => {
+    if (!contactTargetCompany) {
+      return;
+    }
+
+    setModalError(null);
+    setCreatingContact(true);
+    try {
+      const noteParts = [contact.notes?.trim() ?? ""];
+      if (contact.linkedin?.trim()) {
+        noteParts.push(`LinkedIn: ${contact.linkedin.trim()}`);
+      }
+
+      await requestJson(
+        `/api/v1/companies/${contactTargetCompany.id}/contacts`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: (contact.name ?? "").trim(),
+            designation: contact.designation?.trim() || undefined,
+            emails: contact.email?.trim() ? [contact.email.trim()] : undefined,
+            phones: contact.phone?.trim() ? [contact.phone.trim()] : undefined,
+            preferredContactMethod: contact.preferredMethod || undefined,
+            notes: noteParts.filter(Boolean).join("\n") || undefined,
+          }),
+        },
+      );
+
+      setContactModalOpen(false);
+      setContactTargetCompany(null);
+      await fetchCompanies();
+    } catch (error) {
+      setModalError(
+        error instanceof Error ? error.message : "Unable to add contact",
+      );
+    } finally {
+      setCreatingContact(false);
+    }
+  };
 
   const filtered = useMemo(() => {
-    let data = MOCK_COMPANIES;
+    let data = companies;
     if (search) {
       const q = search.toLowerCase();
       data = data.filter(
         (c) =>
           c.name.toLowerCase().includes(q) ||
-          c.industry.toLowerCase().includes(q),
+          c.industry.toLowerCase().includes(q) ||
+          (c.website ?? "").toLowerCase().includes(q),
       );
     }
     if (statusFilter.length > 0)
@@ -503,22 +680,41 @@ export default function CompaniesPage() {
     assigneeFilter,
     sortField,
     sortDir,
+    companies,
   ]);
+
+  const coordinatorOptions = useMemo(() => {
+    const values = new Set(companies.map((company) => company.assignedTo));
+    values.add("Unassigned");
+
+    return Array.from(values)
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a === "Unassigned") {
+          return 1;
+        }
+        if (b === "Unassigned") {
+          return -1;
+        }
+        return a.localeCompare(b);
+      })
+      .map((value) => ({ value, label: value }));
+  }, [companies]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   const stats = useMemo(
     () => ({
-      total: MOCK_COMPANIES.length,
-      accepted: MOCK_COMPANIES.filter((c) => c.status === "accepted").length,
-      positive: MOCK_COMPANIES.filter(
+      total: companies.length,
+      accepted: companies.filter((c) => c.status === "accepted").length,
+      positive: companies.filter(
         (c) => c.status === "positive" || c.status === "accepted",
       ).length,
-      notContacted: MOCK_COMPANIES.filter((c) => c.status === "not_contacted")
+      notContacted: companies.filter((c) => c.status === "not_contacted")
         .length,
     }),
-    [],
+    [companies],
   );
 
   const handleSort = (field: keyof Company) => {
@@ -848,6 +1044,7 @@ export default function CompaniesPage() {
               <button
                 className="btn btn-primary btn-sm gap-1.5 shrink-0"
                 onClick={() => {
+                  setModalError(null);
                   setSelectedCompany(null);
                   setAddEditOpen(true);
                 }}
@@ -900,7 +1097,7 @@ export default function CompaniesPage() {
                     setAssigneeFilter(v);
                     setPage(1);
                   }}
-                  options={COORDINATOR_OPTIONS}
+                  options={coordinatorOptions}
                   placeholder="Coordinator"
                   className="flex-1 min-w-0"
                 />
@@ -924,7 +1121,15 @@ export default function CompaniesPage() {
 
           {/* Table */}
           <div className="flex-1 overflow-auto">
-            {paginated.length === 0 ? (
+            {loading ? (
+              <CompaniesTableSkeleton />
+            ) : listError ? (
+              <EmptyState
+                icon={Building2}
+                title="Unable to load companies"
+                description={listError}
+              />
+            ) : paginated.length === 0 ? (
               <EmptyState
                 icon={Building2}
                 title="No companies found"
@@ -1014,10 +1219,18 @@ export default function CompaniesPage() {
                       </td>
                       <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                         <div className="flex items-center justify-center gap-2">
-                          {new Date(company.lastUpdated).toLocaleDateString(
-                            "en-IN",
-                            { day: "numeric", month: "short", year: "numeric" },
-                          )}
+                          <span>
+                            {new Date(company.lastUpdated).toLocaleString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )}
+                          </span>
                           <button
                             type="button"
                             className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-200 text-slate-500 hover:text-[#2563EB] hover:border-[#BFDBFE] hover:bg-[#EFF6FF] transition-colors"
@@ -1044,6 +1257,7 @@ export default function CompaniesPage() {
                             className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
                             title="Edit"
                             onClick={() => {
+                              setModalError(null);
                               setSelectedCompany(company);
                               setAddEditOpen(true);
                             }}
@@ -1054,6 +1268,7 @@ export default function CompaniesPage() {
                             className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
                             title="Add Contact"
                             onClick={() => {
+                              setModalError(null);
                               setContactTargetCompany(company);
                               setContactModalOpen(true);
                             }}
@@ -1070,6 +1285,7 @@ export default function CompaniesPage() {
                             className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
                             title="Delete"
                             onClick={() => {
+                              setModalError(null);
                               setSelectedCompany(company);
                               setDeleteOpen(true);
                             }}
@@ -1225,19 +1441,32 @@ export default function CompaniesPage() {
 
       <AddEditModal
         isOpen={addEditOpen}
-        onClose={() => setAddEditOpen(false)}
+        onClose={() => {
+          setAddEditOpen(false);
+          setModalError(null);
+        }}
         company={selectedCompany}
+        onSubmit={handleAddOrEditCompany}
+        submitting={upsertingCompany}
+        errorMessage={modalError}
       />
       <DeleteModal
         isOpen={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
+        onClose={() => {
+          setDeleteOpen(false);
+          setModalError(null);
+        }}
         company={selectedCompany}
+        onConfirm={handleDeleteCompany}
+        submitting={deletingCompany}
+        errorMessage={modalError}
       />
       <ContactModal
         isOpen={contactModalOpen}
         onClose={() => {
           setContactModalOpen(false);
           setContactTargetCompany(null);
+          setModalError(null);
         }}
         contact={null}
         title={
@@ -1245,6 +1474,9 @@ export default function CompaniesPage() {
             ? `Add Contact - ${contactTargetCompany.name}`
             : "Add Contact"
         }
+        onSubmit={handleAddContact}
+        submitting={creatingContact}
+        errorMessage={modalError}
       />
     </div>
   );

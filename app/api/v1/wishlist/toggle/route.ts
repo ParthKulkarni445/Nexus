@@ -9,17 +9,11 @@ import {
 } from "@/lib/api/response";
 import { validateBody } from "@/lib/api/validation";
 import { db } from "@/lib/db";
-import { studentCompanyFollows } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 
 const toggleWishlistSchema = z.object({
   companyId: z.string().uuid(),
 });
 
-/**
- * POST /api/v1/wishlist/toggle
- * Follow/unfollow company
- */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -38,30 +32,28 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    // Check if already following
-    const existing = await db.query.studentCompanyFollows.findFirst({
-      where: and(
-        eq(studentCompanyFollows.studentId, user.id),
-        eq(studentCompanyFollows.companyId, validation.companyId)
-      ),
+    const existing = await db.studentCompanyFollow.findUnique({
+      where: {
+        studentId_companyId: {
+          studentId: user.id,
+          companyId: validation.companyId,
+        },
+      },
     });
 
     if (existing) {
-      // Unfollow
-      await db
-        .delete(studentCompanyFollows)
-        .where(eq(studentCompanyFollows.id, existing.id));
-
+      await db.studentCompanyFollow.delete({ where: { id: existing.id } });
       return success({ message: "Company unfollowed", following: false });
-    } else {
-      // Follow
-      await db.insert(studentCompanyFollows).values({
+    }
+
+    await db.studentCompanyFollow.create({
+      data: {
         studentId: user.id,
         companyId: validation.companyId,
-      });
+      },
+    });
 
-      return success({ message: "Company followed", following: true });
-    }
+    return success({ message: "Company followed", following: true });
   } catch (error) {
     console.error("Error toggling wishlist:", error);
     return serverError();

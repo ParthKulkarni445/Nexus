@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hasRoleOrCoordinatorType } from "@/lib/api/auth";
 import {
@@ -10,8 +11,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { emailTemplates } from "@/lib/db/schema";
-import { desc, eq, or } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const createTemplateSchema = z.object({
@@ -24,10 +23,6 @@ const createTemplateSchema = z.object({
   sendPolicy: z.record(z.string(), z.any()).optional(),
 });
 
-/**
- * GET /api/v1/mail/templates
- * List templates with status/version filtering
- */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -39,20 +34,33 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
 
   try {
-    let templates;
-
-    if (status) {
-      templates = await db
-        .select()
-        .from(emailTemplates)
-        .where(eq(emailTemplates.status, status as any))
-        .orderBy(desc(emailTemplates.createdAt));
-    } else {
-      templates = await db
-        .select()
-        .from(emailTemplates)
-        .orderBy(desc(emailTemplates.createdAt));
-    }
+    const templates = await db.emailTemplate.findMany({
+      where: status ? { status: status as never } : undefined,
+      orderBy: { createdAt: "desc" },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        approver: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        _count: {
+          select: {
+            versions: true,
+            mailRequests: true,
+            emails: true,
+          },
+        },
+      },
+    });
 
     return success(templates);
   } catch (error) {
@@ -61,10 +69,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * POST /api/v1/mail/templates
- * Create draft template
- */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -72,7 +76,12 @@ export async function POST(request: NextRequest) {
     return unauthorized();
   }
 
-  if (!hasRoleOrCoordinatorType(user, ["tpo_admin"], ["mailing_team"])) {
+  if (
+    !hasRoleOrCoordinatorType(user, ["tpo_admin"], [
+      "mailing_team",
+      "student_representative",
+    ])
+  ) {
     return forbidden("Insufficient permissions to create templates");
   }
 
@@ -86,16 +95,15 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [template] = await db
-      .insert(emailTemplates)
-      .values({
+    const template = await db.emailTemplate.create({
+      data: {
         ...validation,
-        status: "draft",
+        status: "approved",
         createdBy: user.id,
-      })
-      .returning();
+        approvedBy: user.id,
+      },
+    });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "create_email_template",
@@ -106,10 +114,14 @@ export async function POST(request: NextRequest) {
     });
 
     return success(template);
-  } catch (error: any) {
-    if (error.code === "23505") {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       return serverError("Template with this slug already exists");
     }
+
     console.error("Error creating template:", error);
     return serverError();
   }

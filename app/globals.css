@@ -62,13 +62,25 @@ body {
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  inset: -144px;
   z-index: -1;
   pointer-events: none;
   background-image:
     linear-gradient(rgba(37, 99, 235, 0.25) 2px, transparent 2px),
     linear-gradient(90deg, rgba(37, 99, 235, 0.25) 2px, transparent 2px);
   background-size: 72px 72px;
+  animation: gridDrift 6s linear infinite;
+  will-change: transform;
+}
+
+@keyframes gridDrift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+
+  to {
+    transform: translate3d(144px, 144px, 0);
+  }
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────── */

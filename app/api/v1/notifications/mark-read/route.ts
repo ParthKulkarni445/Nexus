@@ -4,17 +4,11 @@ import { getCurrentUser } from "@/lib/api/auth";
 import { success, unauthorized, serverError } from "@/lib/api/response";
 import { validateBody } from "@/lib/api/validation";
 import { db } from "@/lib/db";
-import { notifications } from "@/lib/db/schema";
-import { eq, inArray, and } from "drizzle-orm";
 
 const markReadSchema = z.object({
   notificationIds: z.array(z.string().uuid()),
 });
 
-/**
- * POST /api/v1/notifications/mark-read
- * Mark notifications as read
- */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -29,18 +23,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await db
-      .update(notifications)
-      .set({
+    await db.notification.updateMany({
+      where: {
+        userId: user.id,
+        id: { in: validation.notificationIds },
+      },
+      data: {
         isRead: true,
         readAt: new Date(),
-      })
-      .where(
-        and(
-          eq(notifications.userId, user.id),
-          inArray(notifications.id, validation.notificationIds)
-        )
-      );
+      },
+    });
 
     return success({ message: "Notifications marked as read" });
   } catch (error) {

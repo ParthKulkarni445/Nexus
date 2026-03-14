@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
@@ -11,8 +12,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { companyAssignments, companyAssignmentHistory } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const reassignSchema = z.object({
@@ -20,10 +19,6 @@ const reassignSchema = z.object({
   reason: z.string().min(1),
 });
 
-/**
- * PUT /api/v1/assignments/:assignmentId/reassign
- * Reassign ownership with reason
- */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ assignmentId: string }> }
@@ -49,36 +44,35 @@ export async function PUT(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    // Get current assignment
-    const currentAssignment = await db.query.companyAssignments.findFirst({
-      where: eq(companyAssignments.id, assignmentId),
+    const currentAssignment = await db.companyAssignment.findUnique({
+      where: { id: assignmentId },
     });
 
     if (!currentAssignment) {
       return notFound("Assignment not found");
     }
 
-    // Create history entry
-    await db.insert(companyAssignmentHistory).values({
-      assignmentId,
-      fromUserId: currentAssignment.assigneeUserId,
-      toUserId: validation.newAssigneeUserId,
-      changedBy: user.id,
-      reason: validation.reason,
+    const updatedAssignment = await db.$transaction(async (tx) => {
+      await tx.companyAssignmentHistory.create({
+        data: {
+          assignmentId,
+          fromUserId: currentAssignment.assigneeUserId,
+          toUserId: validation.newAssigneeUserId,
+          changedBy: user.id,
+          reason: validation.reason,
+        },
+      });
+
+      return tx.companyAssignment.update({
+        where: { id: assignmentId },
+        data: {
+          assigneeUserId: validation.newAssigneeUserId,
+          assignedBy: user.id,
+          updatedAt: new Date(),
+        },
+      });
     });
 
-    // Update assignment
-    const [updatedAssignment] = await db
-      .update(companyAssignments)
-      .set({
-        assigneeUserId: validation.newAssigneeUserId,
-        assignedBy: user.id,
-        updatedAt: new Date(),
-      })
-      .where(eq(companyAssignments.id, assignmentId))
-      .returning();
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "reassign_assignment",
@@ -93,7 +87,14 @@ export async function PUT(
     });
 
     return success(updatedAssignment);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Assignment not found");
+    }
+
     console.error("Error reassigning:", error);
     return serverError();
   }

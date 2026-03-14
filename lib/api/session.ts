@@ -7,6 +7,15 @@ const SESSION_SECRET =
 const COOKIE_NAME = "nexus_session";
 const MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
 
+export type SessionUserClaims = {
+  userId: string;
+  email?: string;
+  name?: string;
+  role?: string;
+  coordinatorType?: string;
+  isActive?: boolean;
+};
+
 // ── Token ─────────────────────────────────────────────────────────────────────
 
 function sign(payload: string): string {
@@ -16,14 +25,14 @@ function sign(payload: string): string {
     .digest("base64url");
 }
 
-export function createToken(userId: string): string {
+export function createToken(claims: SessionUserClaims): string {
   const payload = Buffer.from(
-    JSON.stringify({ userId, exp: Date.now() + MAX_AGE * 1000 })
+    JSON.stringify({ ...claims, exp: Date.now() + MAX_AGE * 1000 })
   ).toString("base64url");
   return `${payload}.${sign(payload)}`;
 }
 
-export function verifyToken(token: string): { userId: string } | null {
+export function verifyToken(token: string): SessionUserClaims | null {
   const dot = token.lastIndexOf(".");
   if (dot < 0) return null;
   const payload = token.slice(0, dot);
@@ -33,7 +42,14 @@ export function verifyToken(token: string): { userId: string } | null {
   try {
     const data = JSON.parse(Buffer.from(payload, "base64url").toString());
     if (data.exp < Date.now()) return null;
-    return { userId: data.userId };
+    return {
+      userId: data.userId,
+      email: data.email,
+      name: data.name,
+      role: data.role,
+      coordinatorType: data.coordinatorType,
+      isActive: data.isActive,
+    };
   } catch {
     return null;
   }
@@ -48,19 +64,44 @@ export async function getSessionUserId(): Promise<string | null> {
   return verifyToken(token)?.userId ?? null;
 }
 
+export async function getSessionUserClaims(): Promise<SessionUserClaims | null> {
+  const jar = await cookies();
+  const token = jar.get(COOKIE_NAME)?.value;
+  if (!token) return null;
+  return verifyToken(token);
+}
+
 export function respondWithSession<T>(
   data: T,
-  userId: string,
   status = 200
 ): NextResponse {
+  const sessionData = data as T & {
+    id: string;
+    email?: string;
+    name?: string;
+    role?: string;
+    coordinatorType?: string | null;
+    isActive?: boolean;
+  };
   const res = NextResponse.json({ data }, { status });
-  res.cookies.set(COOKIE_NAME, createToken(userId), {
+  res.cookies.set(
+    COOKIE_NAME,
+    createToken({
+      userId: sessionData.id,
+      email: sessionData.email,
+      name: sessionData.name,
+      role: sessionData.role,
+      coordinatorType: sessionData.coordinatorType ?? undefined,
+      isActive: sessionData.isActive ?? true,
+    }),
+    {
     httpOnly: true,
     sameSite: "lax",
     maxAge: MAX_AGE,
     path: "/",
     secure: process.env.NODE_ENV === "production",
-  });
+    }
+  );
   return res;
 }
 

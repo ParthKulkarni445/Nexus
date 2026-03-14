@@ -9,12 +9,11 @@ type CompanyStatus =
   | "active"
   | "inactive"
   | "pending"
-  | "approved"
+  | "queued"
   | "sent"
   | "draft"
   | "archived"
   | "confirmed"
-  | "scheduled"
   | "completed"
   | "cancelled";
 
@@ -40,12 +39,11 @@ const statusConfig: Record<
   active: { label: "Active", variant: "success" },
   inactive: { label: "Inactive", variant: "gray" },
   pending: { label: "Pending", variant: "warning" },
-  approved: { label: "Approved", variant: "success" },
+  queued: { label: "Queued", variant: "success" },
   sent: { label: "Sent", variant: "info" },
   draft: { label: "Draft", variant: "gray" },
   archived: { label: "Archived", variant: "gray" },
   confirmed: { label: "Confirmed", variant: "success" },
-  scheduled: { label: "Scheduled", variant: "info" },
   completed: { label: "Completed", variant: "success" },
   cancelled: { label: "Cancelled", variant: "danger" },
 };

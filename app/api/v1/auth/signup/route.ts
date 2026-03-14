@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { error } from "@/lib/api/response";
 import { respondWithSession, hashPassword } from "@/lib/api/session";
 
@@ -39,8 +38,8 @@ export async function POST(request: NextRequest) {
   const { name, email, password } = parsed.data;
 
   // Check for existing email
-  const existing = await db.query.users.findFirst({
-    where: eq(users.email, email.toLowerCase()),
+  const existing = await db.user.findUnique({
+    where: { email: email.toLowerCase() },
   });
 
   if (existing) {
@@ -53,25 +52,29 @@ export async function POST(request: NextRequest) {
 
   const passwordHash = hashPassword(password);
 
-  const [user] = await db
-    .insert(users)
-    .values({
-      name: name.trim(),
-      email: email.toLowerCase(),
-      role: "student",
-      authProvider: "credentials",
-      profileMeta: { passwordHash },
-    })
-    .returning();
+  try {
+    const user = await db.user.create({
+      data: {
+        name: name.trim(),
+        email: email.toLowerCase(),
+        role: "student",
+        authProvider: "credentials",
+        profileMeta: { passwordHash } as Prisma.InputJsonValue,
+      },
+    });
 
-  return respondWithSession(
-    {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-    },
-    user.id,
-    201
-  );
+    return respondWithSession(
+      {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        isActive: user.isActive,
+      },
+      201
+    );
+  } catch (dbError) {
+    console.error("Signup failed:", dbError);
+    return error("Unable to create account", "SERVER_ERROR", 500);
+  }
 }

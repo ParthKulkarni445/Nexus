@@ -1,7 +1,5 @@
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { getSessionUserId } from "@/lib/api/session";
+import { getSessionUserClaims } from "@/lib/api/session";
 
 export type UserRole = "tpo_admin" | "coordinator" | "student" | "tech_support";
 
@@ -24,11 +22,11 @@ export interface AuthUser {
  * This is a placeholder - implement with NextAuth or your auth solution
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  const userId = await getSessionUserId();
-  if (!userId) return null;
+  const sessionUser = await getSessionUserClaims();
+  if (!sessionUser?.userId) return null;
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
+  const user = await db.user.findUnique({
+    where: { id: sessionUser.userId },
   });
 
   if (!user || !user.isActive) return null;

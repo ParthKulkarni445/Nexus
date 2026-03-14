@@ -5,28 +5,27 @@ import {
   success,
   unauthorized,
   forbidden,
-  notFound,
   badRequest,
   serverError,
 } from "@/lib/api/response";
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { companySeasonCycles } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const createCycleSchema = z.object({
   seasonId: z.string().uuid(),
-  status: z.enum(["not_contacted", "contacted", "positive", "accepted", "rejected"]),
+  status: z.enum([
+    "not_contacted",
+    "contacted",
+    "positive",
+    "accepted",
+    "rejected",
+  ]),
   notes: z.string().optional(),
   ownerUserId: z.string().uuid().optional(),
 });
 
-/**
- * POST /api/v1/companies/:companyId/season-cycles
- * Create/activate company cycle for a season
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
@@ -52,30 +51,31 @@ export async function POST(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    // Check if cycle already exists
-    const existing = await db.query.companySeasonCycles.findFirst({
-      where: and(
-        eq(companySeasonCycles.companyId, companyId),
-        eq(companySeasonCycles.seasonId, validation.seasonId)
-      ),
+    const existing = await db.companySeasonCycle.findUnique({
+      where: {
+        companyId_seasonId: {
+          companyId,
+          seasonId: validation.seasonId,
+        },
+      },
     });
 
     if (existing) {
       return badRequest("Company cycle for this season already exists");
     }
 
-    const [cycle] = await db
-      .insert(companySeasonCycles)
-      .values({
+    const cycle = await db.companySeasonCycle.create({
+      data: {
         companyId,
         seasonId: validation.seasonId,
         status: validation.status,
         notes: validation.notes,
         ownerUserId: validation.ownerUserId,
-      })
-      .returning();
+        updatedBy: user.id,
+        updatedField: "status",
+      },
+    });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "create_company_season_cycle",

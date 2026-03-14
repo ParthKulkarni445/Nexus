@@ -1,10 +1,10 @@
 # Database Setup Guide
 
-This project uses **Drizzle ORM** with **PostgreSQL** (Supabase).
+This project uses **Prisma ORM** with **PostgreSQL**.
 
 ## Prerequisites
 
-1. A PostgreSQL database (Supabase recommended)
+1. A PostgreSQL database
 2. Database connection URL
 
 ## Environment Setup
@@ -21,17 +21,24 @@ This project uses **Drizzle ORM** with **PostgreSQL** (Supabase).
    DATABASE_URL=postgresql://user:password@host:port/database
    ```
 
-   For Supabase:
+   Example for a local Prisma Postgres-compatible database:
 
    ```
-   DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
+   DATABASE_URL=postgresql://postgres:password@localhost:5432/nexus
+   ```
+
+   Optional overrides if you want separate connections:
+
+   ```
+   DATABASE_URL_RUNTIME=postgresql://user:password@host:port/database
+   DATABASE_URL_MIGRATIONS=postgresql://user:password@host:port/database
    ```
 
 ## Database Commands
 
-### Generate Migrations
+### Generate Prisma Client
 
-Generate SQL migration files from your schema:
+Generate the Prisma client after schema changes:
 
 ```bash
 npm run db:generate
@@ -39,7 +46,7 @@ npm run db:generate
 
 ### Apply Migrations
 
-Apply pending migrations to your database:
+Create/apply pending Prisma migrations to your database:
 
 ```bash
 npm run db:migrate
@@ -53,9 +60,9 @@ Push schema changes directly to the database (skips migration files):
 npm run db:push
 ```
 
-### Drizzle Studio
+### Prisma Studio
 
-Open Drizzle Studio to browse and edit your database:
+Open Prisma Studio to browse and edit your database:
 
 ```bash
 npm run db:studio
@@ -63,37 +70,34 @@ npm run db:studio
 
 ## Schema Organization
 
-The database schema is organized into logical modules:
+The database schema is defined in:
 
-- **`lib/db/enums.ts`** - PostgreSQL enums
-- **`lib/db/schema/users.ts`** - User and permission tables
-- **`lib/db/schema/companies.ts`** - Company-related tables
-- **`lib/db/schema/recruitment.ts`** - Recruitment seasons, drives, interactions
-- **`lib/db/schema/emails.ts`** - Email templates and mail system
-- **`lib/db/schema/audit.ts`** - Audit logs, blogs, notifications
+- **`prisma/schema.prisma`** - Prisma models, enums, mappings, and relations
+- **`prisma/migrations/`** - SQL migrations managed by Prisma
 
 ## Usage in Code
 
-Import the database client and schema:
+Import the Prisma client:
 
 ```typescript
 import { db } from "@/lib/db";
-import { users, companies } from "@/lib/db/schema";
 
 // Query example
-const allUsers = await db.select().from(users);
+const allUsers = await db.user.findMany();
 
 // Insert example
-await db.insert(companies).values({
-  name: "Example Corp",
-  slug: "example-corp",
+await db.company.create({
+  data: {
+    name: "Example Corp",
+    slug: "example-corp",
+  },
 });
 ```
 
 ## Initial Setup Steps
 
 1. Set up your environment variables
-2. Generate migrations: `npm run db:generate`
+2. Generate Prisma client: `npm run db:generate`
 3. Apply migrations: `npm run db:migrate`
 4. Start developing!
 

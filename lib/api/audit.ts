@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { auditLogs } from "@/lib/db/schema";
+import type { Prisma } from "@prisma/client";
 
 export interface AuditLogEntry {
   actorId?: string;
@@ -16,14 +16,16 @@ export interface AuditLogEntry {
  */
 export async function createAuditLog(entry: AuditLogEntry): Promise<void> {
   try {
-    await db.insert(auditLogs).values({
-      actorId: entry.actorId,
-      action: entry.action,
-      targetType: entry.targetType,
-      targetId: entry.targetId,
-      meta: entry.meta,
-      ipAddress: entry.ipAddress,
-      userAgent: entry.userAgent,
+    await db.auditLog.create({
+      data: {
+        actorId: entry.actorId,
+        action: entry.action,
+        targetType: entry.targetType,
+        targetId: entry.targetId,
+        meta: entry.meta as Prisma.InputJsonValue | undefined,
+        ipAddress: entry.ipAddress,
+        userAgent: entry.userAgent,
+      },
     });
   } catch (error) {
     console.error("Failed to create audit log:", error);

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hasRoleOrCoordinatorType } from "@/lib/api/auth";
 import {
@@ -11,8 +12,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { companyContacts, contactInteractions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const updateContactSchema = z.object({
@@ -24,17 +23,6 @@ const updateContactSchema = z.object({
   notes: z.string().optional(),
 });
 
-const quickActionSchema = z.object({
-  action: z.enum(["call", "email", "note"]),
-  summary: z.string().min(1),
-  outcome: z.string().optional(),
-  nextFollowUpAt: z.string().datetime().optional(),
-});
-
-/**
- * PUT /api/v1/contacts/:contactId
- * Update contact details
- */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ contactId: string }> }
@@ -60,20 +48,14 @@ export async function PUT(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [updatedContact] = await db
-      .update(companyContacts)
-      .set({
+    const updatedContact = await db.companyContact.update({
+      where: { id: contactId },
+      data: {
         ...validation,
         updatedAt: new Date(),
-      })
-      .where(eq(companyContacts.id, contactId))
-      .returning();
+      },
+    });
 
-    if (!updatedContact) {
-      return notFound("Contact not found");
-    }
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "update_contact",
@@ -84,16 +66,19 @@ export async function PUT(
     });
 
     return success(updatedContact);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Contact not found");
+    }
+
     console.error("Error updating contact:", error);
     return serverError();
   }
 }
 
-/**
- * DELETE /api/v1/contacts/:contactId
- * Soft delete contact
- */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ contactId: string }> }
@@ -113,9 +98,8 @@ export async function DELETE(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    await db.delete(companyContacts).where(eq(companyContacts.id, contactId));
+    await db.companyContact.delete({ where: { id: contactId } });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "delete_contact",
@@ -125,7 +109,14 @@ export async function DELETE(
     });
 
     return success({ message: "Contact deleted successfully" });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Contact not found");
+    }
+
     console.error("Error deleting contact:", error);
     return serverError();
   }

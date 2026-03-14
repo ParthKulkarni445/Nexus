@@ -1,17 +1,21 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
   success,
   unauthorized,
   forbidden,
+  badRequest,
   serverError,
 } from "@/lib/api/response";
-import { validateBody, paginationSchema, searchSchema } from "@/lib/api/validation";
+import {
+  validateBody,
+  paginationSchema,
+  searchSchema,
+} from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { companies } from "@/lib/db/schema";
-import { like, or, desc, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const listCompaniesSchema = paginationSchema.merge(searchSchema).extend({
@@ -28,10 +32,6 @@ const createCompanySchema = z.object({
   notes: z.string().optional(),
 });
 
-/**
- * GET /api/v1/companies
- * List companies with search, industry, page, limit filters
- */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -40,51 +40,218 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const params = listCompaniesSchema.parse({
+  const parsed = listCompaniesSchema.safeParse({
     page: searchParams.get("page") || "1",
     limit: searchParams.get("limit") || "20",
     search: searchParams.get("search") || undefined,
     industry: searchParams.get("industry") || undefined,
   });
 
+  if (!parsed.success) {
+    return badRequest("Invalid query parameters", parsed.error.issues);
+  }
+
+  const params = parsed.data;
+
   try {
-    // Build query conditions
-    const conditions = [];
+    const where: Prisma.CompanyWhereInput = {
+      ...(params.search
+        ? {
+            OR: [
+              { name: { contains: params.search, mode: "insensitive" } },
+              { domain: { contains: params.search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+      ...(params.industry
+        ? {
+            industry: { contains: params.industry, mode: "insensitive" },
+          }
+        : {}),
+    };
 
-    if (params.search) {
-      conditions.push(
-        or(
-          like(companies.name, `%${params.search}%`),
-          like(companies.domain, `%${params.search}%`)
-        )
-      );
-    }
-
-    if (params.industry) {
-      conditions.push(like(companies.industry, `%${params.industry}%`));
-    }
-
-    // Count total
-    const [{ count }] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(companies)
-      .where(conditions.length > 0 ? sql`${sql.join(conditions, sql` AND `)}` : undefined);
-
-    // Fetch companies
     const offset = (params.page - 1) * params.limit;
-    const companiesList = await db
-      .select()
-      .from(companies)
-      .where(conditions.length > 0 ? sql`${sql.join(conditions, sql` AND `)}` : undefined)
-      .orderBy(desc(companies.createdAt))
-      .limit(params.limit)
-      .offset(offset);
+    const [total, companiesList] = await Promise.all([
+      db.company.count({ where }),
+      db.company.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take: params.limit,
+        skip: offset,
+      }),
+    ]);
 
-    return success(companiesList, {
+    if (companiesList.length === 0) {
+      return success([], {
+        page: params.page,
+        limit: params.limit,
+        total,
+        totalPages: Math.ceil(total / params.limit),
+      });
+    }
+
+    const companyIds = companiesList.map((company) => company.id);
+
+    const [contactCountRows, cycleRows, assignmentRows, interactionRows] =
+      await Promise.all([
+      db.companyContact.groupBy({
+        by: ["companyId"],
+        where: { companyId: { in: companyIds } },
+        _count: { _all: true },
+        _max: { updatedAt: true },
+      }),
+      db.companySeasonCycle.findMany({
+        where: { companyId: { in: companyIds } },
+        select: {
+          companyId: true,
+          status: true,
+          ownerUserId: true,
+          updatedBy: true,
+          updatedField: true,
+          updatedAt: true,
+        },
+        orderBy: { updatedAt: "desc" },
+      }),
+      db.companyAssignment.findMany({
+        where: {
+          itemType: "company",
+          isActive: true,
+          itemId: { in: companyIds },
+        },
+        select: {
+          itemId: true,
+          assigneeUserId: true,
+          assignedAt: true,
+        },
+        orderBy: { assignedAt: "desc" },
+      }),
+      db.contactInteraction.groupBy({
+        by: ["companyId"],
+        where: { companyId: { in: companyIds } },
+        _max: { createdAt: true },
+      }),
+    ]);
+
+    const contactsByCompany = new Map<string, number>();
+    const latestContactUpdateByCompany = new Map<string, Date>();
+    for (const row of contactCountRows) {
+      contactsByCompany.set(row.companyId, row._count._all);
+      if (row._max.updatedAt) {
+        latestContactUpdateByCompany.set(row.companyId, row._max.updatedAt);
+      }
+    }
+
+    const latestInteractionByCompany = new Map<string, Date>();
+    for (const row of interactionRows) {
+      if (row._max.createdAt) {
+        latestInteractionByCompany.set(row.companyId, row._max.createdAt);
+      }
+    }
+
+    const latestCycleByCompany = new Map<string, (typeof cycleRows)[number]>();
+    for (const row of cycleRows) {
+      if (!latestCycleByCompany.has(row.companyId)) {
+        latestCycleByCompany.set(row.companyId, row);
+      }
+    }
+
+    const latestAssignmentByCompany = new Map<
+      string,
+      (typeof assignmentRows)[number]
+    >();
+    for (const row of assignmentRows) {
+      if (!latestAssignmentByCompany.has(row.itemId)) {
+        latestAssignmentByCompany.set(row.itemId, row);
+      }
+    }
+
+    const userIds = new Set<string>();
+    for (const row of cycleRows) {
+      if (row.updatedBy) {
+        userIds.add(row.updatedBy);
+      }
+      if (row.ownerUserId) {
+        userIds.add(row.ownerUserId);
+      }
+    }
+    for (const row of assignmentRows) {
+      userIds.add(row.assigneeUserId);
+    }
+
+    const usersById = new Map<string, string>();
+    if (userIds.size > 0) {
+      const userRows = await db.user.findMany({
+        where: { id: { in: Array.from(userIds) } },
+        select: { id: true, name: true },
+      });
+
+      for (const row of userRows) {
+        usersById.set(row.id, row.name);
+      }
+    }
+
+    const now = new Date();
+
+    const enrichedCompanies = companiesList.map((company) => {
+      const cycle = latestCycleByCompany.get(company.id);
+      const assignment = latestAssignmentByCompany.get(company.id);
+
+      let lastUpdated = company.updatedAt;
+      let updatedField = "company";
+      let lastUpdatedBy = "System";
+
+      if (cycle && cycle.updatedAt <= now && cycle.updatedAt > lastUpdated) {
+        lastUpdated = cycle.updatedAt;
+        updatedField = cycle.updatedField ?? "status";
+        lastUpdatedBy = cycle.updatedBy
+          ? (usersById.get(cycle.updatedBy) ?? "System")
+          : cycle.ownerUserId
+            ? (usersById.get(cycle.ownerUserId) ?? "System")
+            : "System";
+      }
+
+      if (assignment && assignment.assignedAt <= now && assignment.assignedAt > lastUpdated) {
+        lastUpdated = assignment.assignedAt;
+        updatedField = "assignment";
+        lastUpdatedBy = usersById.get(assignment.assigneeUserId) ?? "System";
+      }
+
+      const latestContactUpdate = latestContactUpdateByCompany.get(company.id);
+      if (latestContactUpdate && latestContactUpdate <= now && latestContactUpdate > lastUpdated) {
+        lastUpdated = latestContactUpdate;
+        updatedField = "contact";
+        lastUpdatedBy = "System";
+      }
+
+      const latestInteraction = latestInteractionByCompany.get(company.id);
+      if (latestInteraction && latestInteraction <= now && latestInteraction > lastUpdated) {
+        lastUpdated = latestInteraction;
+        updatedField = "interaction";
+        lastUpdatedBy = "System";
+      }
+
+      const assignedTo = assignment
+        ? (usersById.get(assignment.assigneeUserId) ?? "Unassigned")
+        : cycle?.ownerUserId
+          ? (usersById.get(cycle.ownerUserId) ?? "Unassigned")
+          : "Unassigned";
+
+      return {
+        ...company,
+        currentStatus: cycle?.status ?? "not_contacted",
+        contactsCount: contactsByCompany.get(company.id) ?? 0,
+        assignedTo,
+        lastUpdated,
+        lastUpdatedBy,
+        updatedField,
+      };
+    });
+
+    return success(enrichedCompanies, {
       page: params.page,
       limit: params.limit,
-      total: count,
-      totalPages: Math.ceil(count / params.limit),
+      total,
+      totalPages: Math.ceil(total / params.limit),
     });
   } catch (error) {
     console.error("Error listing companies:", error);
@@ -92,10 +259,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * POST /api/v1/companies
- * Create company master record
- */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -117,17 +280,13 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [company] = await db
-      .insert(companies)
-      .values({
+    const company = await db.company.create({
+      data: {
         ...validation,
         createdBy: user.id,
-        updatedBy: user.id,
-        updatedField: "created",
-      })
-      .returning();
+      },
+    });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "create_company",
@@ -138,11 +297,14 @@ export async function POST(request: NextRequest) {
     });
 
     return success(company);
-  } catch (error: any) {
-    if (error.code === "23505") {
-      // Unique constraint violation
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
       return serverError("Company with this slug already exists");
     }
+
     console.error("Error creating company:", error);
     return serverError();
   }

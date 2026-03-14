@@ -1,17 +1,10 @@
 import { NextRequest } from "next/server";
-import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/api/auth";
 import { success, unauthorized, serverError } from "@/lib/api/response";
 import { paginationSchema } from "@/lib/api/validation";
 import { db } from "@/lib/db";
-import { companySeasonCycles } from "@/lib/db/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
 
-/**
- * GET /api/v1/company-season-cycles
- * List operational company-season rows for dashboard/Kanban
- * Query params: seasonId, status, assigneeId, companyId, page, limit
- */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -32,46 +25,37 @@ export async function GET(request: NextRequest) {
   };
 
   try {
-    // Build query conditions
-    const conditions = [];
+    const where: Prisma.CompanySeasonCycleWhereInput = {
+      ...(params.seasonId ? { seasonId: params.seasonId } : {}),
+      ...(params.status ? { status: params.status as never } : {}),
+      ...(params.assigneeId ? { ownerUserId: params.assigneeId } : {}),
+      ...(params.companyId ? { companyId: params.companyId } : {}),
+    };
 
-    if (params.seasonId) {
-      conditions.push(eq(companySeasonCycles.seasonId, params.seasonId));
-    }
-
-    if (params.status) {
-      conditions.push(eq(companySeasonCycles.status, params.status as any));
-    }
-
-    if (params.assigneeId) {
-      conditions.push(eq(companySeasonCycles.ownerUserId, params.assigneeId));
-    }
-
-    if (params.companyId) {
-      conditions.push(eq(companySeasonCycles.companyId, params.companyId));
-    }
-
-    // Count total
-    const [{ count }] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(companySeasonCycles)
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
-
-    // Fetch cycles
     const offset = (params.page - 1) * params.limit;
-    const cycles = await db
-      .select()
-      .from(companySeasonCycles)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(companySeasonCycles.updatedAt))
-      .limit(params.limit)
-      .offset(offset);
+    const [total, cycles] = await Promise.all([
+      db.companySeasonCycle.count({ where }),
+      db.companySeasonCycle.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        take: params.limit,
+        skip: offset,
+        include: {
+          updater: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      }),
+    ]);
 
     return success(cycles, {
       page: params.page,
       limit: params.limit,
-      total: count,
-      totalPages: Math.ceil(count / params.limit),
+      total,
+      totalPages: Math.ceil(total / params.limit),
     });
   } catch (error) {
     console.error("Error listing company season cycles:", error);

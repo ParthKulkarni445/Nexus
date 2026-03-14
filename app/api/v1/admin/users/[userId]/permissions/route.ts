@@ -1,12 +1,14 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
-import { success, unauthorized, forbidden, badRequest } from "@/lib/api/response";
+import {
+  success,
+  unauthorized,
+  forbidden,
+} from "@/lib/api/response";
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { userPermissions } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const updatePermissionsSchema = z.object({
@@ -18,10 +20,6 @@ const updatePermissionsSchema = z.object({
   ),
 });
 
-/**
- * PUT /api/v1/admin/users/:userId/permissions
- * Grant/revoke granular permissions
- */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ userId: string }> }
@@ -46,38 +44,35 @@ export async function PUT(
   const headersList = await headers();
   const clientInfo = getClientInfo(headersList);
 
-  // Update permissions
   for (const perm of validation.permissions) {
-    // Check if permission exists
-    const existing = await db.query.userPermissions.findFirst({
-      where: and(
-        eq(userPermissions.userId, userId),
-        eq(userPermissions.permissionKey, perm.key)
-      ),
+    const existing = await db.userPermission.findFirst({
+      where: {
+        userId,
+        permissionKey: perm.key,
+      },
     });
 
     if (existing) {
-      // Update existing permission
-      await db
-        .update(userPermissions)
-        .set({
+      await db.userPermission.update({
+        where: { id: existing.id },
+        data: {
           isAllowed: perm.allowed,
           grantedBy: user.id,
           grantedAt: new Date(),
-        })
-        .where(eq(userPermissions.id, existing.id));
+        },
+      });
     } else {
-      // Create new permission
-      await db.insert(userPermissions).values({
-        userId,
-        permissionKey: perm.key,
-        isAllowed: perm.allowed,
-        grantedBy: user.id,
+      await db.userPermission.create({
+        data: {
+          userId,
+          permissionKey: perm.key,
+          isAllowed: perm.allowed,
+          grantedBy: user.id,
+        },
       });
     }
   }
 
-  // Create audit log
   await createAuditLog({
     actorId: user.id,
     action: "update_user_permissions",

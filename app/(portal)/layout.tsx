@@ -1,9 +1,17 @@
 ﻿import Shell from "@/components/layout/Shell";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/api/auth";
 
-export default function PortalLayout({
+export default async function PortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <Shell>{children}</Shell>;
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  return <Shell currentUser={user}>{children}</Shell>;
 }

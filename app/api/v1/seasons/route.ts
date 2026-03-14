@@ -10,8 +10,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { recruitmentSeasons } from "@/lib/db/schema";
-import { desc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const createSeasonSchema = z.object({
@@ -23,10 +21,6 @@ const createSeasonSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
-/**
- * GET /api/v1/seasons
- * List recruitment seasons
- */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -35,8 +29,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const seasons = await db.query.recruitmentSeasons.findMany({
-      orderBy: [desc(recruitmentSeasons.createdAt)],
+    const seasons = await db.recruitmentSeason.findMany({
+      orderBy: { createdAt: "desc" },
     });
 
     return success(seasons);
@@ -46,10 +40,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * POST /api/v1/seasons
- * Create a new recruitment season
- */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -71,17 +61,15 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [season] = await db
-      .insert(recruitmentSeasons)
-      .values({
+    const season = await db.recruitmentSeason.create({
+      data: {
         ...validation,
-        startDate: validation.startDate || null,
-        endDate: validation.endDate || null,
+        startDate: validation.startDate ? new Date(validation.startDate) : null,
+        endDate: validation.endDate ? new Date(validation.endDate) : null,
         createdBy: user.id,
-      })
-      .returning();
+      },
+    });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "create_season",

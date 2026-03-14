@@ -10,8 +10,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { mailRequests } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const createMailRequestSchema = z.object({
@@ -22,14 +20,11 @@ const createMailRequestSchema = z.object({
   templateVersion: z.number().int().optional(),
   customSubject: z.string().max(500).optional(),
   customBody: z.string().optional(),
+  previewPayload: z.record(z.string(), z.any()).optional(),
   recipientFilter: z.record(z.string(), z.any()).optional(),
   urgency: z.number().int().min(1).max(5).optional(),
 });
 
-/**
- * GET /api/v1/mail/requests
- * List mail requests (with status filter for pending queue)
- */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -41,20 +36,45 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
 
   try {
-    let requests;
-
-    if (status) {
-      requests = await db
-        .select()
-        .from(mailRequests)
-        .where(eq(mailRequests.status, status as any))
-        .orderBy(desc(mailRequests.createdAt));
-    } else {
-      requests = await db
-        .select()
-        .from(mailRequests)
-        .orderBy(desc(mailRequests.createdAt));
-    }
+    const requests = await db.mailRequest.findMany({
+      where: status ? { status: status as never } : undefined,
+      orderBy: { createdAt: "desc" },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+          },
+        },
+        requester: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        reviewer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        template: {
+          select: {
+            id: true,
+            name: true,
+            subject: true,
+            bodyHtml: true,
+            bodyText: true,
+            status: true,
+            variables: true,
+            updatedAt: true,
+          },
+        },
+      },
+    });
 
     return success(requests);
   } catch (error) {
@@ -63,10 +83,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * POST /api/v1/mail/requests
- * Create mail request (template or custom)
- */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -88,16 +104,14 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [mailRequest] = await db
-      .insert(mailRequests)
-      .values({
+    const mailRequest = await db.mailRequest.create({
+      data: {
         ...validation,
         requestedBy: user.id,
         status: "pending",
-      })
-      .returning();
+      },
+    });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "create_mail_request",

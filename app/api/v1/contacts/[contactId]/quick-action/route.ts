@@ -11,8 +11,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { companyContacts, contactInteractions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const quickActionSchema = z.object({
@@ -23,10 +21,6 @@ const quickActionSchema = z.object({
   companySeasonCycleId: z.string().uuid().optional(),
 });
 
-/**
- * POST /api/v1/contacts/:contactId/quick-action
- * Quick log for call/email/note action
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ contactId: string }> }
@@ -52,19 +46,17 @@ export async function POST(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    // Verify contact exists
-    const contact = await db.query.companyContacts.findFirst({
-      where: eq(companyContacts.id, contactId),
+    const contact = await db.companyContact.findUnique({
+      where: { id: contactId },
+      select: { companyId: true },
     });
 
     if (!contact) {
       return notFound("Contact not found");
     }
 
-    // Create interaction log
-    const [interaction] = await db
-      .insert(contactInteractions)
-      .values({
+    const interaction = await db.contactInteraction.create({
+      data: {
         companyId: contact.companyId,
         contactId,
         companySeasonCycleId: validation.companySeasonCycleId,
@@ -75,16 +67,14 @@ export async function POST(
           ? new Date(validation.nextFollowUpAt)
           : null,
         createdBy: user.id,
-      })
-      .returning();
+      },
+    });
 
-    // Update contact last contacted timestamp
-    await db
-      .update(companyContacts)
-      .set({ lastContactedAt: new Date() })
-      .where(eq(companyContacts.id, contactId));
+    await db.companyContact.update({
+      where: { id: contactId },
+      data: { lastContactedAt: new Date() },
+    });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: `contact_${validation.action}`,

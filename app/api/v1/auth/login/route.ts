@@ -1,8 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { error } from "@/lib/api/response";
 import { respondWithSession, verifyPassword } from "@/lib/api/session";
 
@@ -30,15 +28,15 @@ export async function POST(request: NextRequest) {
 
   const { email, password } = parsed.data;
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.email, email.toLowerCase()),
+  const user = await db.user.findUnique({
+    where: { email: email.toLowerCase() },
   });
 
   if (!user || !user.isActive) {
     return error("Invalid email or password", "AUTH_FAILED", 401);
   }
 
-  const meta = (user.profileMeta as Record<string, string>) ?? {};
+  const meta = ((user.profileMeta ?? {}) as Record<string, string>) ?? {};
   const passwordHash = meta.passwordHash;
 
   if (!passwordHash || !verifyPassword(password, passwordHash)) {
@@ -52,7 +50,7 @@ export async function POST(request: NextRequest) {
       name: user.name,
       role: user.role,
       coordinatorType: user.coordinatorType,
+      isActive: user.isActive,
     },
-    user.id
   );
 }

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
@@ -10,8 +11,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { drives } from "@/lib/db/schema";
-import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const createDriveSchema = z.object({
@@ -26,11 +25,6 @@ const createDriveSchema = z.object({
   notes: z.string().optional(),
 });
 
-/**
- * GET /api/v1/drives
- * Calendar feed with filtering
- * Query params: from, to, status, seasonId
- */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -42,29 +36,25 @@ export async function GET(request: NextRequest) {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const status = searchParams.get("status");
-  const seasonId = searchParams.get("seasonId");
 
   try {
-    const conditions = [];
+    const where: Prisma.DriveWhereInput = {
+      ...(from || to
+        ? {
+            startAt: {
+              ...(from ? { gte: new Date(from) } : {}),
+              ...(to ? { lte: new Date(to) } : {}),
+            },
+          }
+        : {}),
+      ...(status ? { status: status as never } : {}),
+    };
 
-    if (from) {
-      conditions.push(gte(drives.startAt, new Date(from)));
-    }
-
-    if (to) {
-      conditions.push(lte(drives.startAt, new Date(to)));
-    }
-
-    if (status) {
-      conditions.push(eq(drives.status, status as any));
-    }
-
-    const drivesList = await db
-      .select()
-      .from(drives)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(drives.startAt))
-      .limit(100);
+    const drivesList = await db.drive.findMany({
+      where,
+      orderBy: { startAt: "desc" },
+      take: 100,
+    });
 
     return success(drivesList);
   } catch (error) {
@@ -73,10 +63,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/**
- * POST /api/v1/drives
- * Create tentative/confirmed drive with conflict checks
- */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -98,37 +84,31 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
-    // Check for conflicts if venue and time are specified
     let isConflictFlagged = false;
-    if (validation.venue && validation.startAt && validation.endAt) {
-      const conflicts = await db
-        .select()
-        .from(drives)
-        .where(
-          and(
-            eq(drives.venue, validation.venue),
-            gte(drives.startAt, new Date(validation.startAt)),
-            lte(drives.endAt, new Date(validation.endAt))
-          )
-        );
 
-      if (conflicts.length > 0) {
-        isConflictFlagged = true;
-      }
+    if (validation.venue && validation.startAt && validation.endAt) {
+      const conflicts = await db.drive.findMany({
+        where: {
+          venue: validation.venue,
+          startAt: { gte: new Date(validation.startAt) },
+          endAt: { lte: new Date(validation.endAt) },
+        },
+        select: { id: true },
+      });
+
+      isConflictFlagged = conflicts.length > 0;
     }
 
-    const [drive] = await db
-      .insert(drives)
-      .values({
+    const drive = await db.drive.create({
+      data: {
         ...validation,
         startAt: validation.startAt ? new Date(validation.startAt) : null,
         endAt: validation.endAt ? new Date(validation.endAt) : null,
         isConflictFlagged,
         createdBy: user.id,
-      })
-      .returning();
+      },
+    });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "create_drive",

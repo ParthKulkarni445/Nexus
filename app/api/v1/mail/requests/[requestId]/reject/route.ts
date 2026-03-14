@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hasRoleOrCoordinatorType } from "@/lib/api/auth";
 import {
@@ -11,18 +12,12 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { mailRequests } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const rejectSchema = z.object({
   reviewNote: z.string().min(1),
 });
 
-/**
- * POST /api/v1/mail/requests/:requestId/reject
- * Reject request with feedback
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ requestId: string }> }
@@ -33,8 +28,13 @@ export async function POST(
     return unauthorized();
   }
 
-  if (!hasRoleOrCoordinatorType(user, ["tpo_admin"], ["mailing_team"])) {
-    return forbidden("Only mailing team can reject requests");
+  if (
+    !hasRoleOrCoordinatorType(user, ["tpo_admin"], [
+      "mailing_team",
+      "student_representative",
+    ])
+  ) {
+    return forbidden("Only mailing team or student representatives can reject requests");
   }
 
   const { requestId } = await params;
@@ -48,22 +48,16 @@ export async function POST(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [rejectedRequest] = await db
-      .update(mailRequests)
-      .set({
+    const rejectedRequest = await db.mailRequest.update({
+      where: { id: requestId },
+      data: {
         status: "rejected",
         reviewedBy: user.id,
         reviewNote: validation.reviewNote,
         updatedAt: new Date(),
-      })
-      .where(eq(mailRequests.id, requestId))
-      .returning();
+      },
+    });
 
-    if (!rejectedRequest) {
-      return notFound("Mail request not found");
-    }
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "reject_mail_request",
@@ -74,7 +68,14 @@ export async function POST(
     });
 
     return success(rejectedRequest);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Mail request not found");
+    }
+
     console.error("Error rejecting mail request:", error);
     return serverError();
   }

@@ -10,8 +10,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { companyContacts } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const createContactSchema = z.object({
@@ -23,10 +21,6 @@ const createContactSchema = z.object({
   notes: z.string().optional(),
 });
 
-/**
- * GET /api/v1/companies/:companyId/contacts
- * List contacts for a company
- */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
@@ -40,9 +34,9 @@ export async function GET(
   const { companyId } = await params;
 
   try {
-    const contacts = await db.query.companyContacts.findMany({
-      where: eq(companyContacts.companyId, companyId),
-      orderBy: [desc(companyContacts.createdAt)],
+    const contacts = await db.companyContact.findMany({
+      where: { companyId },
+      orderBy: { createdAt: "desc" },
     });
 
     return success(contacts);
@@ -52,10 +46,6 @@ export async function GET(
   }
 }
 
-/**
- * POST /api/v1/companies/:companyId/contacts
- * Add new HR contact
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
@@ -81,15 +71,13 @@ export async function POST(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [contact] = await db
-      .insert(companyContacts)
-      .values({
+    const contact = await db.companyContact.create({
+      data: {
         companyId,
         ...validation,
-      })
-      .returning();
+      },
+    });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "create_contact",

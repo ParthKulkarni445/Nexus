@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
@@ -11,14 +12,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import {
-  companies,
-  companyContacts,
-  companyAssignments,
-  contactInteractions,
-  drives,
-} from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const updateCompanySchema = z.object({
@@ -31,10 +24,6 @@ const updateCompanySchema = z.object({
   notes: z.string().optional(),
 });
 
-/**
- * GET /api/v1/companies/:companyId
- * Company detail with contacts, assignments, recent interactions, linked drives
- */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
@@ -48,45 +37,116 @@ export async function GET(
   const { companyId } = await params;
 
   try {
-    const company = await db.query.companies.findFirst({
-      where: eq(companies.id, companyId),
+    const company = await db.company.findUnique({
+      where: { id: companyId },
     });
 
     if (!company) {
       return notFound("Company not found");
     }
 
-    // Fetch related data
-    const [contacts, assignments, interactions, recentDrives] =
+    const [contacts, assignments, interactions, recentDrives, latestCycle] =
       await Promise.all([
-        db.query.companyContacts.findMany({
-          where: eq(companyContacts.companyId, companyId),
-          orderBy: [desc(companyContacts.createdAt)],
-        }),
-        db.query.companyAssignments.findMany({
-          where: eq(companyAssignments.itemId, companyId),
-          with: {
-            assigneeUserId: true,
+        db.companyContact.findMany({
+          where: { companyId },
+          select: {
+            id: true,
+            name: true,
+            designation: true,
+            emails: true,
+            phones: true,
+            preferredContactMethod: true,
+            notes: true,
+            lastContactedAt: true,
+            createdAt: true,
+            updatedAt: true,
           },
+          orderBy: { createdAt: "desc" },
         }),
-        db.query.contactInteractions.findMany({
-          where: eq(contactInteractions.companyId, companyId),
-          orderBy: [desc(contactInteractions.createdAt)],
-          limit: 10,
+        db.companyAssignment.findMany({
+          where: { itemId: companyId, itemType: "company", isActive: true },
+          include: { assigneeUser: { select: { name: true } } },
+          orderBy: { assignedAt: "desc" },
         }),
-        db.query.drives.findMany({
-          where: eq(drives.companyId, companyId),
-          orderBy: [desc(drives.createdAt)],
-          limit: 5,
+        db.contactInteraction.findMany({
+          where: { companyId },
+          select: {
+            id: true,
+            summary: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        }),
+        db.drive.findMany({
+          where: { companyId },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            stage: true,
+            startAt: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+        }),
+        db.companySeasonCycle.findFirst({
+          where: { companyId },
+          select: {
+            id: true,
+            status: true,
+            updatedBy: true,
+            updatedField: true,
+            updatedAt: true,
+            statusHistory: {
+              select: {
+                id: true,
+                toStatus: true,
+                changeNote: true,
+                changedAt: true,
+                changer: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+              orderBy: { changedAt: "desc" },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
         }),
       ]);
 
     return success({
       company,
       contacts,
-      assignments,
+      assignments: assignments.map((assignment) => ({
+        id: assignment.id,
+        itemType: assignment.itemType,
+        assigneeUserId: assignment.assigneeUserId,
+        assigneeName: assignment.assigneeUser.name,
+        assignedAt: assignment.assignedAt,
+        notes: assignment.notes,
+      })),
       recentInteractions: interactions,
       recentDrives,
+      latestCycle: latestCycle
+        ? {
+            id: latestCycle.id,
+            status: latestCycle.status,
+            updatedBy: latestCycle.updatedBy,
+            updatedField: latestCycle.updatedField,
+            updatedAt: latestCycle.updatedAt,
+          }
+        : null,
+      statusHistory: latestCycle?.statusHistory.map((entry) => ({
+        id: entry.id,
+        toStatus: entry.toStatus,
+        changeNote: entry.changeNote,
+        changedBy: entry.changer.name,
+        changedAt: entry.changedAt,
+      })) ?? [],
     });
   } catch (error) {
     console.error("Error fetching company:", error);
@@ -94,10 +154,6 @@ export async function GET(
   }
 }
 
-/**
- * PUT /api/v1/companies/:companyId
- * Update company master attributes
- */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
@@ -123,30 +179,14 @@ export async function PUT(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    // Determine which field(s) were updated
-    const updatedFields = Object.keys(validation);
-    const updatedField = updatedFields.length > 0 
-      ? updatedFields.length === 1 
-        ? updatedFields[0] 
-        : `${updatedFields.length} fields`
-      : "unknown";
-
-    const [updatedCompany] = await db
-      .update(companies)
-      .set({
+    const updatedCompany = await db.company.update({
+      where: { id: companyId },
+      data: {
         ...validation,
-        updatedBy: user.id,
-        updatedField,
         updatedAt: new Date(),
-      })
-      .where(eq(companies.id, companyId))
-      .returning();
+      },
+    });
 
-    if (!updatedCompany) {
-      return notFound("Company not found");
-    }
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "update_company",
@@ -157,16 +197,19 @@ export async function PUT(
     });
 
     return success(updatedCompany);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Company not found");
+    }
+
     console.error("Error updating company:", error);
     return serverError();
   }
 }
 
-/**
- * DELETE /api/v1/companies/:companyId
- * Soft delete company (admin only)
- */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ companyId: string }> }
@@ -186,11 +229,8 @@ export async function DELETE(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    // Note: Implement soft delete by adding deletedAt column if needed
-    // For now, we'll do a hard delete
-    await db.delete(companies).where(eq(companies.id, companyId));
+    await db.company.delete({ where: { id: companyId } });
 
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "delete_company",
@@ -200,7 +240,14 @@ export async function DELETE(
     });
 
     return success({ message: "Company deleted successfully" });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Company not found");
+    }
+
     console.error("Error deleting company:", error);
     return serverError();
   }

@@ -2,8 +2,6 @@ import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/api/auth";
 import { success, unauthorized } from "@/lib/api/response";
 import { db } from "@/lib/db";
-import { userPermissions } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 
 /**
  * GET /api/v1/auth/me
@@ -17,8 +15,8 @@ export async function GET(request: NextRequest) {
   }
 
   // Fetch user's custom permissions
-  const permissions = await db.query.userPermissions.findMany({
-    where: eq(userPermissions.userId, user.id),
+  const permissions = await db.userPermission.findMany({
+    where: { userId: user.id },
   });
 
   return success({

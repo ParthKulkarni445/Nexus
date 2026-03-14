@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
   success,
@@ -9,14 +10,8 @@ import {
 } from "@/lib/api/response";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { blogs } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
-/**
- * POST /api/v1/admin/blogs/:blogId/approve
- * Approve blog
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ blogId: string }> }
@@ -36,22 +31,16 @@ export async function POST(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [approvedBlog] = await db
-      .update(blogs)
-      .set({
+    const approvedBlog = await db.blog.update({
+      where: { id: blogId },
+      data: {
         moderationStatus: "approved",
         approvedBy: user.id,
         approvedAt: new Date(),
         updatedAt: new Date(),
-      })
-      .where(eq(blogs.id, blogId))
-      .returning();
+      },
+    });
 
-    if (!approvedBlog) {
-      return notFound("Blog not found");
-    }
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "approve_blog",
@@ -61,7 +50,14 @@ export async function POST(
     });
 
     return success(approvedBlog);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Blog not found");
+    }
+
     console.error("Error approving blog:", error);
     return serverError();
   }

@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
@@ -11,18 +12,12 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { blogs } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 
 const rejectSchema = z.object({
   moderationNote: z.string().min(1),
 });
 
-/**
- * POST /api/v1/admin/blogs/:blogId/reject
- * Reject blog with note
- */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ blogId: string }> }
@@ -48,21 +43,15 @@ export async function POST(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const [rejectedBlog] = await db
-      .update(blogs)
-      .set({
+    const rejectedBlog = await db.blog.update({
+      where: { id: blogId },
+      data: {
         moderationStatus: "rejected",
         moderationNote: validation.moderationNote,
         updatedAt: new Date(),
-      })
-      .where(eq(blogs.id, blogId))
-      .returning();
+      },
+    });
 
-    if (!rejectedBlog) {
-      return notFound("Blog not found");
-    }
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "reject_blog",
@@ -73,7 +62,14 @@ export async function POST(
     });
 
     return success(rejectedBlog);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return notFound("Blog not found");
+    }
+
     console.error("Error rejecting blog:", error);
     return serverError();
   }

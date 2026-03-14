@@ -1,0 +1,545 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+enum UserRole {
+  tpo_admin
+  coordinator
+  student
+  tech_support
+  @@map("user_role")
+}
+
+enum CoordinatorType {
+  general
+  student_representative
+  mailing_team
+  @@map("coordinator_type")
+}
+
+enum SeasonType {
+  intern
+  placement
+  @@map("season_type")
+}
+
+enum SeasonContactStatus {
+  not_contacted
+  contacted
+  positive
+  accepted
+  rejected
+  @@map("season_contact_status")
+}
+
+enum AssignmentItemType {
+  company
+  contact
+  @@map("assignment_item_type")
+}
+
+enum DriveStatus {
+  tentative
+  confirmed
+  completed
+  cancelled
+  @@map("drive_status")
+}
+
+enum MailRequestType {
+  template
+  custom
+  @@map("mail_request_type")
+}
+
+enum MailRequestStatus {
+  pending
+  queued
+  sent
+  rejected
+  cancelled
+  @@map("mail_request_status")
+}
+
+enum TemplateStatus {
+  draft
+  approved
+  archived
+  @@map("template_status")
+}
+
+enum BlogModerationStatus {
+  pending
+  approved
+  rejected
+  @@map("blog_moderation_status")
+}
+
+enum EmailDirection {
+  inbound
+  outbound
+  @@map("email_direction")
+}
+
+model User {
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                    String                     @unique @db.VarChar(255)
+  name                     String                     @db.VarChar(255)
+  role                     UserRole
+  coordinatorType          CoordinatorType?           @map("coordinator_type")
+  authProvider             String?                    @map("auth_provider") @db.VarChar(100)
+  authSubject              String?                    @map("auth_subject") @db.VarChar(255)
+  profileMeta              Json?                      @map("profile_meta")
+  isActive                 Boolean                    @default(true) @map("is_active")
+  createdAt                DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                   @default(now()) @map("updated_at") @db.Timestamptz(6)
+  permissions              UserPermission[]           @relation("UserPermissions")
+  grantedPermissions       UserPermission[]           @relation("PermissionGrants")
+  createdCompanies         Company[]                  @relation("CompanyCreator")
+  updatedCompanies         Company[]                  @relation("CompanyUpdater")
+  assignmentAssignee       CompanyAssignment[]        @relation("AssignmentAssignee")
+  assignmentAssigner       CompanyAssignment[]        @relation("AssignmentAssigner")
+  assignmentHistoryFrom    CompanyAssignmentHistory[] @relation("AssignmentHistoryFrom")
+  assignmentHistoryTo      CompanyAssignmentHistory[] @relation("AssignmentHistoryTo")
+  assignmentHistoryChanged CompanyAssignmentHistory[] @relation("AssignmentHistoryChangedBy")
+  seasonOwnerships         CompanySeasonCycle[]       @relation("SeasonCycleOwner")
+  seasonCycleUpdates      CompanySeasonCycle[]       @relation("SeasonCycleUpdatedBy")
+  seasonStatusChanges      CompanySeasonStatusHistory[]
+  interactionsCreated      ContactInteraction[]
+  createdDrives            Drive[]
+  createdSeasons           RecruitmentSeason[]
+  follows                  StudentCompanyFollow[]
+  createdTemplates         EmailTemplate[]            @relation("TemplateCreator")
+  approvedTemplates        EmailTemplate[]            @relation("TemplateApprover")
+  templateVersionsCreated  EmailTemplateVersion[]
+  requestedMailRequests    MailRequest[]              @relation("MailRequestRequester")
+  reviewedMailRequests     MailRequest[]              @relation("MailRequestReviewer")
+  createdCompanyDomains    CompanyDomain[]            @relation("CompanyDomainCreator")
+  authoredBlogs            Blog[]                     @relation("BlogAuthor")
+  approvedBlogs            Blog[]                     @relation("BlogApprover")
+  notifications            Notification[]
+  auditLogs                AuditLog[]
+
+  @@map("users")
+}
+
+model UserPermission {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  permissionKey String   @map("permission_key") @db.VarChar(100)
+  isAllowed     Boolean  @map("is_allowed")
+  grantedBy     String?  @map("granted_by") @db.Uuid
+  grantedAt     DateTime @default(now()) @map("granted_at") @db.Timestamptz(6)
+  user          User     @relation("UserPermissions", fields: [userId], references: [id], onDelete: Cascade)
+  grantedByUser User?    @relation("PermissionGrants", fields: [grantedBy], references: [id])
+
+  @@index([userId, permissionKey], map: "user_permissions_user_key_idx")
+  @@map("user_permissions")
+}
+
+model Company {
+  id            String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String               @db.VarChar(255)
+  slug          String               @unique @db.VarChar(255)
+  domain        String?              @db.VarChar(255)
+  industry      String?              @db.VarChar(100)
+  website       String?              @db.VarChar(500)
+  priority      Int?
+  notes         String?
+  createdBy     String?              @map("created_by") @db.Uuid
+  updatedBy     String?              @map("updated_by") @db.Uuid
+  updatedField  String?              @map("updated_field") @db.VarChar(100)
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  creator       User?                @relation("CompanyCreator", fields: [createdBy], references: [id])
+  updater       User?                @relation("CompanyUpdater", fields: [updatedBy], references: [id])
+  contacts      CompanyContact[]
+  seasonCycles  CompanySeasonCycle[]
+  interactions  ContactInteraction[]
+  drives        Drive[]
+  follows       StudentCompanyFollow[]
+  mailRequests  MailRequest[]
+  emails        Email[]
+  domains       CompanyDomain[]
+  blogs         Blog[]
+
+  @@index([name], map: "companies_name_idx")
+  @@index([industry], map: "companies_industry_idx")
+  @@index([createdAt], map: "companies_created_at_idx")
+  @@map("companies")
+}
+
+model CompanyContact {
+  id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId              String    @map("company_id") @db.Uuid
+  name                   String    @db.VarChar(255)
+  designation            String?   @db.VarChar(255)
+  emails                 String[]  @default([])
+  phones                 String[]  @default([])
+  preferredContactMethod String?   @map("preferred_contact_method") @db.VarChar(50)
+  notes                  String?
+  lastContactedAt        DateTime? @map("last_contacted_at") @db.Timestamptz(6)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  company                Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, createdAt], map: "company_contacts_company_created_idx")
+  @@map("company_contacts")
+}
+
+model CompanyAssignment {
+  id             String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  itemType       AssignmentItemType       @map("item_type")
+  itemId         String                   @map("item_id") @db.Uuid
+  assigneeUserId String                   @map("assignee_user_id") @db.Uuid
+  assignedBy     String?                  @map("assigned_by") @db.Uuid
+  notes          String?
+  isActive       Boolean                  @default(true) @map("is_active")
+  assignedAt     DateTime                 @default(now()) @map("assigned_at") @db.Timestamptz(6)
+  updatedAt      DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(6)
+  assigneeUser   User                     @relation("AssignmentAssignee", fields: [assigneeUserId], references: [id])
+  assignerUser   User?                    @relation("AssignmentAssigner", fields: [assignedBy], references: [id])
+  history        CompanyAssignmentHistory[]
+
+  @@index([itemType, itemId, isActive, assignedAt], map: "company_assignments_item_lookup_idx")
+  @@index([assigneeUserId, isActive, assignedAt], map: "company_assignments_assignee_active_idx")
+  @@map("company_assignments")
+}
+
+model CompanyAssignmentHistory {
+  id            String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  assignmentId  String            @map("assignment_id") @db.Uuid
+  fromUserId    String?           @map("from_user_id") @db.Uuid
+  toUserId      String?           @map("to_user_id") @db.Uuid
+  changedBy     String            @map("changed_by") @db.Uuid
+  reason        String?
+  changedAt     DateTime          @default(now()) @map("changed_at") @db.Timestamptz(6)
+  assignment    CompanyAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  fromUser      User?             @relation("AssignmentHistoryFrom", fields: [fromUserId], references: [id])
+  toUser        User?             @relation("AssignmentHistoryTo", fields: [toUserId], references: [id])
+  changedByUser User              @relation("AssignmentHistoryChangedBy", fields: [changedBy], references: [id])
+
+  @@index([assignmentId, changedAt], map: "company_assignment_history_assignment_changed_at_idx")
+  @@map("company_assignment_history")
+}
+
+model RecruitmentSeason {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String              @db.VarChar(255)
+  seasonType    SeasonType          @map("season_type")
+  academicYear  String              @map("academic_year") @db.VarChar(20)
+  startDate     DateTime?           @map("start_date") @db.Date
+  endDate       DateTime?           @map("end_date") @db.Date
+  isActive      Boolean             @default(true) @map("is_active")
+  createdBy     String?             @map("created_by") @db.Uuid
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
+  creator       User?               @relation(fields: [createdBy], references: [id])
+  companyCycles CompanySeasonCycle[]
+
+  @@index([seasonType, academicYear, isActive], map: "recruitment_seasons_type_year_active_idx")
+  @@map("recruitment_seasons")
+}
+
+model CompanySeasonCycle {
+  id                 String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId          String                      @map("company_id") @db.Uuid
+  seasonId           String                      @map("season_id") @db.Uuid
+  status             SeasonContactStatus
+  lastContactedAt    DateTime?                   @map("last_contacted_at") @db.Timestamptz(6)
+  ownerUserId        String?                     @map("owner_user_id") @db.Uuid
+  updatedBy          String?                     @map("updated_by") @db.Uuid
+  updatedField       String?                     @map("updated_field") @db.VarChar(100)
+  nextFollowUpAt     DateTime?                   @map("next_follow_up_at") @db.Timestamptz(6)
+  notes              String?
+  createdAt          DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime                    @default(now()) @map("updated_at") @db.Timestamptz(6)
+  company            Company                     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  season             RecruitmentSeason           @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  owner              User?                       @relation("SeasonCycleOwner", fields: [ownerUserId], references: [id])
+  updater            User?                       @relation("SeasonCycleUpdatedBy", fields: [updatedBy], references: [id])
+  statusHistory      CompanySeasonStatusHistory[]
+  interactions       ContactInteraction[]
+  drives             Drive[]
+  mailRequests       MailRequest[]
+  emails             Email[]
+
+  @@unique([companyId, seasonId])
+  @@index([seasonId, status, updatedAt], map: "company_season_cycles_season_status_updated_idx")
+  @@index([seasonId, ownerUserId, updatedAt], map: "company_season_cycles_season_owner_updated_idx")
+  @@index([companyId, updatedAt], map: "company_season_cycles_company_updated_idx")
+  @@index([ownerUserId, updatedAt], map: "company_season_cycles_owner_updated_idx")
+  @@map("company_season_cycles")
+}
+
+model CompanySeasonStatusHistory {
+  id                   String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companySeasonCycleId String               @map("company_season_cycle_id") @db.Uuid
+  fromStatus           SeasonContactStatus? @map("from_status")
+  toStatus             SeasonContactStatus  @map("to_status")
+  changedBy            String               @map("changed_by") @db.Uuid
+  changeNote           String?              @map("change_note")
+  changedAt            DateTime             @default(now()) @map("changed_at") @db.Timestamptz(6)
+  companySeasonCycle   CompanySeasonCycle   @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade)
+  changer              User                 @relation(fields: [changedBy], references: [id])
+
+  @@index([companySeasonCycleId, changedAt], map: "company_season_status_history_cycle_changed_idx")
+  @@map("company_season_status_history")
+}
+
+model ContactInteraction {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId            String              @map("company_id") @db.Uuid
+  contactId            String?             @map("contact_id") @db.Uuid
+  companySeasonCycleId String?             @map("company_season_cycle_id") @db.Uuid
+  interactionType      String              @map("interaction_type") @db.VarChar(50)
+  outcome              String?             @db.VarChar(255)
+  summary              String?
+  nextFollowUpAt       DateTime?           @map("next_follow_up_at") @db.Timestamptz(6)
+  createdBy            String              @map("created_by") @db.Uuid
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  company              Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companySeasonCycle   CompanySeasonCycle? @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade)
+  creator              User                @relation(fields: [createdBy], references: [id])
+
+  @@index([companyId, createdAt], map: "contact_interactions_company_created_idx")
+  @@index([companySeasonCycleId, createdAt], map: "contact_interactions_cycle_created_idx")
+  @@map("contact_interactions")
+}
+
+model Drive {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId            String             @map("company_id") @db.Uuid
+  companySeasonCycleId String             @map("company_season_cycle_id") @db.Uuid
+  title                String             @db.VarChar(255)
+  stage                String             @db.VarChar(50)
+  status               DriveStatus
+  venue                String?            @db.VarChar(255)
+  startAt              DateTime?          @map("start_at") @db.Timestamptz(6)
+  endAt                DateTime?          @map("end_at") @db.Timestamptz(6)
+  isConflictFlagged    Boolean?           @default(false) @map("is_conflict_flagged")
+  notes                String?
+  createdBy            String?            @map("created_by") @db.Uuid
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
+  company              Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companySeasonCycle   CompanySeasonCycle @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade)
+  creator              User?              @relation(fields: [createdBy], references: [id])
+  emails               Email[]
+
+  @@index([companyId, startAt], map: "drives_company_start_idx")
+  @@index([startAt, endAt], map: "drives_start_end_idx")
+  @@index([companySeasonCycleId, startAt], map: "drives_cycle_start_idx")
+  @@index([venue, startAt, endAt], map: "drives_venue_window_idx")
+  @@map("drives")
+}
+
+model StudentCompanyFollow {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  student   User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, companyId])
+  @@index([companyId], map: "student_company_follows_company_idx")
+  @@map("student_company_follows")
+}
+
+model Email {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  direction            EmailDirection
+  messageId            String              @unique @map("message_id") @db.VarChar(500)
+  mailRequestId        String?             @map("mail_request_id") @db.Uuid
+  templateId           String?             @map("template_id") @db.Uuid
+  templateVersion      Int?                @map("template_version")
+  companyId            String?             @map("company_id") @db.Uuid
+  driveId              String?             @map("drive_id") @db.Uuid
+  companySeasonCycleId String?             @map("company_season_cycle_id") @db.Uuid
+  fromEmail            String              @map("from_email") @db.VarChar(255)
+  toEmails             String[]            @default([]) @map("to_emails")
+  ccEmails             String[]            @default([]) @map("cc_emails")
+  subject              String              @db.VarChar(500)
+  textBody             String?             @map("text_body")
+  htmlBody             String?             @map("html_body")
+  inReplyTo            String?             @map("in_reply_to") @db.VarChar(500)
+  references           String[]            @default([])
+  threadId             String?             @map("thread_id") @db.VarChar(255)
+  headers              Json?
+  classification       Json?
+  providerStatus       String?             @map("provider_status") @db.VarChar(100)
+  providerEventAt      DateTime?           @map("provider_event_at") @db.Timestamptz(6)
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  mailRequest          MailRequest?        @relation(fields: [mailRequestId], references: [id], onDelete: Cascade)
+  template             EmailTemplate?      @relation(fields: [templateId], references: [id])
+  company              Company?            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  drive                Drive?              @relation(fields: [driveId], references: [id], onDelete: Cascade)
+  companySeasonCycle   CompanySeasonCycle? @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade)
+  attachments          EmailAttachment[]
+
+  @@index([companyId, createdAt], map: "emails_company_created_idx")
+  @@map("emails")
+}
+
+model EmailAttachment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  emailId    String   @map("email_id") @db.Uuid
+  fileName   String   @map("file_name") @db.VarChar(255)
+  mimeType   String?  @map("mime_type") @db.VarChar(255)
+  sizeBytes  Int?     @map("size_bytes")
+  storagePath String  @map("storage_path") @db.VarChar(500)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  email      Email    @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@map("email_attachments")
+}
+
+model CompanyDomain {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  domain    String   @db.VarChar(255)
+  confidence String? @db.VarChar(50)
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creator   User?    @relation("CompanyDomainCreator", fields: [createdBy], references: [id])
+
+  @@unique([companyId, domain])
+  @@map("company_domains")
+}
+
+model EmailTemplate {
+  id           String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String                 @db.VarChar(255)
+  slug         String                 @unique @db.VarChar(255)
+  subject      String                 @db.VarChar(500)
+  bodyHtml     String                 @map("body_html")
+  bodyText     String?                @map("body_text")
+  variables    String[]               @default([])
+  sendPolicy   Json?                  @map("send_policy")
+  status       TemplateStatus
+  createdBy    String?                @map("created_by") @db.Uuid
+  approvedBy   String?                @map("approved_by") @db.Uuid
+  createdAt    DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime               @default(now()) @map("updated_at") @db.Timestamptz(6)
+  creator      User?                  @relation("TemplateCreator", fields: [createdBy], references: [id])
+  approver     User?                  @relation("TemplateApprover", fields: [approvedBy], references: [id])
+  versions     EmailTemplateVersion[]
+  mailRequests MailRequest[]
+  emails       Email[]
+
+  @@index([status, updatedAt], map: "email_templates_status_updated_idx")
+  @@map("email_templates")
+}
+
+model EmailTemplateVersion {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId String        @map("template_id") @db.Uuid
+  version    Int
+  subject    String        @db.VarChar(500)
+  bodyHtml   String        @map("body_html")
+  bodyText   String?       @map("body_text")
+  variables  String[]      @default([])
+  createdBy  String?       @map("created_by") @db.Uuid
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  template   EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  creator    User?         @relation(fields: [createdBy], references: [id])
+
+  @@unique([templateId, version])
+  @@map("email_template_versions")
+}
+
+model MailRequest {
+  id                   String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId            String?             @map("company_id") @db.Uuid
+  requestedBy          String              @map("requested_by") @db.Uuid
+  companySeasonCycleId String?             @map("company_season_cycle_id") @db.Uuid
+  requestType          MailRequestType     @map("request_type")
+  templateId           String?             @map("template_id") @db.Uuid
+  templateVersion      Int?                @map("template_version")
+  customSubject        String?             @map("custom_subject") @db.VarChar(500)
+  customBody           String?             @map("custom_body")
+  recipientFilter      Json?               @map("recipient_filter")
+  previewPayload       Json?               @map("preview_payload")
+  status               MailRequestStatus
+  urgency              Int?
+  reviewedBy           String?             @map("reviewed_by") @db.Uuid
+  reviewNote           String?             @map("review_note")
+  sendAt               DateTime?           @map("send_at") @db.Timestamptz(6)
+  sentAt               DateTime?           @map("sent_at") @db.Timestamptz(6)
+  createdAt            DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime            @default(now()) @map("updated_at") @db.Timestamptz(6)
+  company              Company?            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  requester            User                @relation("MailRequestRequester", fields: [requestedBy], references: [id])
+  companySeasonCycle   CompanySeasonCycle? @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade)
+  template             EmailTemplate?      @relation(fields: [templateId], references: [id])
+  reviewer             User?               @relation("MailRequestReviewer", fields: [reviewedBy], references: [id])
+  emails               Email[]
+
+  @@index([status, createdAt], map: "mail_requests_status_created_idx")
+  @@index([sendAt], map: "mail_requests_send_at_idx")
+  @@index([requestedBy, createdAt], map: "mail_requests_requested_by_created_idx")
+  @@map("mail_requests")
+}
+
+model Blog {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId         String               @map("author_id") @db.Uuid
+  companyId        String               @map("company_id") @db.Uuid
+  title            String               @db.VarChar(500)
+  body             String
+  tags             String[]             @default([])
+  isAiAssisted     Boolean?             @default(false) @map("is_ai_assisted")
+  moderationStatus BlogModerationStatus @map("moderation_status")
+  moderationNote   String?              @map("moderation_note")
+  approvedBy       String?              @map("approved_by") @db.Uuid
+  approvedAt       DateTime?            @map("approved_at") @db.Timestamptz(6)
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  author           User                 @relation("BlogAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  approver         User?                @relation("BlogApprover", fields: [approvedBy], references: [id])
+
+  @@index([companyId, createdAt], map: "blogs_company_created_idx")
+  @@index([moderationStatus, createdAt], map: "blogs_moderation_created_idx")
+  @@map("blogs")
+}
+
+model Notification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String    @db.VarChar(100)
+  title     String    @db.VarChar(255)
+  body      String?
+  payload   Json?
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt], map: "notifications_user_read_created_idx")
+  @@map("notifications")
+}
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(255)
+  targetType String?  @map("target_type") @db.VarChar(100)
+  targetId   String?  @map("target_id") @db.Uuid
+  meta       Json?
+  ipAddress  String?  @map("ip_address") @db.VarChar(100)
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  actor      User?    @relation(fields: [actorId], references: [id])
+
+  @@index([createdAt], map: "audit_logs_created_idx")
+  @@index([actorId, createdAt], map: "audit_logs_actor_created_idx")
+  @@map("audit_logs")
+}

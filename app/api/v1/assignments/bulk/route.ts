@@ -10,7 +10,6 @@ import {
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
-import { companyAssignments } from "@/lib/db/schema";
 import { headers } from "next/headers";
 
 const bulkAssignmentSchema = z.object({
@@ -24,10 +23,6 @@ const bulkAssignmentSchema = z.object({
   ),
 });
 
-/**
- * POST /api/v1/assignments/bulk
- * Bulk assign multiple companies/contacts
- */
 export async function POST(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -49,17 +44,17 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const assignmentValues = validation.assignments.map((a) => ({
-      ...a,
-      assignedBy: user.id,
-    }));
+    const createdAssignments = await db.$transaction(
+      validation.assignments.map((assignment) =>
+        db.companyAssignment.create({
+          data: {
+            ...assignment,
+            assignedBy: user.id,
+          },
+        })
+      )
+    );
 
-    const createdAssignments = await db
-      .insert(companyAssignments)
-      .values(assignmentValues)
-      .returning();
-
-    // Create audit log
     await createAuditLog({
       actorId: user.id,
       action: "bulk_create_assignments",
