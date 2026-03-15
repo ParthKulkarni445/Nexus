@@ -131,26 +131,28 @@ export async function GET() {
       }
     }
 
-    const assignments: AssignmentListItem[] = latestAssignments
-      .map((assignment) => {
+    const assignments: AssignmentListItem[] = latestAssignments.flatMap(
+      (assignment) => {
         const company = companyById.get(assignment.itemId);
-        if (!company) return null;
+        if (!company) return [];
 
         const latestCycle = latestCycleByCompany.get(assignment.itemId);
 
-        return {
-          assignmentId: assignment.id,
-          companyId: company.id,
-          companyName: company.name,
-          industry: company.industry,
-          status: latestCycle?.status ?? "not_contacted",
-          coordinatorId: assignment.assigneeUserId,
-          coordinatorName: assignment.assigneeUser.name,
-          season: latestCycle?.season?.name ?? "No active season",
-          assignedAt: assignment.assignedAt.toISOString(),
-        };
-      })
-      .filter((item): item is AssignmentListItem => item !== null);
+        return [
+          {
+            assignmentId: assignment.id,
+            companyId: company.id,
+            companyName: company.name,
+            industry: company.industry,
+            status: latestCycle?.status ?? "not_contacted",
+            coordinatorId: assignment.assigneeUserId,
+            coordinatorName: assignment.assigneeUser.name,
+            season: latestCycle?.season?.name ?? "No active season",
+            assignedAt: assignment.assignedAt.toISOString(),
+          },
+        ];
+      }
+    );
 
     const assignedCompanyIds = assignments.map((item) => item.companyId);
 
