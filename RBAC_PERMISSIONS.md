@@ -24,7 +24,7 @@ This document describes the current role-based access control (RBAC) model imple
 | ---------------- | ---------------------------------------------------------------------------- |
 | `/companies`     | Any authenticated role                                                       |
 | `/outreach`      | Any authenticated role                                                       |
-| `/assignments`   | Any authenticated role                                                       |
+| `/assignments`   | `tpo_admin` OR `coordinator` with `student_representative`                   |
 | `/drives`        | Any authenticated role                                                       |
 | `/blogs`         | Any authenticated role                                                       |
 | `/notifications` | Any authenticated role                                                       |
@@ -34,18 +34,19 @@ This document describes the current role-based access control (RBAC) model imple
 
 ### Core placement operations
 
-| Capability                                                           | Allowed roles              |
-| -------------------------------------------------------------------- | -------------------------- |
-| Create/update companies, contacts, drives, assignments, interactions | `tpo_admin`, `coordinator` |
-| Delete company                                                       | `tpo_admin`                |
-| Create season                                                        | `tpo_admin`                |
-| Reassign assignments                                                 | `tpo_admin`, `coordinator` |
+| Capability                                              | Allowed roles                                            |
+| ------------------------------------------------------- | -------------------------------------------------------- |
+| Create/update companies, contacts, drives, interactions | `tpo_admin`, `coordinator`                               |
+| Create assignments                                      | `tpo_admin`, `coordinator` with `student_representative` |
+| Delete company                                          | `tpo_admin`                                              |
+| Create season                                           | `tpo_admin`                                              |
+| Reassign assignments                                    | `tpo_admin`, `coordinator` with `student_representative` |
 
 ### Mailing operations
 
 | Capability                     | Allowed roles                                                              |
 | ------------------------------ | -------------------------------------------------------------------------- |
-| Create mail request            | `tpo_admin`, `coordinator`                                                 |
+| Create mail request            | `tpo_admin`, `coordinator` with `mailing_team` or `student_representative` |
 | Approve/reject mail request    | `tpo_admin`, `coordinator` with `mailing_team` or `student_representative` |
 | Create/update/delete templates | `tpo_admin`, `coordinator` with `mailing_team` or `student_representative` |
 | Approve template               | `tpo_admin`, `coordinator` with `mailing_team` or `student_representative` |

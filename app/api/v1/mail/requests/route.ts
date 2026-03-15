@@ -32,6 +32,15 @@ export async function GET(request: NextRequest) {
     return unauthorized();
   }
 
+  if (
+    !hasRoleOrCoordinatorType(user, ["tpo_admin"], [
+      "mailing_team",
+      "student_representative",
+    ])
+  ) {
+    return forbidden("Insufficient permissions to view mail requests");
+  }
+
   const searchParams = request.nextUrl.searchParams;
   const status = searchParams.get("status");
 
@@ -90,7 +99,12 @@ export async function POST(request: NextRequest) {
     return unauthorized();
   }
 
-  if (!hasRoleOrCoordinatorType(user, ["tpo_admin", "coordinator"])) {
+  if (
+    !hasRoleOrCoordinatorType(user, ["tpo_admin"], [
+      "mailing_team",
+      "student_representative",
+    ])
+  ) {
     return forbidden("Insufficient permissions to create mail requests");
   }
 

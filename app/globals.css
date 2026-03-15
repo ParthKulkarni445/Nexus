@@ -305,7 +305,7 @@ body::before {
 }
 
 .btn-success {
-  background: var(--success);
+  background: var(--primary);
   color: #fff;
 }
 

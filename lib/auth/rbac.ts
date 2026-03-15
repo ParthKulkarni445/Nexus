@@ -40,9 +40,33 @@ export const APP_ROUTE_POLICIES: RoutePolicy[] = [
       coordinatorTypes: ["mailing_team", "student_representative"],
     },
   },
+  {
+    route: "/assignments",
+    label: "Assignments",
+    rule: {
+      roles: ["tpo_admin"],
+      coordinatorTypes: ["student_representative"],
+    },
+  },
 ];
 
 export const API_ROUTE_POLICIES: RoutePolicy[] = [
+  {
+    route: "/api/v1/mail",
+    label: "Mailing API",
+    rule: {
+      roles: ["tpo_admin"],
+      coordinatorTypes: ["mailing_team", "student_representative"],
+    },
+  },
+  {
+    route: "/api/v1/assignments",
+    label: "Assignments API",
+    rule: {
+      roles: ["tpo_admin"],
+      coordinatorTypes: ["student_representative"],
+    },
+  },
   {
     route: "/api/v1/admin/users",
     label: "Admin user permission management",

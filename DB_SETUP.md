@@ -27,12 +27,20 @@ This project uses **Prisma ORM** with **PostgreSQL**.
    DATABASE_URL=postgresql://postgres:password@localhost:5432/nexus
    ```
 
-   Optional overrides if you want separate connections:
+If your `DATABASE_URL` uses a proxy/accelerate URL (for example `prisma+postgres://...`), set a direct runtime URL as well:
 
-   ```
-   DATABASE_URL_RUNTIME=postgresql://user:password@host:port/database
-   DATABASE_URL_MIGRATIONS=postgresql://user:password@host:port/database
-   ```
+```
+DATABASE_URL_RUNTIME=postgresql://user:password@host:port/database
+```
+
+You can also use `DIRECT_URL` as a direct runtime fallback.
+
+Optional overrides if you want separate connections:
+
+```
+DATABASE_URL_RUNTIME=postgresql://user:password@host:port/database
+DATABASE_URL_MIGRATIONS=postgresql://user:password@host:port/database
+```
 
 ## Database Commands
 

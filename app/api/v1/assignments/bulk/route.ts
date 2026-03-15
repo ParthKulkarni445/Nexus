@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { z } from "zod";
-import { getCurrentUser, hasRole } from "@/lib/api/auth";
+import { getCurrentUser, hasRoleOrCoordinatorType } from "@/lib/api/auth";
 import {
   success,
   unauthorized,
@@ -16,8 +16,8 @@ const bulkAssignmentSchema = z.object({
   assignments: z.array(
     z.object({
       itemType: z.enum(["company", "contact"]),
-      itemId: z.string().uuid(),
-      assigneeUserId: z.string().uuid(),
+      itemId: z.string().trim().min(1),
+      assigneeUserId: z.string().trim().min(1),
       notes: z.string().optional(),
     })
   ),
@@ -30,7 +30,9 @@ export async function POST(request: NextRequest) {
     return unauthorized();
   }
 
-  if (!hasRole(user, ["tpo_admin", "coordinator"])) {
+  if (
+    !hasRoleOrCoordinatorType(user, ["tpo_admin"], ["student_representative"])
+  ) {
     return forbidden("Insufficient permissions to create assignments");
   }
 

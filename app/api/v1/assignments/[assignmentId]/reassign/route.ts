@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import { getCurrentUser, hasRole } from "@/lib/api/auth";
+import { getCurrentUser, hasRoleOrCoordinatorType } from "@/lib/api/auth";
 import {
   success,
   unauthorized,
@@ -15,7 +15,7 @@ import { db } from "@/lib/db";
 import { headers } from "next/headers";
 
 const reassignSchema = z.object({
-  newAssigneeUserId: z.string().uuid(),
+  newAssigneeUserId: z.string().trim().min(1),
   reason: z.string().min(1),
 });
 
@@ -29,7 +29,9 @@ export async function PUT(
     return unauthorized();
   }
 
-  if (!hasRole(user, ["tpo_admin", "coordinator"])) {
+  if (
+    !hasRoleOrCoordinatorType(user, ["tpo_admin"], ["student_representative"])
+  ) {
     return forbidden("Insufficient permissions to reassign");
   }
 

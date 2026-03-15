@@ -1,11 +1,16 @@
 import Link from "next/link";
 
-export default function UnauthorizedPage({
+type UnauthorizedSearchParams = Promise<{
+  from?: string;
+}>;
+
+export default async function UnauthorizedPage({
   searchParams,
 }: {
-  searchParams: { from?: string };
+  searchParams: UnauthorizedSearchParams;
 }) {
-  const from = searchParams?.from;
+  const params = await searchParams;
+  const from = params?.from;
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-16 sm:px-6">
