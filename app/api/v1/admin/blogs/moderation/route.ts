@@ -30,6 +30,10 @@ export async function GET(request: NextRequest) {
       where: { moderationStatus: status },
       orderBy: { createdAt: "desc" },
       take: 100,
+      include: {
+        author: { select: { id: true, name: true, role: true } },
+        company: { select: { id: true, name: true } },
+      },
     });
 
     return success(blogsList);

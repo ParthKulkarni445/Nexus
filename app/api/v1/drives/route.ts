@@ -36,6 +36,8 @@ export async function GET(request: NextRequest) {
   const from = searchParams.get("from");
   const to = searchParams.get("to");
   const status = searchParams.get("status");
+  const search = searchParams.get("search");
+  const stage = searchParams.get("stage");
 
   try {
     const where: Prisma.DriveWhereInput = {
@@ -48,12 +50,35 @@ export async function GET(request: NextRequest) {
           }
         : {}),
       ...(status ? { status: status as never } : {}),
+      ...(stage ? { stage } : {}),
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: search, mode: "insensitive" } },
+              {
+                company: {
+                  name: { contains: search, mode: "insensitive" },
+                },
+              },
+              { venue: { contains: search, mode: "insensitive" } },
+            ],
+          }
+        : {}),
     };
 
     const drivesList = await db.drive.findMany({
       where,
       orderBy: { startAt: "desc" },
       take: 100,
+      include: {
+        company: { select: { id: true, name: true, industry: true } },
+        companySeasonCycle: {
+          select: {
+            season: { select: { name: true, seasonType: true } },
+          },
+        },
+        creator: { select: { id: true, name: true } },
+      },
     });
 
     return success(drivesList);

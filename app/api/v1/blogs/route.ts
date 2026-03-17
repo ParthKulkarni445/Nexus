@@ -32,9 +32,30 @@ export async function GET(request: NextRequest) {
   };
 
   try {
+    const search = searchParams.get("search") || undefined;
+    const tag = searchParams.get("tag") || undefined;
+
     const where: Prisma.BlogWhereInput = {
       moderationStatus: "approved",
       ...(params.company ? { companyId: params.company } : {}),
+      ...(search
+        ? {
+            OR: [
+              { title: { contains: search, mode: "insensitive" } },
+              {
+                company: {
+                  name: { contains: search, mode: "insensitive" },
+                },
+              },
+              {
+                author: {
+                  name: { contains: search, mode: "insensitive" },
+                },
+              },
+            ],
+          }
+        : {}),
+      ...(tag ? { tags: { has: tag } } : {}),
     };
 
     const offset = (params.page - 1) * params.limit;
@@ -45,6 +66,10 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: "desc" },
         take: params.limit,
         skip: offset,
+        include: {
+          author: { select: { id: true, name: true, role: true } },
+          company: { select: { id: true, name: true } },
+        },
       }),
     ]);
 
