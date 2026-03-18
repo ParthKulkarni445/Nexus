@@ -868,7 +868,7 @@ export default function AssignmentsPage() {
                         className="border border-[#DBEAFE] rounded-xl overflow-hidden"
                       >
                         <button
-                          className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 transition-colors"
+                          className="w-full flex items-center justify-between px-4 py-3 bg-slate-200 transition-colors"
                           onClick={() => toggleGroup(coordinatorName)}
                         >
                           <div className="flex items-center gap-3">
