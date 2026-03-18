@@ -17,12 +17,10 @@ export default function Shell({
   children: React.ReactNode;
   currentUser: ShellUser;
 }) {
-  const pathname = usePathname();
-
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       <TopNav currentUser={currentUser} />
-      <main className="flex-1 flex flex-col w-full max-w-screen-2xl mx-auto px-4 lg:px-6 pt-6 pb-6 xl:pt-0 xl:pb-0">
+      <main className="flex-1 overflow-y-auto xl:overflow-hidden flex flex-col w-full max-w-screen-2xl mx-auto px-4 lg:px-6 pt-6 pb-6 xl:pt-0 xl:pb-0">
         {children}
       </main>
     </div>
