@@ -5,7 +5,7 @@ import { success, unauthorized, notFound, serverError } from "@/lib/api/response
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { seasonId: string } }
+  { params }: { params: Promise<{ seasonId: string }> }
 ) {
   const user = await getCurrentUser();
 
@@ -13,7 +13,7 @@ export async function GET(
     return unauthorized();
   }
 
-  const { seasonId } = params;
+  const { seasonId } = await params;
 
   try {
     const season = await db.recruitmentSeason.findUnique({

@@ -5,7 +5,7 @@ import { success, unauthorized, notFound, serverError } from "@/lib/api/response
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { seasonId: string; companyId: string } }
+  { params }: { params: Promise<{ seasonId: string; companyId: string }> }
 ) {
   const user = await getCurrentUser();
 
@@ -13,7 +13,7 @@ export async function GET(
     return unauthorized();
   }
 
-  const { seasonId, companyId } = params;
+  const { seasonId, companyId } = await params;
 
   try {
     const cycle = await db.companySeasonCycle.findFirst({

@@ -185,7 +185,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const normalizedSendPolicy = asRecord(sendPolicy) ?? {};
+    const normalizedSendPolicy: Prisma.InputJsonObject =
+      (asRecord(sendPolicy) ?? {}) as Prisma.InputJsonObject;
 
     const template = await db.emailTemplate.create({
       data: {

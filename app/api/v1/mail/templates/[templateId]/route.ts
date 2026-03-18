@@ -150,8 +150,8 @@ export async function PUT(
       }
     }
 
-    const normalizedSendPolicy = sendPolicy
-      ? (asRecord(sendPolicy) ?? {})
+    const normalizedSendPolicy: Prisma.InputJsonValue | undefined = sendPolicy
+      ? ((asRecord(sendPolicy) ?? {}) as Prisma.InputJsonObject)
       : undefined;
 
     const updatedTemplate = await db.emailTemplate.update({

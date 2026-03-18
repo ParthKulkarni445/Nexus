@@ -6,7 +6,7 @@ import { success, unauthorized, serverError } from "@/lib/api/response";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { seasonId: string } }
+  { params }: { params: Promise<{ seasonId: string }> }
 ) {
   const user = await getCurrentUser();
 
@@ -14,7 +14,7 @@ export async function GET(
     return unauthorized();
   }
 
-  const { seasonId } = params;
+  const { seasonId } = await params;
   const searchParams = request.nextUrl.searchParams;
   const search = searchParams.get("search");
   const status = searchParams.get("status");
