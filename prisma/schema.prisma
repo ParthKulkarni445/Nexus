@@ -543,3 +543,41 @@ model AuditLog {
   @@index([actorId, createdAt], map: "audit_logs_actor_created_idx")
   @@map("audit_logs")
 }
+
+model Placement {
+  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId        String             @map("student_id") @db.Uuid
+  companyId        String             @map("company_id") @db.Uuid
+  seasonId         String             @map("season_id") @db.Uuid
+  driveId          String?            @map("drive_id") @db.Uuid
+  role             String             @db.VarChar(255)
+  packageType      String             @map("package_type") @db.VarChar(50) // ctc | stipend
+  packageAmount    Decimal            @map("package_amount") @db.Decimal(12, 2)
+  packageFrequency String?            @map("package_frequency") @db.VarChar(20) // yearly | monthly
+  currency         String             @default("INR") @db.VarChar(10)
+  selectionDate    DateTime?          @map("selection_date") @db.Date
+  placementStatus  String             @default("accepted") @map("placement_status") @db.VarChar(50)
+  source           String?            @db.VarChar(100)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  student          User               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  season           RecruitmentSeason  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  drive            Drive?             @relation(fields: [driveId], references: [id], onDelete: SetNull)
+
+  @@index([seasonId, companyId], map: "placements_season_company_idx")
+  @@index([studentId, seasonId], map: "placements_student_season_idx")
+  @@index([packageAmount], map: "placements_package_amount_idx")
+  @@map("placements")
+}
+
+model StudentDataConsent {
+  studentId             String   @id @map("student_id") @db.Uuid
+  allowPublicPlacementData Boolean @default(false) @map("allow_public_placement_data")
+  updatedAt             DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  student               User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("student_data_consent")
+}

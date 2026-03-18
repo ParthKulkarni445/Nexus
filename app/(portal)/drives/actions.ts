@@ -77,6 +77,7 @@ export async function getDrivesData(seasonId: string) {
         date: d.startAt ? d.startAt.toISOString() : null,
         stage: d.stage,
         status: (d.status === "completed" ? "completed" : d.status === "confirmed" ? "in_progress" : "scheduled") as "completed" | "in_progress" | "scheduled",
+        isConflictFlagged: !!d.isConflictFlagged,
       })),
       linkedBlogs: c.blogs.map((b) => ({
         title: b.title,
