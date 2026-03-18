@@ -29,9 +29,18 @@ export const APP_PROTECTED_PATH_PREFIXES = [
   "/drives",
   "/blogs",
   "/notifications",
+  "/schedule",
+  "/admin",
 ] as const;
 
 export const APP_ROUTE_POLICIES: RoutePolicy[] = [
+  {
+    route: "/admin",
+    label: "Admin pages",
+    rule: {
+      roles: ["tpo_admin", "coordinator"],
+    },
+  },
   {
     route: "/mailing",
     label: "Mailing center",

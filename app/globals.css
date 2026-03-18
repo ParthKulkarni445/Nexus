@@ -48,6 +48,7 @@
 
 html {
   scroll-behavior: smooth;
+  scrollbar-width: none;
 }
 
 body {
@@ -56,6 +57,7 @@ body {
   font-family: var(--font-poppins), 'Poppins', sans-serif;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  scrollbar-width: none;
 }
 
 /* ── Fixed Grid Background ─────────────────────────────────── */
@@ -85,8 +87,8 @@ body::before {
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 0;
+  height: 0;
 }
 
 ::-webkit-scrollbar-track {
@@ -94,12 +96,12 @@ body::before {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #93C5FD;
+  background: transparent;
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #60A5FA;
+  background: transparent;
 }
 
 .nav-scroll::-webkit-scrollbar {
