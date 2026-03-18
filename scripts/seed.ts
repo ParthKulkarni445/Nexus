@@ -67,6 +67,26 @@ type SeasonSeed = {
   createdBy: string;
 };
 
+type BlogSeed = {
+  key: string;
+  companySlug: string;
+  authorId: string;
+  title: string;
+  body: string;
+  tags: string[];
+  isAiAssisted: boolean;
+  moderationStatus: "pending" | "approved" | "rejected";
+  moderationNote?: string;
+  approvedBy?: string;
+  createdAtDaysAgo: number;
+};
+
+type BlogVoteSeed = {
+  blogKey: string;
+  userId: string;
+  voteType: "upvote" | "downvote";
+};
+
 function deterministicUuid(key: string): string {
   const hex = crypto.createHash("sha256").update(key).digest("hex");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
@@ -512,6 +532,158 @@ const companiesSeed: CompanySeed[] = [
   },
 ];
 
+const blogsSeed: BlogSeed[] = [
+  {
+    key: "google-sde-rounds",
+    companySlug: "google-india",
+    authorId: ids.ananya,
+    title: "Google SDE Hiring: Round-by-Round Notes for 2026",
+    body: "<p>This note summarizes our latest Google process from outreach to final interviews. The coding rounds were heavy on graph traversal and dynamic programming, while interviews also focused on communication clarity.</p><p>Recommended prep order: DSA revision, timed mock rounds, and role-based behavioral stories.</p>",
+    tags: ["sde", "interview-rounds", "dsa"],
+    isAiAssisted: false,
+    moderationStatus: "approved",
+    approvedBy: ids.admin,
+    createdAtDaysAgo: 22,
+  },
+  {
+    key: "microsoft-intern-experience",
+    companySlug: "microsoft",
+    authorId: ids.student,
+    title: "Microsoft Internship Interview Experience (Student)",
+    body: "<p>I had one OA and two interviews. Most questions were based on arrays, hashing, and practical debugging. The final interview leaned on project discussion and trade-offs.</p><p>My biggest takeaway was to clearly explain assumptions before coding.</p>",
+    tags: ["internship", "swe", "experience"],
+    isAiAssisted: true,
+    moderationStatus: "approved",
+    approvedBy: ids.admin,
+    createdAtDaysAgo: 18,
+  },
+  {
+    key: "goldman-analyst-checklist",
+    companySlug: "goldman-sachs",
+    authorId: ids.priya,
+    title: "Goldman Sachs Analyst Drive: Practical Prep Checklist",
+    body: "<p>This checklist covers aptitude prep, SQL basics, and finance-awareness topics that were repeatedly asked. A focused final-week plan improved confidence significantly.</p>",
+    tags: ["analyst", "finance", "sql"],
+    isAiAssisted: false,
+    moderationStatus: "approved",
+    approvedBy: ids.admin,
+    createdAtDaysAgo: 16,
+  },
+  {
+    key: "tcs-mass-hiring-guide",
+    companySlug: "tcs",
+    authorId: ids.rohan,
+    title: "TCS Mass Hiring: What to Prepare in One Week",
+    body: "<p>For mass hiring pipelines, consistency and speed matter more than novelty. Prioritize aptitude sets, communication drills, and resume confidence.</p>",
+    tags: ["mass-hiring", "aptitude", "communication"],
+    isAiAssisted: false,
+    moderationStatus: "approved",
+    approvedBy: ids.admin,
+    createdAtDaysAgo: 14,
+  },
+  {
+    key: "flipkart-product-ops",
+    companySlug: "flipkart",
+    authorId: ids.vibha,
+    title: "Flipkart Product and Ops Roles: Selection Insights",
+    body: "<p>Recent interactions suggest strong demand for product-minded communication and structured problem solving. Students should prepare role-specific examples with measurable outcomes.</p>",
+    tags: ["product", "ops", "selection"],
+    isAiAssisted: true,
+    moderationStatus: "approved",
+    approvedBy: ids.admin,
+    createdAtDaysAgo: 10,
+  },
+  {
+    key: "amazon-oa-student",
+    companySlug: "amazon-aws",
+    authorId: ids.student,
+    title: "Amazon OA Strategy That Worked for Me",
+    body: "<p>I practiced two mock OAs daily and built a quick template library for common patterns. This helped reduce panic and improved accuracy under time pressure.</p>",
+    tags: ["oa", "amazon", "strategy"],
+    isAiAssisted: true,
+    moderationStatus: "pending",
+    moderationNote: "Add one concrete round-wise timeline before approval.",
+    createdAtDaysAgo: 7,
+  },
+  {
+    key: "deloitte-case-round-student",
+    companySlug: "deloitte",
+    authorId: ids.student,
+    title: "Deloitte Case Round Prep for First-Timers",
+    body: "<p>Case rounds become easier when you stick to a clear framework and communicate assumptions early. I used a simple structure: clarify objective, list constraints, propose options, then conclude with trade-offs.</p>",
+    tags: ["consulting", "case-study", "student"],
+    isAiAssisted: true,
+    moderationStatus: "pending",
+    moderationNote: "Good draft; include one real example scenario.",
+    createdAtDaysAgo: 5,
+  },
+  {
+    key: "zomato-cycle-retrospective",
+    companySlug: "zomato",
+    authorId: ids.ananya,
+    title: "Zomato Cycle Retrospective: What We Learned",
+    body: "<p>This retrospective covers why this cycle did not move forward and what to improve in timing and stakeholder follow-up for next season.</p>",
+    tags: ["retrospective", "coordination", "planning"],
+    isAiAssisted: false,
+    moderationStatus: "rejected",
+    moderationNote: "Internal retrospective, not suitable for student publishing feed.",
+    createdAtDaysAgo: 3,
+  },
+];
+
+const blogVotesSeed: BlogVoteSeed[] = [
+  {
+    blogKey: "google-sde-rounds",
+    userId: ids.student,
+    voteType: "upvote",
+  },
+  {
+    blogKey: "google-sde-rounds",
+    userId: ids.rohan,
+    voteType: "upvote",
+  },
+  {
+    blogKey: "google-sde-rounds",
+    userId: ids.priya,
+    voteType: "downvote",
+  },
+  {
+    blogKey: "microsoft-intern-experience",
+    userId: ids.ananya,
+    voteType: "upvote",
+  },
+  {
+    blogKey: "microsoft-intern-experience",
+    userId: ids.vibha,
+    voteType: "upvote",
+  },
+  {
+    blogKey: "goldman-analyst-checklist",
+    userId: ids.student,
+    voteType: "upvote",
+  },
+  {
+    blogKey: "goldman-analyst-checklist",
+    userId: ids.rohan,
+    voteType: "downvote",
+  },
+  {
+    blogKey: "tcs-mass-hiring-guide",
+    userId: ids.student,
+    voteType: "upvote",
+  },
+  {
+    blogKey: "flipkart-product-ops",
+    userId: ids.student,
+    voteType: "upvote",
+  },
+  {
+    blogKey: "flipkart-product-ops",
+    userId: ids.priya,
+    voteType: "upvote",
+  },
+];
+
 async function seed() {
   const databaseUrl =
     process.env.DATABASE_URL_MIGRATIONS ?? process.env.DATABASE_URL;
@@ -530,6 +702,8 @@ async function seed() {
   });
 
   let totalContacts = 0;
+  let totalBlogs = 0;
+  let totalBlogVotes = 0;
 
   try {
     const tx = db;
@@ -679,6 +853,8 @@ async function seed() {
         });
       }
 
+      const companyIdBySlug = new Map<string, string>();
+
       for (let index = 0; index < companiesSeed.length; index += 1) {
         const company = companiesSeed[index];
         const generatedCompanyId = deterministicUuid(`company:${company.slug}`);
@@ -713,6 +889,7 @@ async function seed() {
         });
 
         const companyId = upsertedCompany.id;
+  companyIdBySlug.set(company.slug, companyId);
 
         const generatedCycleId = deterministicUuid(
           `cycle:${companyId}:${ids.seasonPlacement}`,
@@ -884,7 +1061,96 @@ async function seed() {
         }
       }
 
-    console.log(`Seeded ${companiesSeed.length} companies and ${totalContacts} contacts.`);
+      const blogIdByKey = new Map<string, string>();
+
+      for (const blog of blogsSeed) {
+        const companyId = companyIdBySlug.get(blog.companySlug);
+        if (!companyId) {
+          console.warn(
+            `Skipping blog seed ${blog.key}: company slug ${blog.companySlug} not found.`,
+          );
+          continue;
+        }
+
+        const blogId = deterministicUuid(`blog:${blog.key}`);
+        const approvedAt =
+          blog.moderationStatus === "approved"
+            ? daysAgo(Math.max(1, blog.createdAtDaysAgo - 1))
+            : null;
+
+        await tx.blog.upsert({
+          where: { id: blogId },
+          update: {
+            authorId: blog.authorId,
+            companyId,
+            title: blog.title,
+            body: blog.body,
+            tags: blog.tags,
+            isAiAssisted: blog.isAiAssisted,
+            moderationStatus: blog.moderationStatus,
+            moderationNote: blog.moderationNote ?? null,
+            approvedBy:
+              blog.moderationStatus === "approved"
+                ? blog.approvedBy ?? ids.admin
+                : null,
+            approvedAt,
+            updatedAt: new Date(),
+          },
+          create: {
+            id: blogId,
+            authorId: blog.authorId,
+            companyId,
+            title: blog.title,
+            body: blog.body,
+            tags: blog.tags,
+            isAiAssisted: blog.isAiAssisted,
+            moderationStatus: blog.moderationStatus,
+            moderationNote: blog.moderationNote ?? null,
+            approvedBy:
+              blog.moderationStatus === "approved"
+                ? blog.approvedBy ?? ids.admin
+                : null,
+            approvedAt,
+            createdAt: daysAgo(blog.createdAtDaysAgo),
+            updatedAt: daysAgo(blog.createdAtDaysAgo),
+          },
+        });
+
+        blogIdByKey.set(blog.key, blogId);
+
+        totalBlogs += 1;
+      }
+
+      for (const vote of blogVotesSeed) {
+        const blogId = blogIdByKey.get(vote.blogKey);
+        if (!blogId) {
+          console.warn(
+            `Skipping blog vote seed for ${vote.blogKey}: blog not found in seeded dataset.`,
+          );
+          continue;
+        }
+
+        const voteId = deterministicUuid(
+          `blog-vote:${vote.blogKey}:${vote.userId}`,
+        );
+
+        await tx.$executeRaw`
+          INSERT INTO "blog_votes" ("id", "blog_id", "user_id", "vote_type")
+          VALUES (${voteId}::uuid, ${blogId}::uuid, ${vote.userId}::uuid, ${vote.voteType}::"blog_vote_type")
+          ON CONFLICT ("id")
+          DO UPDATE SET
+            "blog_id" = EXCLUDED."blog_id",
+            "user_id" = EXCLUDED."user_id",
+            "vote_type" = EXCLUDED."vote_type",
+            "updated_at" = CURRENT_TIMESTAMP
+        `;
+
+        totalBlogVotes += 1;
+      }
+
+    console.log(
+      `Seeded ${companiesSeed.length} companies, ${totalContacts} contacts, ${totalBlogs} blogs, and ${totalBlogVotes} blog votes.`,
+    );
 
     console.log("Seed completed.");
     console.log("Demo users:");

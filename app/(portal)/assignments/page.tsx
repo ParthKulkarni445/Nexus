@@ -737,8 +737,12 @@ export default function AssignmentsPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-5 pt-6 xl:flex-row xl:items-start">
-        <div className="min-w-0 flex-1 space-y-5">
+      <div
+        className={`flex flex-col gap-5 pt-6 xl:flex-row ${
+          isLoading ? "xl:items-stretch" : "xl:items-start"
+        }`}
+      >
+        <div className="min-w-0 flex-1 space-y-5 xl:flex xl:flex-col">
           <div className="card overflow-visible flex flex-col">
             <div className="px-4 py-3 border-b border-(--card-border)">
               <div
@@ -816,7 +820,7 @@ export default function AssignmentsPage() {
             </div>
           </div>
 
-          <div className="card overflow-hidden">
+          <div className="card overflow-hidden xl:flex-1">
             <div className="border-b border-[#DBEAFE] flex items-center justify-between px-4">
               <div className="flex">
                 {tabs.map((tabItem) => (
@@ -849,7 +853,7 @@ export default function AssignmentsPage() {
             {tab === "assigned" && (
               <div className="p-4 space-y-3">
                 {isLoading ? (
-                  <AssignedGroupsSkeleton />
+                  <AssignedGroupsSkeleton groups={5} rowsPerGroup={3} />
                 ) : Object.keys(groupedByCoordinator).length === 0 ? (
                   <EmptyState
                     icon={Users}
@@ -864,7 +868,7 @@ export default function AssignmentsPage() {
                         className="border border-[#DBEAFE] rounded-xl overflow-hidden"
                       >
                         <button
-                          className="w-full flex items-center justify-between px-4 py-3 bg-[#2563EB] transition-colors"
+                          className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 transition-colors"
                           onClick={() => toggleGroup(coordinatorName)}
                         >
                           <div className="flex items-center gap-3">
@@ -875,7 +879,7 @@ export default function AssignmentsPage() {
                                 .join("")}
                             </div>
                             <div className="text-left">
-                              <p className="text-sm font-semibold text-white">
+                              <p className="text-sm font-semibold text-black">
                                 {coordinatorName}
                               </p>
                               {/* <p className="text-xs text-slate-500">

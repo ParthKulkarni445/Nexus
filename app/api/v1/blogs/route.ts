@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     }),
     company: searchParams.get("company") || undefined,
   };
+  const currentUser = await getCurrentUser();
 
   try {
     const search = searchParams.get("search") || undefined;
@@ -69,11 +70,42 @@ export async function GET(request: NextRequest) {
         include: {
           author: { select: { id: true, name: true, role: true } },
           company: { select: { id: true, name: true } },
+          votes: { select: { userId: true, voteType: true } },
         },
       }),
     ]);
 
-    return success(blogsList, {
+    const blogsWithVoteSummary = blogsList.map((blog) => {
+      const upvoteCount = blog.votes.filter(
+        (vote) => vote.voteType === "upvote"
+      ).length;
+      const downvoteCount = blog.votes.filter(
+        (vote) => vote.voteType === "downvote"
+      ).length;
+      const currentUserVote =
+        currentUser
+          ? (blog.votes.find((vote) => vote.userId === currentUser.id)
+              ?.voteType ?? null)
+          : null;
+
+      return {
+        id: blog.id,
+        title: blog.title,
+        body: blog.body,
+        tags: blog.tags,
+        isAiAssisted: blog.isAiAssisted,
+        moderationStatus: blog.moderationStatus,
+        moderationNote: blog.moderationNote,
+        createdAt: blog.createdAt,
+        author: blog.author,
+        company: blog.company,
+        upvoteCount,
+        downvoteCount,
+        currentUserVote,
+      };
+    });
+
+    return success(blogsWithVoteSummary, {
       page: params.page,
       limit: params.limit,
       total,
@@ -104,13 +136,16 @@ export async function POST(request: NextRequest) {
 
   const headersList = await headers();
   const clientInfo = getClientInfo(headersList);
+  const isStudentAuthor = user.role === "student";
 
   try {
     const blog = await db.blog.create({
       data: {
         ...validation,
         authorId: user.id,
-        moderationStatus: "pending",
+        moderationStatus: isStudentAuthor ? "pending" : "approved",
+        approvedBy: isStudentAuthor ? null : user.id,
+        approvedAt: isStudentAuthor ? null : new Date(),
       },
     });
 
@@ -119,7 +154,7 @@ export async function POST(request: NextRequest) {
       action: "create_blog",
       targetType: "blog",
       targetId: blog.id,
-      meta: { title: blog.title },
+      meta: { title: blog.title, moderationStatus: blog.moderationStatus },
       ...clientInfo,
     });
 

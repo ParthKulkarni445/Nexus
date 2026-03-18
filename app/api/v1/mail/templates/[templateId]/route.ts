@@ -15,6 +15,14 @@ import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
 import { headers } from "next/headers";
 
+const mailAttachmentSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().max(255).optional().nullable(),
+  sizeBytes: z.number().int().nonnegative().optional().nullable(),
+  storagePath: z.string().min(1).max(500),
+  publicUrl: z.string().min(1).max(500),
+});
+
 const updateTemplateSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   subject: z.string().min(1).max(500).optional(),
@@ -22,7 +30,33 @@ const updateTemplateSchema = z.object({
   bodyText: z.string().optional(),
   variables: z.array(z.string()).optional(),
   sendPolicy: z.record(z.string(), z.any()).optional(),
+  attachments: z.array(mailAttachmentSchema).max(10).optional(),
 });
+
+function asRecord(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function mapAttachmentRecord(attachment: {
+  mailAsset: {
+    fileName: string;
+    mimeType: string | null;
+    sizeBytes: number | null;
+    storagePath: string;
+    publicUrl: string;
+  };
+}) {
+  return {
+    fileName: attachment.mailAsset.fileName,
+    mimeType: attachment.mailAsset.mimeType,
+    sizeBytes: attachment.mailAsset.sizeBytes,
+    storagePath: attachment.mailAsset.storagePath,
+    publicUrl: attachment.mailAsset.publicUrl,
+  };
+}
 
 export async function PUT(
   request: NextRequest,
@@ -56,6 +90,16 @@ export async function PUT(
   try {
     const currentTemplate = await db.emailTemplate.findUnique({
       where: { id: templateId },
+      select: {
+        id: true,
+        status: true,
+        subject: true,
+        bodyHtml: true,
+        bodyText: true,
+        variables: true,
+        sendPolicy: true,
+        approvedBy: true,
+      },
     });
 
     if (!currentTemplate) {
@@ -81,13 +125,70 @@ export async function PUT(
       });
     }
 
+    const { attachments, sendPolicy, ...restValidation } = validation;
+
+    const attachmentStoragePaths = attachments?.map((item) => item.storagePath) ?? [];
+    const uniqueStoragePaths = Array.from(new Set(attachmentStoragePaths));
+
+    let resolvedAssets: Array<{ id: string; storagePath: string }> = [];
+
+    if (uniqueStoragePaths.length > 0) {
+      resolvedAssets = await db.mailAsset.findMany({
+        where: {
+          storagePath: {
+            in: uniqueStoragePaths,
+          },
+        },
+        select: {
+          id: true,
+          storagePath: true,
+        },
+      });
+
+      if (resolvedAssets.length !== uniqueStoragePaths.length) {
+        return badRequest("Some attachments are missing. Please re-upload and try again.");
+      }
+    }
+
+    const normalizedSendPolicy = sendPolicy
+      ? (asRecord(sendPolicy) ?? {})
+      : undefined;
+
     const updatedTemplate = await db.emailTemplate.update({
       where: { id: templateId },
       data: {
-        ...validation,
+        ...restValidation,
+        sendPolicy: normalizedSendPolicy,
         status: "approved",
         approvedBy: currentTemplate.approvedBy ?? user.id,
         updatedAt: new Date(),
+        attachments:
+          attachments !== undefined
+            ? {
+                deleteMany: {},
+                create: resolvedAssets.map((asset) => ({
+                  mailAssetId: asset.id,
+                })),
+              }
+            : undefined,
+      },
+      include: {
+        attachments: {
+          include: {
+            mailAsset: {
+              select: {
+                fileName: true,
+                mimeType: true,
+                sizeBytes: true,
+                storagePath: true,
+                publicUrl: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
       },
     });
 
@@ -96,11 +197,17 @@ export async function PUT(
       action: "update_email_template",
       targetType: "email_template",
       targetId: templateId,
-      meta: validation,
+      meta: {
+        ...restValidation,
+        attachmentCount: attachments?.length,
+      },
       ...clientInfo,
     });
 
-    return success(updatedTemplate);
+    return success({
+      ...updatedTemplate,
+      attachments: updatedTemplate.attachments.map(mapAttachmentRecord),
+    });
   } catch (error) {
     console.error("Error updating template:", error);
     return serverError();

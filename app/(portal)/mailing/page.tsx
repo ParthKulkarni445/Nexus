@@ -26,6 +26,9 @@ import {
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
 import FilterSelect from "@/components/ui/FilterSelect";
+import MailAttachmentInput, {
+  type MailAttachmentMeta,
+} from "@/components/ui/MailAttachmentInput";
 import Modal from "@/components/ui/Modal";
 import RichTextEditor, {
   type RichTextEditorHandle,
@@ -54,7 +57,9 @@ type MailRequestRecord = {
     subject?: string;
     htmlBody?: string;
     textBody?: string;
+    attachments?: MailAttachmentMeta[];
   } | null;
+  attachments?: MailAttachmentMeta[];
   status: MailStatus;
   urgency?: number | null;
   reviewNote?: string | null;
@@ -86,6 +91,7 @@ type MailRequestRecord = {
     status: TemplateStatus;
     variables: string[];
     updatedAt: string;
+    attachments?: MailAttachmentMeta[];
   } | null;
 };
 
@@ -97,6 +103,7 @@ type TemplateRecord = {
   bodyHtml: string;
   bodyText?: string | null;
   variables: string[];
+  attachments?: MailAttachmentMeta[];
   status: TemplateStatus;
   createdAt: string;
   updatedAt: string;
@@ -124,7 +131,10 @@ type TemplateFormState = {
   contentHtml: string;
   plainTextFallback: string;
   variables: string;
+  attachments: MailAttachmentMeta[];
 };
+
+type TemplateFormFieldValue = TemplateFormState[keyof TemplateFormState];
 
 type InboundEmailRecord = {
   id: string;
@@ -256,6 +266,21 @@ function getMailHtml(mail: MailRequestRecord) {
   );
 }
 
+function getMailAttachments(mail: MailRequestRecord) {
+  if (mail.attachments && mail.attachments.length > 0) {
+    return mail.attachments;
+  }
+
+  if (
+    mail.previewPayload?.attachments &&
+    mail.previewPayload.attachments.length > 0
+  ) {
+    return mail.previewPayload.attachments;
+  }
+
+  return mail.template?.attachments ?? [];
+}
+
 function getInitials(value: string) {
   return value
     .split(" ")
@@ -275,6 +300,7 @@ function buildTemplateFormState(
     contentHtml: template?.bodyHtml ?? "<p></p>",
     plainTextFallback: template?.bodyText ?? "",
     variables: template?.variables.join(", ") ?? "",
+    attachments: template?.attachments ?? [],
   };
 }
 
@@ -299,6 +325,42 @@ function htmlToPlainText(value: string) {
     .replace(/&quot;/g, '"')
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function plainTextToHtml(value: string) {
+  const normalized = value.replace(/\r\n?/g, "\n").trim();
+  if (!normalized) return "<p></p>";
+
+  return normalized
+    .split(/\n{2,}/)
+    .map(
+      (paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br />")}</p>`,
+    )
+    .join("");
+}
+
+function looksLikeHtml(value: string) {
+  return /<\/?[a-z][^>]*>/i.test(value);
+}
+
+function normalizeMailEditorHtml(
+  htmlValue?: string | null,
+  fallbackText?: string,
+) {
+  if (htmlValue && htmlValue.trim()) {
+    return looksLikeHtml(htmlValue) ? htmlValue : plainTextToHtml(htmlValue);
+  }
+
+  return plainTextToHtml(fallbackText ?? "");
 }
 
 function StatCard({
@@ -395,27 +457,124 @@ function SectionSkeleton({
 
 function PreviewModal({
   mail,
+  submitting,
+  onSave,
   onClose,
 }: {
   mail: MailRequestRecord | null;
+  submitting: boolean;
+  onSave: (
+    mail: MailRequestRecord,
+    payload: { subject: string; htmlBody: string },
+  ) => Promise<void>;
   onClose: () => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [subject, setSubject] = useState("");
+  const [contentHtml, setContentHtml] = useState("<p></p>");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    if (!mail) {
+      setIsEditing(false);
+      setSubject("");
+      setContentHtml("<p></p>");
+      setErrorMessage("");
+      return;
+    }
+
+    const initialSubject = getMailSubject(mail);
+    const initialHtml = getMailHtml(mail);
+
+    setIsEditing(false);
+    setSubject(initialSubject);
+    setContentHtml(normalizeMailEditorHtml(initialHtml, getMailPreview(mail)));
+    setErrorMessage("");
+  }, [mail]);
+
   if (!mail) return null;
 
-  const subject = getMailSubject(mail);
-  const html = getMailHtml(mail);
-  const preview = getMailPreview(mail);
+  const currentMail: MailRequestRecord = mail;
+
+  const html = getMailHtml(currentMail);
+  const preview = getMailPreview(currentMail);
+  const attachments = getMailAttachments(currentMail);
+  const canEdit =
+    currentMail.status === "pending" || currentMail.status === "queued";
+  const contentTextPreview = htmlToPlainText(contentHtml);
+
+  async function handleSave() {
+    if (!subject.trim() || !contentTextPreview.trim()) return;
+
+    setErrorMessage("");
+    try {
+      await onSave(currentMail, {
+        subject: subject.trim(),
+        htmlBody: contentHtml,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to save email content",
+      );
+    }
+  }
 
   return (
     <Modal
       isOpen={!!mail}
       onClose={onClose}
-      title={`Preview - ${getMailCompanyName(mail)}`}
+      title={`Preview - ${getMailCompanyName(currentMail)}`}
       size="lg"
       footer={
-        <button className="btn btn-secondary" onClick={onClose}>
-          Close
-        </button>
+        <>
+          <button className="btn btn-secondary" onClick={onClose}>
+            Close
+          </button>
+          {canEdit && !isEditing && (
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                setIsEditing(true);
+                setErrorMessage("");
+              }}
+            >
+              <Pencil size={14} />
+              Edit
+            </button>
+          )}
+          {canEdit && isEditing && (
+            <>
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  setIsEditing(false);
+                  setErrorMessage("");
+                  setSubject(getMailSubject(currentMail));
+                  const initialHtml = getMailHtml(currentMail);
+                  setContentHtml(
+                    normalizeMailEditorHtml(
+                      initialHtml,
+                      getMailPreview(currentMail),
+                    ),
+                  );
+                }}
+                disabled={submitting}
+              >
+                Cancel edit
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => void handleSave()}
+                disabled={
+                  submitting || !subject.trim() || !contentTextPreview.trim()
+                }
+              >
+                {submitting ? "Saving..." : "Save"}
+              </button>
+            </>
+          )}
+        </>
       }
     >
       <div className="space-y-3">
@@ -423,26 +582,76 @@ function PreviewModal({
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Subject
           </p>
-          <p className="mt-1 text-sm font-semibold text-slate-900">{subject}</p>
-        </div>
-        <div className="overflow-hidden rounded-xl border border-slate-200">
-          <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2">
-            <div className="h-3 w-3 rounded-full bg-blue-400" />
-            <div className="h-3 w-3 rounded-full bg-amber-400" />
-            <div className="h-3 w-3 rounded-full bg-emerald-400" />
-            <span className="ml-2 text-xs text-slate-400">Email Preview</span>
-          </div>
-          {html ? (
-            <div
-              className="prose prose-sm max-w-none p-4"
-              dangerouslySetInnerHTML={{ __html: html }}
+          {isEditing ? (
+            <input
+              className="input-base mt-2"
+              value={subject}
+              onChange={(event) => setSubject(event.target.value)}
+              placeholder="Email subject"
             />
           ) : (
-            <div className="p-4 text-sm leading-relaxed text-slate-600">
-              {preview}
-            </div>
+            <p className="mt-1 text-sm font-semibold text-slate-900">
+              {subject}
+            </p>
           )}
         </div>
+
+        {isEditing ? (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Email Content
+            </label>
+            <RichTextEditor
+              value={contentHtml}
+              onChange={setContentHtml}
+              enterKeyMode="lineBreak"
+              placeholder="Edit email content"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              This uses the same editor as template creation.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2">
+              <div className="h-3 w-3 rounded-full bg-blue-400" />
+              <div className="h-3 w-3 rounded-full bg-amber-400" />
+              <div className="h-3 w-3 rounded-full bg-emerald-400" />
+              <span className="ml-2 text-xs text-slate-400">Email Preview</span>
+            </div>
+            {html ? (
+              <div
+                className="prose prose-sm max-w-none p-4"
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            ) : (
+              <div className="p-4 text-sm leading-relaxed text-slate-600">
+                {preview}
+              </div>
+            )}
+          </div>
+        )}
+
+        {attachments.length > 0 && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Attachments ({attachments.length})
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {attachments.map((attachment) => (
+                <Badge key={attachment.storagePath} variant="gray" size="sm">
+                  {attachment.fileName}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+            {errorMessage}
+          </div>
+        )}
       </div>
     </Modal>
   );
@@ -584,7 +793,10 @@ function TemplateEditorFields({
   mode: "create" | "edit";
   form: TemplateFormState;
   submitting: boolean;
-  onChange: (field: keyof TemplateFormState, value: string) => void;
+  onChange: (
+    field: keyof TemplateFormState,
+    value: TemplateFormFieldValue,
+  ) => void;
 }) {
   const editorRef = useRef<RichTextEditorHandle | null>(null);
   const variables = form.variables
@@ -672,6 +884,14 @@ function TemplateEditorFields({
           clients.
         </p>
       </div>
+      <div className="sm:col-span-2">
+        <MailAttachmentInput
+          value={form.attachments}
+          onChange={(attachments) => onChange("attachments", attachments)}
+          disabled={submitting}
+          maxFiles={6}
+        />
+      </div>
       <details className="sm:col-span-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
         <summary className="cursor-pointer text-sm font-medium text-slate-700">
           Advanced options
@@ -714,7 +934,10 @@ function TemplateEditorModal({
   mode: "create" | "edit";
   form: TemplateFormState;
   submitting: boolean;
-  onChange: (field: keyof TemplateFormState, value: string) => void;
+  onChange: (
+    field: keyof TemplateFormState,
+    value: TemplateFormFieldValue,
+  ) => void;
   onClose: () => void;
   onSubmit: () => void;
 }) {
@@ -906,6 +1129,25 @@ function TemplateDetailsModal({
           </div>
         </div>
 
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Default Attachments
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {template.attachments && template.attachments.length > 0 ? (
+              template.attachments.map((attachment) => (
+                <Badge key={attachment.storagePath} variant="gray" size="sm">
+                  {attachment.fileName}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-sm text-slate-500">
+                No default attachments configured.
+              </span>
+            )}
+          </div>
+        </div>
+
         <div className="overflow-hidden rounded-2xl border border-slate-200">
           <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
             Template preview
@@ -975,6 +1217,7 @@ export default function MailingPage() {
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [templateSubmitting, setTemplateSubmitting] = useState(false);
+  const [previewSubmitting, setPreviewSubmitting] = useState(false);
 
   async function loadQueue() {
     setQueueLoading(true);
@@ -1344,17 +1587,21 @@ export default function MailingPage() {
     }
   }
 
-  function updateTemplateForm(field: keyof TemplateFormState, value: string) {
+  function updateTemplateForm(
+    field: keyof TemplateFormState,
+    value: TemplateFormFieldValue,
+  ) {
     setTemplateForm((current) => {
       if (
         field === "name" &&
         templateEditorMode === "create" &&
         !current.slug
       ) {
+        const nextName = String(value);
         return {
           ...current,
-          name: value,
-          slug: slugify(value),
+          name: nextName,
+          slug: slugify(nextName),
         };
       }
 
@@ -1391,6 +1638,7 @@ export default function MailingPage() {
         .split(",")
         .map((value) => value.trim())
         .filter(Boolean),
+      attachments: templateForm.attachments,
     };
 
     setTemplateSubmitting(true);
@@ -1422,6 +1670,7 @@ export default function MailingPage() {
               bodyHtml: payload.bodyHtml,
               bodyText: payload.bodyText,
               variables: payload.variables,
+              attachments: payload.attachments,
             }),
           },
         );
@@ -1471,30 +1720,47 @@ export default function MailingPage() {
     }
   }
 
-  const activeView = VIEW_OPTIONS.find((option) => option.value === mode)!;
+  async function handleSavePreviewMail(
+    mail: MailRequestRecord,
+    payload: { subject: string; htmlBody: string },
+  ) {
+    setPreviewSubmitting(true);
+    try {
+      const response = await requestJson<MailRequestRecord>(
+        `/api/v1/mail/requests/${mail.id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const updated = response.data;
+      if (updated) {
+        setMailRequests((current) =>
+          current.map((item) =>
+            item.id === mail.id ? { ...item, ...updated } : item,
+          ),
+        );
+        setPreviewMail((current) =>
+          current && current.id === mail.id
+            ? { ...current, ...updated }
+            : current,
+        );
+      }
+      showMessage("Mail content updated.");
+    } finally {
+      setPreviewSubmitting(false);
+    }
+  }
+
   const showInlineTemplateEditor =
     mode === "templates" && templateEditorOpen && isWideTemplateViewport;
   const showTemplateDetailPane =
     mode === "templates" && isWideTemplateViewport && Boolean(selectedTemplate);
 
   return (
-    <div className="-mt-6 space-y-5 px-4 pb-6 pt-0 xl:mt-0 xl:h-full xl:overflow-y-auto">
-      <div className="relative z-0 pt-10">
-        <div className="card relative overflow-hidden border-[#DBEAFE] bg-white px-5 py-4 sm:px-6 sm:py-5">
-          <div className="relative z-10">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-[#2563EB]">
-              Mailing Center
-            </p>
-            <h1 className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-              Queue operations, template manager, and inbound mails in one place
-            </h1>
-            <p className="mt-1.5 text-sm font-bold text-[#2563EB]">
-              {activeView.hint}
-            </p>
-          </div>
-        </div>
-      </div>
-
+    <div className="-mt-6 relative z-10 space-y-5 px-4 pb-6 pt-6 xl:mt-0 xl:h-full xl:overflow-y-auto hide-scrollbar">
       <div className="card overflow-hidden">
         <div className="border-b border-(--card-border) px-4 py-3">
           <div className="flex justify-center">
@@ -1828,6 +2094,15 @@ export default function MailingPage() {
                               )}
                               {mail.reviewer?.name && (
                                 <span>Reviewed by {mail.reviewer.name}</span>
+                              )}
+                              {getMailAttachments(mail).length > 0 && (
+                                <span className="flex items-center gap-1 text-slate-600">
+                                  <Paperclip size={12} />
+                                  {getMailAttachments(mail).length} attachment
+                                  {getMailAttachments(mail).length > 1
+                                    ? "s"
+                                    : ""}
+                                </span>
                               )}
                             </div>
 
@@ -2166,6 +2441,30 @@ export default function MailingPage() {
                         </div>
                       </div>
 
+                      <div className="mt-4">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Default Attachments
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedTemplate!.attachments &&
+                          selectedTemplate!.attachments.length > 0 ? (
+                            selectedTemplate!.attachments.map((attachment) => (
+                              <Badge
+                                key={attachment.storagePath}
+                                variant="gray"
+                                size="sm"
+                              >
+                                {attachment.fileName}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-sm text-slate-500">
+                              No default attachments configured.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
                         <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
                           Template preview
@@ -2415,7 +2714,12 @@ export default function MailingPage() {
         </div>
       )}
 
-      <PreviewModal mail={previewMail} onClose={() => setPreviewMail(null)} />
+      <PreviewModal
+        mail={previewMail}
+        submitting={previewSubmitting}
+        onSave={handleSavePreviewMail}
+        onClose={() => setPreviewMail(null)}
+      />
       <RejectModal
         mail={rejectMail}
         note={rejectNote}

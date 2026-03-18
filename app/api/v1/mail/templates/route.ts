@@ -6,12 +6,21 @@ import {
   success,
   unauthorized,
   forbidden,
+  badRequest,
   serverError,
 } from "@/lib/api/response";
 import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
 import { headers } from "next/headers";
+
+const mailAttachmentSchema = z.object({
+  fileName: z.string().min(1).max(255),
+  mimeType: z.string().max(255).optional().nullable(),
+  sizeBytes: z.number().int().nonnegative().optional().nullable(),
+  storagePath: z.string().min(1).max(500),
+  publicUrl: z.string().min(1).max(500),
+});
 
 const createTemplateSchema = z.object({
   name: z.string().min(1).max(255),
@@ -21,7 +30,33 @@ const createTemplateSchema = z.object({
   bodyText: z.string().optional(),
   variables: z.array(z.string()).optional(),
   sendPolicy: z.record(z.string(), z.any()).optional(),
+  attachments: z.array(mailAttachmentSchema).max(10).optional(),
 });
+
+function asRecord(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
+function mapAttachmentRecord(attachment: {
+  mailAsset: {
+    fileName: string;
+    mimeType: string | null;
+    sizeBytes: number | null;
+    storagePath: string;
+    publicUrl: string;
+  };
+}) {
+  return {
+    fileName: attachment.mailAsset.fileName,
+    mimeType: attachment.mailAsset.mimeType,
+    sizeBytes: attachment.mailAsset.sizeBytes,
+    storagePath: attachment.mailAsset.storagePath,
+    publicUrl: attachment.mailAsset.publicUrl,
+  };
+}
 
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
@@ -61,6 +96,22 @@ export async function GET(request: NextRequest) {
             email: true,
           },
         },
+        attachments: {
+          include: {
+            mailAsset: {
+              select: {
+                fileName: true,
+                mimeType: true,
+                sizeBytes: true,
+                storagePath: true,
+                publicUrl: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
         _count: {
           select: {
             versions: true,
@@ -71,7 +122,12 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return success(templates);
+    const normalizedTemplates = templates.map((template) => ({
+      ...template,
+      attachments: template.attachments.map(mapAttachmentRecord),
+    }));
+
+    return success(normalizedTemplates);
   } catch (error) {
     console.error("Error fetching templates:", error);
     return serverError();
@@ -104,12 +160,66 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
+    const { attachments, sendPolicy, ...restValidation } = validation;
+
+    const attachmentStoragePaths = attachments?.map((item) => item.storagePath) ?? [];
+    const uniqueStoragePaths = Array.from(new Set(attachmentStoragePaths));
+
+    let resolvedAssets: Array<{ id: string; storagePath: string }> = [];
+
+    if (uniqueStoragePaths.length > 0) {
+      resolvedAssets = await db.mailAsset.findMany({
+        where: {
+          storagePath: {
+            in: uniqueStoragePaths,
+          },
+        },
+        select: {
+          id: true,
+          storagePath: true,
+        },
+      });
+
+      if (resolvedAssets.length !== uniqueStoragePaths.length) {
+        return badRequest("Some attachments are missing. Please re-upload and try again.");
+      }
+    }
+
+    const normalizedSendPolicy = asRecord(sendPolicy) ?? {};
+
     const template = await db.emailTemplate.create({
       data: {
-        ...validation,
+        ...restValidation,
+        sendPolicy: normalizedSendPolicy,
         status: "approved",
         createdBy: user.id,
         approvedBy: user.id,
+        attachments:
+          resolvedAssets.length > 0
+            ? {
+                create: resolvedAssets.map((asset) => ({
+                  mailAssetId: asset.id,
+                })),
+              }
+            : undefined,
+      },
+      include: {
+        attachments: {
+          include: {
+            mailAsset: {
+              select: {
+                fileName: true,
+                mimeType: true,
+                sizeBytes: true,
+                storagePath: true,
+                publicUrl: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
       },
     });
 
@@ -118,11 +228,14 @@ export async function POST(request: NextRequest) {
       action: "create_email_template",
       targetType: "email_template",
       targetId: template.id,
-      meta: { name: template.name },
+      meta: { name: template.name, attachmentCount: attachments?.length ?? 0 },
       ...clientInfo,
     });
 
-    return success(template);
+    return success({
+      ...template,
+      attachments: template.attachments.map(mapAttachmentRecord),
+    });
   } catch (error: unknown) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&

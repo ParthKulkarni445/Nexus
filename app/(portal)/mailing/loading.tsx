@@ -56,18 +56,8 @@ function PanelSkeleton() {
 
 export default function Loading() {
   return (
-    <div className="-mt-6 space-y-5 px-4 pb-6 pt-0 xl:mt-0 xl:h-full xl:overflow-y-auto">
-      <div className="relative z-0 pt-10">
-        <div className="card border-[#DBEAFE] bg-white px-5 py-4 sm:px-6 sm:py-5">
-          <div className="space-y-3">
-            <div className="shimmer h-3 w-32 rounded-full" />
-            <div className="shimmer h-8 w-80 max-w-full rounded-full" />
-            <div className="shimmer h-4 w-72 max-w-full rounded-full" />
-          </div>
-        </div>
-      </div>
-
-      <div className="card overflow-hidden">
+    <div className="-mt-6 space-y-5 px-4 pb-6 pt-0 xl:mt-0 xl:h-full xl:overflow-y-auto hide-scrollbar">
+      <div className="card overflow-hidden relative z-0 mt-10">
         <div className="border-b border-(--card-border) px-4 py-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <SegmentSkeleton />

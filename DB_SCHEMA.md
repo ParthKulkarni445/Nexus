@@ -248,7 +248,7 @@ Coordinator -> Mailing Team request queue.
 - `template_version` (nullable)
 - `custom_subject`, `custom_body`
 - `recipient_filter` (`jsonb`) (branch/year/eligibility/tags)
-- `preview_payload` (`jsonb`)
+- `preview_payload` (`jsonb`) (rendered subject/body)
 - `status` (`mail_request_status`)
 - `urgency`
 - `reviewed_by` (fk `users`, nullable), `review_note`
@@ -280,6 +280,32 @@ Attachment metadata for inbound/outbound messages.
 - `file_name`, `mime_type`, `size_bytes`
 - `storage_path`
 - `created_at`
+
+### 29) `mail_assets`
+
+Uploaded file metadata reusable across templates and request queues.
+
+- `id`
+- `file_name`, `mime_type`, `size_bytes`
+- `storage_path` (unique), `public_url`
+- `uploaded_by` (fk `users`, nullable)
+- `created_at`
+
+### 30) `email_template_attachments`
+
+Default attachments bound to templates.
+
+- `id`, `template_id` (fk `email_templates`), `mail_asset_id` (fk `mail_assets`)
+- `created_at`
+- unique (`template_id`, `mail_asset_id`)
+
+### 31) `mail_request_attachments`
+
+Attachments bound to specific mail requests.
+
+- `id`, `mail_request_id` (fk `mail_requests`), `mail_asset_id` (fk `mail_assets`)
+- `created_at`
+- unique (`mail_request_id`, `mail_asset_id`)
 
 ### 22) `company_domains`
 
