@@ -177,7 +177,7 @@ It helps answer:
 ## 5.2 Core Concept
 
 ```
-Company → Year → Stats
+Season_cycle -> Company -> Year -> Stats
 ```
 
 ---

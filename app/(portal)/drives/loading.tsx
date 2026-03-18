@@ -63,6 +63,20 @@ export default function Loading() {
         <div className="shimmer h-10 w-full rounded-xl" />
       </div>
 
+      <div className="card p-4">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 items-stretch">
+          {Array.from({ length: 2 }, (_, index) => (
+            <div
+              key={index}
+              className="rounded-xl border border-slate-200 bg-white p-3 h-full"
+            >
+              <div className="shimmer h-4 w-32 rounded-full" />
+              <div className="shimmer mt-3 h-40 w-full rounded-xl" />
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.8fr)] items-stretch">
         <section className="card p-4 h-full">
           <div className="mb-3 flex items-center justify-between gap-2">

@@ -38,6 +38,9 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
   const search = searchParams.get("search");
   const stage = searchParams.get("stage");
+  const seasonId = searchParams.get("seasonId");
+  const companyId = searchParams.get("companyId");
+  const ownerUserId = searchParams.get("ownerUserId");
 
   try {
     const where: Prisma.DriveWhereInput = {
@@ -51,6 +54,15 @@ export async function GET(request: NextRequest) {
         : {}),
       ...(status ? { status: status as never } : {}),
       ...(stage ? { stage } : {}),
+      ...(companyId ? { companyId } : {}),
+      ...((seasonId || ownerUserId)
+        ? {
+            companySeasonCycle: {
+              ...(seasonId ? { seasonId } : {}),
+              ...(ownerUserId ? { ownerUserId } : {}),
+            },
+          }
+        : {}),
       ...(search
         ? {
             OR: [

@@ -32,7 +32,7 @@ function unauthorizedRedirect(request: NextRequest) {
   return NextResponse.redirect(url);
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
   const claims = await verifySessionToken(sessionToken);
