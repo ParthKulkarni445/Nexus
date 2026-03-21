@@ -34,16 +34,27 @@ type ApiResponse<T> = {
 
 type PositionedEvent = {
   item: ScheduleItem;
-  top: number;
-  height: number;
   left: number;
   width: number;
+  top: number;
+  height: number;
+  displayStartMinute: number;
 };
 
-const DAY_START_HOUR = 8;
+type DayEventSlice = {
+  item: ScheduleItem;
+  startMinute: number;
+  endMinute: number;
+};
+
+type ScheduleViewMode = "upcoming" | "archive";
+
+const DAY_START_HOUR = 0;
 const DAY_END_HOUR = 24;
-const PIXELS_PER_HOUR = 40;
-const MIN_EVENT_HEIGHT = 36;
+const PIXELS_PER_HOUR = 56;
+const EVENT_LANE_HEIGHT = 30;
+const EVENT_ROW_PADDING = 8;
+const MIN_EVENT_WIDTH = 54;
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("en-IN", {
@@ -69,6 +80,17 @@ function formatHourLabel(hour: number) {
   date.setHours(hour, 0, 0, 0);
   return date.toLocaleTimeString("en-IN", {
     hour: "numeric",
+    hour12: true,
+  });
+}
+
+function formatMinuteLabel(minuteOfDay: number) {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  date.setMinutes(Math.max(0, Math.min(minuteOfDay, 24 * 60)));
+  return date.toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
     hour12: true,
   });
 }
@@ -135,7 +157,7 @@ function getEventDurationLabel(startTime: string, endTime: string) {
 
 function eventCardTone(status: ScheduleItem["status"]) {
   if (status === "rescheduled") {
-    return "border-amber-200 bg-amber-50/95";
+    return "border-blue-200 bg-blue-50/95";
   }
   if (status === "cancelled") {
     return "border-rose-200 bg-rose-50/95";
@@ -143,34 +165,30 @@ function eventCardTone(status: ScheduleItem["status"]) {
   return "border-sky-200 bg-sky-50/95";
 }
 
-function buildPositionedEvents(dayItems: ScheduleItem[]): PositionedEvent[] {
+function buildPositionedEvents(dayItems: DayEventSlice[]): PositionedEvent[] {
   const dayStartMinute = DAY_START_HOUR * 60;
   const dayEndMinute = DAY_END_HOUR * 60;
   const positioned: Array<{
     item: ScheduleItem;
     startMinute: number;
     endMinute: number;
-    column: number;
-    group: number;
+    lane: number;
   }> = [];
 
   const normalized = dayItems
     .map((item) => {
-      const rawStart = getMinuteOfDay(new Date(item.startTime));
-      const rawEnd = getMinuteOfDay(new Date(item.endTime));
-      const startMinute = Math.max(dayStartMinute, Math.min(rawStart, dayEndMinute));
-      const endMinute = Math.max(startMinute + 10, Math.min(rawEnd, dayEndMinute));
+      const startMinute = Math.max(dayStartMinute, Math.min(item.startMinute, dayEndMinute));
+      const endMinute = Math.max(startMinute + 10, Math.min(item.endMinute, dayEndMinute));
       return {
-        item,
+        item: item.item,
         startMinute,
         endMinute,
       };
     })
     .sort((a, b) => a.startMinute - b.startMinute);
 
-  let groupIndex = -1;
-  const active: Array<{ endMinute: number; column: number; group: number }> = [];
-  const groupColumns = new Map<number, number>();
+  const active: Array<{ endMinute: number; lane: number }> = [];
+  let laneCount = 0;
 
   for (const entry of normalized) {
     for (let index = active.length - 1; index >= 0; index -= 1) {
@@ -179,53 +197,50 @@ function buildPositionedEvents(dayItems: ScheduleItem[]): PositionedEvent[] {
       }
     }
 
-    if (active.length === 0) {
-      groupIndex += 1;
-    }
+    const usedLanes = new Set(active.map((event) => event.lane));
 
-    const usedColumns = new Set(
-      active.filter((event) => event.group === groupIndex).map((event) => event.column),
-    );
-
-    let column = 0;
-    while (usedColumns.has(column)) {
-      column += 1;
+    let lane = 0;
+    while (usedLanes.has(lane)) {
+      lane += 1;
     }
 
     active.push({
       endMinute: entry.endMinute,
-      column,
-      group: groupIndex,
+      lane,
     });
 
-    const nextCount = Math.max(groupColumns.get(groupIndex) ?? 0, column + 1);
-    groupColumns.set(groupIndex, nextCount);
+    laneCount = Math.max(laneCount, lane + 1);
 
     positioned.push({
       item: entry.item,
       startMinute: entry.startMinute,
       endMinute: entry.endMinute,
-      column,
-      group: groupIndex,
+      lane,
     });
   }
 
   return positioned.map((event) => {
-    const totalColumns = Math.max(groupColumns.get(event.group) ?? 1, 1);
-    const top = ((event.startMinute - dayStartMinute) / 60) * PIXELS_PER_HOUR;
-    const height = Math.max(
+    const totalHours = DAY_END_HOUR - DAY_START_HOUR;
+    const left = ((event.startMinute - dayStartMinute) / 60) * PIXELS_PER_HOUR;
+    const width = Math.max(
       ((event.endMinute - event.startMinute) / 60) * PIXELS_PER_HOUR,
-      MIN_EVENT_HEIGHT,
+      MIN_EVENT_WIDTH,
     );
-    const width = 100 / totalColumns;
-    const left = event.column * width;
+    const top = EVENT_ROW_PADDING + event.lane * EVENT_LANE_HEIGHT;
+    const laneHeight = EVENT_LANE_HEIGHT - 6;
+    const height = Math.max(laneHeight, 18);
+
+    // Expand row height based on active lanes; referenced in row rendering fallback.
+    void totalHours;
+    void laneCount;
 
     return {
       item: event.item,
-      top,
-      height,
       left,
       width,
+      top,
+      height,
+      displayStartMinute: event.startMinute,
     };
   });
 }
@@ -273,6 +288,7 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
 
 export default function SchedulePage() {
   const [items, setItems] = useState<ScheduleItem[]>([]);
+  const [viewMode, setViewMode] = useState<ScheduleViewMode>("upcoming");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weekStart, setWeekStart] = useState<Date>(() => getWeekStart(new Date()));
@@ -283,8 +299,25 @@ export default function SchedulePage() {
     setError(null);
 
     try {
-      const data = await requestJson<ScheduleItem[]>("/api/v1/schedules/upcoming");
-      setItems(data);
+      if (viewMode === "upcoming") {
+        const data = await requestJson<ScheduleItem[]>("/api/v1/schedules/upcoming");
+        setItems(data);
+      } else {
+        const now = new Date();
+        const data = await requestJson<ScheduleItem[]>(
+          `/api/v1/schedules?to=${encodeURIComponent(now.toISOString())}`,
+        );
+
+        const completedPast = data
+          .filter((item) => item.status !== "cancelled")
+          .filter((item) => new Date(item.endTime).getTime() < now.getTime())
+          .sort(
+            (a, b) =>
+              new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
+          );
+
+        setItems(completedPast);
+      }
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -294,11 +327,16 @@ export default function SchedulePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [viewMode]);
 
   useEffect(() => {
     void loadSchedules();
   }, [loadSchedules]);
+
+  useEffect(() => {
+    setWeekInitialized(false);
+    setWeekStart(getWeekStart(new Date()));
+  }, [viewMode]);
 
   useEffect(() => {
     if (weekInitialized || items.length === 0) {
@@ -310,6 +348,17 @@ export default function SchedulePage() {
 
   const summary = useMemo(() => {
     const now = Date.now();
+
+    if (viewMode === "archive") {
+      return {
+        total: items.length,
+        thisWeek: items.filter((item) => {
+          const diff = now - new Date(item.endTime).getTime();
+          return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000;
+        }).length,
+      };
+    }
+
     return {
       total: items.length,
       thisWeek: items.filter((item) => {
@@ -317,7 +366,7 @@ export default function SchedulePage() {
         return diff >= 0 && diff <= 7 * 24 * 60 * 60 * 1000;
       }).length,
     };
-  }, [items]);
+  }, [items, viewMode]);
 
   const daysInWeek = useMemo(
     () => Array.from({ length: 7 }, (_, index) => addDays(weekStart, index)),
@@ -325,34 +374,60 @@ export default function SchedulePage() {
   );
 
   const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart]);
-  const calendarHeight = (DAY_END_HOUR - DAY_START_HOUR) * PIXELS_PER_HOUR;
+  const timelineWidth = (DAY_END_HOUR - DAY_START_HOUR) * PIXELS_PER_HOUR;
   const hourSlots = useMemo(
     () => Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }, (_, index) => DAY_START_HOUR + index),
     [],
   );
   const labelHours = useMemo(
-    () => hourSlots.filter((hour) => hour % 3 === 0),
+    () => hourSlots.filter((hour) => hour % 2 === 0),
     [hourSlots],
   );
 
   const eventsByDay = useMemo(() => {
-    const map = new Map<string, ScheduleItem[]>();
+    const map = new Map<string, DayEventSlice[]>();
 
     for (const day of daysInWeek) {
       map.set(toDayKey(day), []);
     }
 
     for (const item of items) {
-      const key = toDayKey(new Date(item.startTime));
-      if (map.has(key)) {
-        map.get(key)?.push(item);
+      const start = new Date(item.startTime);
+      const end = new Date(item.endTime);
+
+      for (const day of daysInWeek) {
+        const dayStart = new Date(day);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart);
+        dayEnd.setDate(dayEnd.getDate() + 1);
+
+        // Event overlaps this day window.
+        if (end > dayStart && start < dayEnd) {
+          const segmentStart = start > dayStart ? start : dayStart;
+          const segmentEnd = end < dayEnd ? end : dayEnd;
+          const key = toDayKey(day);
+          const startMinute = Math.max(
+            0,
+            Math.floor((segmentStart.getTime() - dayStart.getTime()) / 60000),
+          );
+          const endMinute = Math.max(
+            startMinute + 1,
+            Math.ceil((segmentEnd.getTime() - dayStart.getTime()) / 60000),
+          );
+
+          map.get(key)?.push({
+            item,
+            startMinute,
+            endMinute,
+          });
+        }
       }
     }
 
     for (const dayItems of map.values()) {
       dayItems.sort(
         (a, b) =>
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime(),
+          a.startMinute - b.startMinute,
       );
     }
 
@@ -381,18 +456,51 @@ export default function SchedulePage() {
               Weekly Calendar
             </h1>
             <p className="mt-2 text-sm text-slate-500">
-              A calendar view of upcoming events from the database, grouped by day.
+              {viewMode === "upcoming"
+                ? "A calendar view of upcoming events from the database, grouped by day."
+                : "A calendar view of completed past events from the database archive."}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:max-w-xs">
             <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2.5">
-              <p className="text-xs text-[#1D4ED8]">Upcoming</p>
+              <p className="text-xs text-[#1D4ED8]">
+                {viewMode === "upcoming" ? "Upcoming" : "Archived"}
+              </p>
               <p className="mt-1 text-xl font-semibold text-slate-900">{summary.total}</p>
             </div>
             <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2.5">
-              <p className="text-xs text-[#1D4ED8]">This Week</p>
+              <p className="text-xs text-[#1D4ED8]">
+                {viewMode === "upcoming" ? "This Week" : "Last 7 Days"}
+              </p>
               <p className="mt-1 text-xl font-semibold text-slate-900">{summary.thisWeek}</p>
+            </div>
+          </div>
+
+          <div className="w-full sm:w-auto">
+            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("upcoming")}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  viewMode === "upcoming"
+                    ? "bg-[#2563EB] text-white"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                Upcoming
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("archive")}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  viewMode === "archive"
+                    ? "bg-[#2563EB] text-white"
+                    : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                Archive
+              </button>
             </div>
           </div>
         </div>
@@ -447,93 +555,99 @@ export default function SchedulePage() {
         ) : items.length === 0 ? (
           <EmptyState
             icon={CalendarClock}
-            title="No scheduled events yet"
-            description="Upcoming events will appear here once they are published by admins."
+            title={viewMode === "upcoming" ? "No scheduled events yet" : "No archived events yet"}
+            description={
+              viewMode === "upcoming"
+                ? "Upcoming events will appear here once they are published by admins."
+                : "Completed events will appear here after their end time passes."
+            }
           />
         ) : (
-          <div className="hide-scrollbar overflow-x-auto lg:overflow-x-visible rounded-xl border border-slate-200 bg-white p-1.5 sm:p-2">
-            <div className="grid min-w-[980px] lg:min-w-0 grid-cols-[34px_repeat(7,minmax(0,1fr))] gap-1">
-              <div className="rounded-md bg-slate-50" />
+          <div className="schedule-scroll overflow-x-auto overflow-y-auto max-h-[72vh] rounded-xl border border-slate-200 bg-white p-1.5 sm:p-2">
+            <div className="min-w-[1600px] space-y-1.5">
+              <div className="grid grid-cols-[110px_1fr] gap-1">
+                <div className="rounded-md border border-slate-200 bg-slate-50" />
+                <div className="relative rounded-md border border-slate-200 bg-slate-50" style={{ width: `${timelineWidth}px`, height: "42px" }}>
+                  {hourSlots.map((hour) => {
+                    const left = ((hour - DAY_START_HOUR) / (DAY_END_HOUR - DAY_START_HOUR)) * timelineWidth;
+                    const isLastTick = hour === DAY_END_HOUR;
+                    return (
+                      <div
+                        key={`hour-header-${hour}`}
+                        className="absolute top-0 bottom-0 border-l border-slate-200"
+                        style={{ left: `${left}px` }}
+                      >
+                        {labelHours.includes(hour) ? (
+                          <span
+                            className={`absolute top-1 text-[9px] font-medium text-slate-500 sm:text-[10px] ${
+                              isLastTick ? "left-0 -translate-x-full" : "left-1"
+                            }`}
+                          >
+                            {formatHourLabel(hour)}
+                          </span>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
 
               {daysInWeek.map((day) => {
                 const dayKey = toDayKey(day);
                 const dayItems = eventsByDay.get(dayKey) ?? [];
-
-                return (
-                  <header
-                    key={`header-${dayKey}`}
-                    className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-1"
-                  >
-                    <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:text-xs">
-                      {formatDayHeader(day)}
-                    </p>
-                    <p className="text-xs font-semibold text-slate-500 sm:text-sm">
-                      {dayItems.length} events
-                    </p>
-                  </header>
-                );
-              })}
-
-              <aside className="relative rounded-md border border-slate-200 bg-white" style={{ height: `${calendarHeight}px` }}>
-                {labelHours.map((hour) => {
-                  const top = ((hour - DAY_START_HOUR) / (DAY_END_HOUR - DAY_START_HOUR)) * calendarHeight;
-                  return (
-                    <div
-                      key={`slot-${hour}`}
-                      className="absolute left-0 right-0 border-t border-slate-100"
-                      style={{ top: `${top}px` }}
-                    >
-                      <span className="-translate-y-1/2 absolute left-0.5 top-0 bg-white px-0.5 text-[8px] font-medium text-slate-400 sm:text-[9px]">
-                        {formatHourLabel(hour)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </aside>
-
-              {daysInWeek.map((day) => {
-                const dayKey = toDayKey(day);
                 const positioned = positionedByDay.get(dayKey) ?? [];
+                const laneCount = Math.max(1, ...positioned.map((event) => Math.round((event.top - EVENT_ROW_PADDING) / EVENT_LANE_HEIGHT) + 1));
+                const rowHeight = Math.max(58, EVENT_ROW_PADDING * 2 + laneCount * EVENT_LANE_HEIGHT);
 
                 return (
-                  <section
-                    key={`body-${dayKey}`}
-                    className="relative overflow-hidden rounded-md border border-slate-200 bg-gradient-to-b from-[#fffaf0] via-[#fff] to-[#f8fafc]"
-                    style={{ height: `${calendarHeight}px` }}
-                  >
-                    {hourSlots.map((hour) => {
-                      const top = ((hour - DAY_START_HOUR) / (DAY_END_HOUR - DAY_START_HOUR)) * calendarHeight;
-                      return (
-                        <div
-                          key={`${dayKey}-grid-${hour}`}
-                          className="absolute left-0 right-0 border-t border-slate-100/90"
-                          style={{ top: `${top}px` }}
-                        />
-                      );
-                    })}
+                  <div key={`row-${dayKey}`} className="grid grid-cols-[110px_1fr] gap-1">
+                    <div className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1.5">
+                      <p className="truncate text-[10px] font-semibold uppercase tracking-wide text-slate-600 sm:text-xs">
+                        {formatDayHeader(day)}
+                      </p>
+                      <p className="text-xs font-semibold text-slate-500 sm:text-sm">
+                        {dayItems.length} events
+                      </p>
+                    </div>
 
-                    {positioned.map((event) => (
-                      <article
-                        key={event.item.id}
-                        className={`absolute overflow-hidden rounded border px-1 py-0.5 shadow-sm ${eventCardTone(
-                          event.item.status,
-                        )}`}
-                        style={{
-                          top: `${event.top}px`,
-                          height: `${event.height}px`,
-                          left: `calc(${event.left}% + 1px)`,
-                          width: `calc(${event.width}% - 2px)`,
-                        }}
-                      >
-                        <p className="truncate text-[8px] font-semibold leading-tight text-slate-900 sm:text-[9px]">
-                          {event.item.title}
-                        </p>
-                        <p className="truncate text-[8px] leading-tight text-slate-600 sm:text-[9px]">
-                          {formatTimeOnly(event.item.startTime)}
-                        </p>
-                      </article>
-                    ))}
-                  </section>
+                    <section
+                      className="relative overflow-hidden rounded-md border border-slate-200 bg-gradient-to-b from-[#EFF6FF] via-[#F8FAFC] to-[#FFFFFF]"
+                      style={{ width: `${timelineWidth}px`, height: `${rowHeight}px` }}
+                    >
+                      {hourSlots.map((hour) => {
+                        const left = ((hour - DAY_START_HOUR) / (DAY_END_HOUR - DAY_START_HOUR)) * timelineWidth;
+                        return (
+                          <div
+                            key={`${dayKey}-grid-${hour}`}
+                            className="absolute top-0 bottom-0 border-l border-slate-100/90"
+                            style={{ left: `${left}px` }}
+                          />
+                        );
+                      })}
+
+                      {positioned.map((event) => (
+                        <article
+                          key={event.item.id}
+                          className={`absolute overflow-hidden rounded border px-1 py-0.5 shadow-sm ${eventCardTone(
+                            event.item.status,
+                          )}`}
+                          style={{
+                            left: `${event.left}px`,
+                            width: `${event.width}px`,
+                            top: `${event.top}px`,
+                            height: `${event.height}px`,
+                          }}
+                        >
+                          <p className="truncate text-[8px] font-semibold leading-tight text-slate-900 sm:text-[9px]">
+                            {event.item.title}
+                          </p>
+                          <p className="truncate text-[8px] leading-tight text-slate-600 sm:text-[9px]">
+                            {formatMinuteLabel(event.displayStartMinute)}
+                          </p>
+                        </article>
+                      ))}
+                    </section>
+                  </div>
                 );
               })}
             </div>
@@ -544,7 +658,9 @@ export default function SchedulePage() {
       {!loading && items.length > 0 ? (
         <section className="card p-4 sm:p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Upcoming Events</h2>
+            <h2 className="text-sm font-semibold text-slate-900">
+              {viewMode === "upcoming" ? "Upcoming Events" : "Archived Events"}
+            </h2>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-600">
               Top {Math.min(items.length, 10)}
             </span>
