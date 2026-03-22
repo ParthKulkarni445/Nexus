@@ -973,7 +973,7 @@ export default function CompaniesPage() {
                   <div
                     key={label}
                     className="flex items-center gap-3 px-3 flex-1 rounded-lg"
-                    style={{ background: "#2563EB" }}
+                    style={{ background: "#3B82F6" }}
                   >
                     <div
                       className="w-1 self-stretch rounded-full shrink-0 my-3"
@@ -982,20 +982,20 @@ export default function CompaniesPage() {
                     <div className="flex-1 min-w-0 py-3">
                       <p
                         className="text-[18px] font-bold uppercase tracking-wider leading-none"
-                        style={{ color: "#000000" }}
+                        style={{ color: "#FFFFFF" }}
                       >
                         {label}
                       </p>
                       <p
-                        className="text-[12px] font-medium mt-0.5"
-                        style={{ color: "#FFFFFF" }}
+                        className="text-[13px] font-bold mt-0.5"
+                        style={{ color: "#000000" }}
                       >
                         {sub}
                       </p>
                     </div>
                     <span
                       className="text-2xl font-extrabold shrink-0"
-                      style={{ color: "#000000" }}
+                      style={{ color: "#FFFFFF" }}
                     >
                       {value}
                     </span>
