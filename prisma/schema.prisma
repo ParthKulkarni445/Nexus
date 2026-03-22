@@ -8,50 +8,49 @@ datasource db {
 }
 
 model User {
-  id                                    String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email                                 String                       @unique @db.VarChar(255)
-  name                                  String                       @db.VarChar(255)
-  role                                  UserRole
-  coordinatorType                       CoordinatorType?             @map("coordinator_type")
-  authProvider                          String?                      @map("auth_provider") @db.VarChar(100)
-  authSubject                           String?                      @map("auth_subject") @db.VarChar(255)
-  profileMeta                           Json?                        @map("profile_meta")
-  isActive                              Boolean                      @default(true) @map("is_active")
-  createdAt                             DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt                             DateTime                     @default(now()) @map("updated_at") @db.Timestamptz(6)
-  auditLogs                             AuditLog[]
-  approvedBlogs                         Blog[]                       @relation("BlogApprover")
-  authoredBlogs                         Blog[]                       @relation("BlogAuthor")
-  blogVotes                             BlogVote[]
-  createdCompanies                      Company[]                    @relation("CompanyCreator")
-  updatedCompanies                      Company[]                    @relation("CompanyUpdater")
-  assignmentHistoryChanged              CompanyAssignmentHistory[]   @relation("AssignmentHistoryChangedBy")
-  assignmentHistoryFrom                 CompanyAssignmentHistory[]   @relation("AssignmentHistoryFrom")
-  assignmentHistoryTo                   CompanyAssignmentHistory[]   @relation("AssignmentHistoryTo")
-  assignmentAssigner                    CompanyAssignment[]          @relation("AssignmentAssigner")
-  assignmentAssignee                    CompanyAssignment[]          @relation("AssignmentAssignee")
-  createdCompanyDomains                 CompanyDomain[]              @relation("CompanyDomainCreator")
-  seasonOwnerships                      CompanySeasonCycle[]         @relation("SeasonCycleOwner")
-  seasonCycleUpdates                    CompanySeasonCycle[]         @relation("SeasonCycleUpdatedBy")
-  seasonStatusChanges                   CompanySeasonStatusHistory[]
-  interactionsCreated                   ContactInteraction[]
-  createdDrives                         Drive[]
-  templateVersionsCreated               EmailTemplateVersion[]
-  approvedTemplates                     EmailTemplate[]              @relation("TemplateApprover")
-  createdTemplates                      EmailTemplate[]              @relation("TemplateCreator")
-  uploadedMailAssets                    MailAsset[]                  @relation("MailAssetUploader")
-  requestedMailRequests                 MailRequest[]                @relation("MailRequestRequester")
-  reviewedMailRequests                  MailRequest[]                @relation("MailRequestReviewer")
-  notifications                         Notification[]
-  createdSeasons                        RecruitmentSeason[]
-  createdSchedules                      Schedule[]                   @relation("ScheduleCreator")
-  updatedSchedules                      Schedule[]                   @relation("ScheduleUpdater")
-  follows                               StudentCompanyFollow[]
-  placements                            Placement[]
-  studentDataConsent                    StudentDataConsent?
-  grantedPermissions                    UserPermission[]             @relation("PermissionGrants")
-  permissions                           UserPermission[]             @relation("UserPermissions")
-
+  id                       String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                    String                       @unique @db.VarChar(255)
+  name                     String                       @db.VarChar(255)
+  role                     UserRole
+  coordinatorType          CoordinatorType?             @map("coordinator_type")
+  authProvider             String?                      @map("auth_provider") @db.VarChar(100)
+  authSubject              String?                      @map("auth_subject") @db.VarChar(255)
+  profileMeta              Json?                        @map("profile_meta")
+  isActive                 Boolean                      @default(true) @map("is_active")
+  createdAt                DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime                     @default(now()) @map("updated_at") @db.Timestamptz(6)
+  auditLogs                AuditLog[]
+  blogVotes                BlogVote[]
+  approvedBlogs            Blog[]                       @relation("BlogApprover")
+  authoredBlogs            Blog[]                       @relation("BlogAuthor")
+  createdCompanies         Company[]                    @relation("CompanyCreator")
+  updatedCompanies         Company[]                    @relation("CompanyUpdater")
+  assignmentHistoryChanged CompanyAssignmentHistory[]   @relation("AssignmentHistoryChangedBy")
+  assignmentHistoryFrom    CompanyAssignmentHistory[]   @relation("AssignmentHistoryFrom")
+  assignmentHistoryTo      CompanyAssignmentHistory[]   @relation("AssignmentHistoryTo")
+  assignmentAssigner       CompanyAssignment[]          @relation("AssignmentAssigner")
+  assignmentAssignee       CompanyAssignment[]          @relation("AssignmentAssignee")
+  createdCompanyDomains    CompanyDomain[]              @relation("CompanyDomainCreator")
+  seasonOwnerships         CompanySeasonCycle[]         @relation("SeasonCycleOwner")
+  seasonCycleUpdates       CompanySeasonCycle[]         @relation("SeasonCycleUpdatedBy")
+  seasonStatusChanges      CompanySeasonStatusHistory[]
+  interactionsCreated      ContactInteraction[]
+  createdDrives            Drive[]
+  templateVersionsCreated  EmailTemplateVersion[]
+  approvedTemplates        EmailTemplate[]              @relation("TemplateApprover")
+  createdTemplates         EmailTemplate[]              @relation("TemplateCreator")
+  uploadedMailAssets       MailAsset[]                  @relation("MailAssetUploader")
+  requestedMailRequests    MailRequest[]                @relation("MailRequestRequester")
+  reviewedMailRequests     MailRequest[]                @relation("MailRequestReviewer")
+  notifications            Notification[]
+  placements               Placement[]
+  createdSeasons           RecruitmentSeason[]
+  createdSchedules         Schedule[]                   @relation("ScheduleCreator")
+  updatedSchedules         Schedule[]                   @relation("ScheduleUpdater")
+  follows                  StudentCompanyFollow[]
+  studentDataConsent       StudentDataConsent?
+  grantedPermissions       UserPermission[]             @relation("PermissionGrants")
+  permissions              UserPermission[]             @relation("UserPermissions")
 
   @@map("users")
 }
@@ -94,10 +93,9 @@ model Company {
   drives       Drive[]
   emails       Email[]
   mailRequests MailRequest[]
+  placements   Placement[]
   schedules    Schedule[]
   follows      StudentCompanyFollow[]
-  placements   Placement[]
-
 
   @@index([name])
   @@index([industry])
@@ -480,10 +478,10 @@ model Blog {
   approvedAt       DateTime?            @map("approved_at") @db.Timestamptz(6)
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime             @default(now()) @map("updated_at") @db.Timestamptz(6)
+  votes            BlogVote[]
   approver         User?                @relation("BlogApprover", fields: [approvedBy], references: [id])
   author           User                 @relation("BlogAuthor", fields: [authorId], references: [id], onDelete: Cascade)
   company          Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  votes            BlogVote[]
 
   @@index([companyId, createdAt], map: "blogs_company_created_idx")
   @@index([moderationStatus, createdAt], map: "blogs_moderation_created_idx")
@@ -561,39 +559,37 @@ model AuditLog {
 }
 
 model Placement {
-  id               String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  studentId        String             @map("student_id") @db.Uuid
-  companyId        String             @map("company_id") @db.Uuid
-  seasonId         String             @map("season_id") @db.Uuid
-  driveId          String?            @map("drive_id") @db.Uuid
-  role             String             @db.VarChar(255)
-  packageType      String             @map("package_type") @db.VarChar(50) // ctc | stipend
-  packageAmount    Decimal            @map("package_amount") @db.Decimal(12, 2)
-  packageFrequency String?            @map("package_frequency") @db.VarChar(20) // yearly | monthly
-  currency         String             @default("INR") @db.VarChar(10)
-  selectionDate    DateTime?          @map("selection_date") @db.Date
-  placementStatus  String             @default("accepted") @map("placement_status") @db.VarChar(50)
-  source           String?            @db.VarChar(100)
-  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime           @default(now()) @map("updated_at") @db.Timestamptz(6)
-
-  student          User               @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  company          Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  season           RecruitmentSeason  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  drive            Drive?             @relation(fields: [driveId], references: [id], onDelete: SetNull)
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId        String            @map("student_id") @db.Uuid
+  companyId        String            @map("company_id") @db.Uuid
+  seasonId         String            @map("season_id") @db.Uuid
+  driveId          String?           @map("drive_id") @db.Uuid
+  role             String            @db.VarChar(255)
+  packageType      String            @map("package_type") @db.VarChar(50)
+  packageAmount    Decimal           @map("package_amount") @db.Decimal(12, 2)
+  packageFrequency String?           @map("package_frequency") @db.VarChar(20)
+  currency         String            @default("INR") @db.VarChar(10)
+  selectionDate    DateTime?         @map("selection_date") @db.Date
+  placementStatus  String            @default("accepted") @map("placement_status") @db.VarChar(50)
+  source           String?           @db.VarChar(100)
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  drive            Drive?            @relation(fields: [driveId], references: [id])
+  season           RecruitmentSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  student          User              @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([seasonId, companyId], map: "placements_season_company_idx")
   @@index([studentId, seasonId], map: "placements_student_season_idx")
-  @@index([packageAmount], map: "placements_package_amount_idx")
+  @@index([packageAmount])
   @@map("placements")
 }
 
 model StudentDataConsent {
-  studentId             String   @id @map("student_id") @db.Uuid
-  allowPublicPlacementData Boolean @default(false) @map("allow_public_placement_data")
-  updatedAt             DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
-
-  student               User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  studentId                String   @id @map("student_id") @db.Uuid
+  allowPublicPlacementData Boolean  @default(false) @map("allow_public_placement_data")
+  updatedAt                DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  student                  User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@map("student_data_consent")
 }

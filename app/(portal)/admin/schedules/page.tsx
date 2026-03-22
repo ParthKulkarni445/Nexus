@@ -708,7 +708,7 @@ export default function AdminSchedulesPage() {
             description="Create your first schedule event from the form above."
           />
         ) : (
-          <div className="space-y-3">
+          <div className="schedule-scroll max-h-[62vh] space-y-3 overflow-auto pr-1">
             {schedules.map((item) => (
               <article
                 key={item.id}
