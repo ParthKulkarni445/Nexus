@@ -406,18 +406,18 @@ function ActionModals({
           return (
             <div
               key={season.companySeasonCycleId}
-              className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,1fr)_36px] items-center gap-2"
+              className="flex flex-wrap items-center gap-2"
             >
-              <div className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium leading-tight text-slate-700 break-words">
+              <div className="min-w-34 flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium leading-tight text-slate-700 wrap-break-word">
                 {season.season}
               </div>
               <div
-                className={`min-w-0 rounded-lg border px-3 py-2 text-center text-xs font-semibold ${status.bg} ${status.border} ${status.text}`}
+                className={`min-w-30 flex-1 rounded-lg border px-3 py-2 text-center text-xs font-semibold ${status.bg} ${status.border} ${status.text}`}
               >
                 {status.label}
               </div>
               <button
-                className="btn btn-secondary btn-sm px-2 text-slate-500"
+                className="btn btn-secondary btn-sm ml-auto shrink-0 px-2 text-slate-500"
                 onClick={() => openStatusEditor(season)}
               >
                 <Pencil size={13} />
@@ -1332,7 +1332,10 @@ export default function OutreachPage() {
                 </div>
               </div>
 
-              <div ref={detailsCardRef} className="card self-start p-4">
+              <div
+                ref={detailsCardRef}
+                className="card w-full max-w-full min-w-0 self-start overflow-hidden p-4"
+              >
                 {selectedEntry ? (
                   <div className="flex flex-col space-y-4">
                     <div className="flex items-start gap-3 min-w-0">
@@ -1393,7 +1396,7 @@ export default function OutreachPage() {
                       </div>
                     </div>
 
-                    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                    <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(420px,1.15fr)_minmax(300px,0.85fr)]">
                       <div
                         ref={detailLeftColumnRef}
                         className="flex flex-col space-y-4"
@@ -1521,7 +1524,7 @@ export default function OutreachPage() {
                       </div>
 
                       <div
-                        className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4"
+                        className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4"
                         style={{
                           height: detailColumnsHeight
                             ? `${Math.ceil(detailColumnsHeight)}px`

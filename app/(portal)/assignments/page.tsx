@@ -495,7 +495,9 @@ export default function AssignmentsPage() {
         }
 
         return (
-          seasonList.find((season) => season.isActive)?.id ?? seasonList[0]?.id ?? ""
+          seasonList.find((season) => season.isActive)?.id ??
+          seasonList[0]?.id ??
+          ""
         );
       });
     } catch (error) {
@@ -603,7 +605,9 @@ export default function AssignmentsPage() {
     }
 
     if (selectedSeasonId) {
-      data = data.filter((assignment) => assignment.seasonId === selectedSeasonId);
+      data = data.filter(
+        (assignment) => assignment.seasonId === selectedSeasonId,
+      );
     }
 
     if (statusFilter.length > 0) {
@@ -1027,7 +1031,9 @@ export default function AssignmentsPage() {
                         }
                         className="text-slate-300 group-hover:text-slate-400 hover:text-[#2563EB]! transition-colors shrink-0"
                       >
-                        {selectedUnassigned.has(company.companySeasonCycleId) ? (
+                        {selectedUnassigned.has(
+                          company.companySeasonCycleId,
+                        ) ? (
                           <CheckCircle2 size={16} className="text-[#2563EB]" />
                         ) : (
                           <div className="w-4 h-4 rounded border border-slate-300 group-hover:border-[#3B82F6]" />
@@ -1080,6 +1086,10 @@ export default function AssignmentsPage() {
                 <div className="shimmer mx-auto h-52 w-52 rounded-full" />
                 <div className="shimmer mx-auto h-3 w-44 rounded-full" />
               </div>
+            ) : stats.assigned === 0 ? (
+              <div className="px-4 py-8 text-center text-sm font-medium text-slate-500">
+                No Assignments
+              </div>
             ) : (
               <div className="p-4">
                 <div className="h-52">
@@ -1129,6 +1139,10 @@ export default function AssignmentsPage() {
             {isLoading ? (
               <div className="space-y-3 p-4">
                 <div className="shimmer h-56 w-full rounded-xl" />
+              </div>
+            ) : stats.assigned === 0 ? (
+              <div className="px-4 py-8 text-center text-sm font-medium text-slate-500">
+                No Assignments
               </div>
             ) : (
               <div className="p-4">
@@ -1202,7 +1216,7 @@ export default function AssignmentsPage() {
                 ))
               ) : topCoordinatorLoads.length === 0 ? (
                 <div className="px-4 py-8 text-center text-sm text-slate-500">
-                  No assignments available.
+                  No Assignments
                 </div>
               ) : (
                 topCoordinatorLoads.map((coordinator) => (
