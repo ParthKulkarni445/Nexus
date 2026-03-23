@@ -334,7 +334,9 @@ function ActionModals({
     note?: string;
   }) => Promise<void>;
 }) {
-  const [mode, setMode] = useState<"none" | "mail" | "log" | "call" | "status">("none");
+  const [mode, setMode] = useState<"none" | "mail" | "log" | "call" | "status">(
+    "none",
+  );
   const [cycleId, setCycleId] = useState("");
   const [contactId, setContactId] = useState("");
   const [requestType, setRequestType] = useState<"template" | "custom">(
@@ -351,12 +353,18 @@ function ActionModals({
   const [summary, setSummary] = useState("");
   const [outcome, setOutcome] = useState("");
   const [nextFollowUpAt, setNextFollowUpAt] = useState("");
-  const [statusValue, setStatusValue] = useState<OutreachStatus>("not_contacted");
+  const [statusValue, setStatusValue] =
+    useState<OutreachStatus>("not_contacted");
   const [statusNote, setStatusNote] = useState("");
-  const selectedTemplate = templates.find((template) => template.id === templateId);
-  const selectedContact = entry.contacts.find((contact) => contact.id === contactId);
+  const selectedTemplate = templates.find(
+    (template) => template.id === templateId,
+  );
+  const selectedContact = entry.contacts.find(
+    (contact) => contact.id === contactId,
+  );
   const resolvedCycleId =
-    cycleId || (entry.seasons.length === 1 ? entry.seasons[0].companySeasonCycleId : "");
+    cycleId ||
+    (entry.seasons.length === 1 ? entry.seasons[0].companySeasonCycleId : "");
 
   const missingVariables = (selectedTemplate?.variables ?? []).filter(
     (variable) => !templateVariables[variable]?.trim(),
@@ -390,18 +398,28 @@ function ActionModals({
   return (
     <>
       <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Season Status</p>
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+          Season Status
+        </p>
         {entry.seasons.map((season) => {
           const status = STATUS_STYLE[season.status];
           return (
-            <div key={season.companySeasonCycleId} className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,1fr)_36px] items-center gap-2">
+            <div
+              key={season.companySeasonCycleId}
+              className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,1fr)_36px] items-center gap-2"
+            >
               <div className="min-w-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium leading-tight text-slate-700 break-words">
                 {season.season}
               </div>
-              <div className={`min-w-0 rounded-lg border px-3 py-2 text-center text-xs font-semibold ${status.bg} ${status.border} ${status.text}`}>
+              <div
+                className={`min-w-0 rounded-lg border px-3 py-2 text-center text-xs font-semibold ${status.bg} ${status.border} ${status.text}`}
+              >
                 {status.label}
               </div>
-              <button className="btn btn-secondary btn-sm px-2 text-slate-500" onClick={() => openStatusEditor(season)}>
+              <button
+                className="btn btn-secondary btn-sm px-2 text-slate-500"
+                onClick={() => openStatusEditor(season)}
+              >
                 <Pencil size={13} />
               </button>
             </div>
@@ -410,46 +428,91 @@ function ActionModals({
       </div>
 
       <div className="mt-4 flex flex-wrap justify-end gap-2">
-        <button onClick={() => setMode("log")} className="btn btn-secondary btn-sm gap-1">
+        <button
+          onClick={() => setMode("log")}
+          className="btn btn-secondary btn-sm gap-1"
+        >
           <MessageSquare size={13} />
           Log
         </button>
-        <button onClick={() => setMode("call")} className="btn btn-primary btn-sm gap-1">
+        <button
+          onClick={() => setMode("call")}
+          className="btn btn-primary btn-sm gap-1"
+        >
           <Phone size={13} />
           Call
         </button>
-        <button onClick={() => setMode("mail")} className="btn btn-primary btn-sm gap-1">
+        <button
+          onClick={() => setMode("mail")}
+          className="btn btn-primary btn-sm gap-1"
+        >
           <Mail size={13} />
           Mail
         </button>
       </div>
 
-      <Modal isOpen={mode === "mail"} onClose={closeModal} title={`Send Mail - ${entry.companyName}`} size="md"
+      <Modal
+        isOpen={mode === "mail"}
+        onClose={closeModal}
+        title={`Send Mail - ${entry.companyName}`}
+        size="md"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+            <button className="btn btn-secondary" onClick={closeModal}>
+              Cancel
+            </button>
             <button
               className="btn btn-primary"
-              disabled={mailSubmitting || !resolvedCycleId || !contactId || (requestType === "template" ? !templateId || missingVariables.length > 0 : !customSubject || !customBody)}
+              disabled={
+                mailSubmitting ||
+                !resolvedCycleId ||
+                !contactId ||
+                (requestType === "template"
+                  ? !templateId || missingVariables.length > 0
+                  : !customSubject || !customBody)
+              }
               onClick={() => {
                 const mergedAttachments = [
-                  ...(requestType === "template" ? selectedTemplate?.attachments ?? [] : []),
+                  ...(requestType === "template"
+                    ? (selectedTemplate?.attachments ?? [])
+                    : []),
                   ...attachments,
-                ].filter((attachment, index, current) => current.findIndex((candidate) => candidate.storagePath === attachment.storagePath) === index);
+                ].filter(
+                  (attachment, index, current) =>
+                    current.findIndex(
+                      (candidate) =>
+                        candidate.storagePath === attachment.storagePath,
+                    ) === index,
+                );
                 void onQueueMail({
                   companyId: entry.companyId,
                   companySeasonCycleId: resolvedCycleId,
                   contactId,
                   requestType,
                   templateId,
-                  templateVariables: requestType === "template" ? templateVariables : undefined,
-                  previewPayload: requestType === "template" && selectedTemplate ? {
-                    templateVariables,
-                    subject: interpolateTemplate(selectedTemplate.subject, templateVariables),
-                    htmlBody: interpolateTemplate(selectedTemplate.bodyHtml, templateVariables),
-                    textBody: interpolateTemplate(selectedTemplate.bodyText ?? selectedTemplate.bodyHtml ?? "", templateVariables),
-                    attachments: mergedAttachments,
-                  } : undefined,
+                  templateVariables:
+                    requestType === "template" ? templateVariables : undefined,
+                  previewPayload:
+                    requestType === "template" && selectedTemplate
+                      ? {
+                          templateVariables,
+                          subject: interpolateTemplate(
+                            selectedTemplate.subject,
+                            templateVariables,
+                          ),
+                          htmlBody: interpolateTemplate(
+                            selectedTemplate.bodyHtml,
+                            templateVariables,
+                          ),
+                          textBody: interpolateTemplate(
+                            selectedTemplate.bodyText ??
+                              selectedTemplate.bodyHtml ??
+                              "",
+                            templateVariables,
+                          ),
+                          attachments: mergedAttachments,
+                        }
+                      : undefined,
                   customSubject,
                   customBody,
                   attachments: mergedAttachments,
@@ -460,45 +523,102 @@ function ActionModals({
               {mailSubmitting ? "Queueing..." : "Send to Queue"}
             </button>
           </>
-        }>
+        }
+      >
         <div className="space-y-4">
-          {mailError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{mailError}</div>}
+          {mailError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {mailError}
+            </div>
+          )}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Season *</label>
-            <SeasonSelect seasons={entry.seasons} value={resolvedCycleId} onChange={setCycleId} />
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Season *
+            </label>
+            <SeasonSelect
+              seasons={entry.seasons}
+              value={resolvedCycleId}
+              onChange={setCycleId}
+            />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Send to Contact *</label>
-            <ContactSelect contacts={entry.contacts} value={contactId} onChange={setContactId} placeholder="Select a contact" />
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Send to Contact *
+            </label>
+            <ContactSelect
+              contacts={entry.contacts}
+              value={contactId}
+              onChange={setContactId}
+              placeholder="Select a contact"
+            />
           </div>
           <div className="flex gap-3">
             {(["template", "custom"] as const).map((type) => (
-              <button key={type} onClick={() => setRequestType(type)} className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium ${requestType === type ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 bg-white text-slate-600"}`}>
+              <button
+                key={type}
+                onClick={() => setRequestType(type)}
+                className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium ${requestType === type ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 bg-white text-slate-600"}`}
+              >
                 {type === "template" ? "Template" : "Custom"}
               </button>
             ))}
           </div>
           {requestType === "template" ? (
             <div className="space-y-4">
-              <select className="input-base" value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+              <select
+                className="input-base"
+                value={templateId}
+                onChange={(event) => setTemplateId(event.target.value)}
+              >
                 <option value="">Select a template</option>
-                {templates.map((template) => <option key={template.id} value={template.id}>{template.name} ({template.status})</option>)}
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} ({template.status})
+                  </option>
+                ))}
               </select>
               {selectedTemplate?.variables.length ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {selectedTemplate.variables.map((variable) => (
-                    <input key={variable} className="input-base" value={templateVariables[variable] ?? ""} onChange={(event) => setTemplateVariables((current) => ({ ...current, [variable]: event.target.value }))} placeholder={`Enter ${variable.replace(/_/g, " ")}`} />
+                    <input
+                      key={variable}
+                      className="input-base"
+                      value={templateVariables[variable] ?? ""}
+                      onChange={(event) =>
+                        setTemplateVariables((current) => ({
+                          ...current,
+                          [variable]: event.target.value,
+                        }))
+                      }
+                      placeholder={`Enter ${variable.replace(/_/g, " ")}`}
+                    />
                   ))}
                 </div>
               ) : null}
             </div>
           ) : (
             <div className="space-y-4">
-              <input className="input-base" value={customSubject} onChange={(event) => setCustomSubject(event.target.value)} placeholder="Email subject" />
-              <textarea rows={5} className="input-base" value={customBody} onChange={(event) => setCustomBody(event.target.value)} placeholder="Write the email content" />
+              <input
+                className="input-base"
+                value={customSubject}
+                onChange={(event) => setCustomSubject(event.target.value)}
+                placeholder="Email subject"
+              />
+              <textarea
+                rows={5}
+                className="input-base"
+                value={customBody}
+                onChange={(event) => setCustomBody(event.target.value)}
+                placeholder="Write the email content"
+              />
             </div>
           )}
-          <MailAttachmentInput value={attachments} onChange={setAttachments} disabled={mailSubmitting} maxFiles={6} />
+          <MailAttachmentInput
+            value={attachments}
+            onChange={setAttachments}
+            disabled={mailSubmitting}
+            maxFiles={6}
+          />
           <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
             <AlertCircle size={14} className="mt-0.5 shrink-0" />
             <span>Mail requests are queued for approval before dispatch.</span>
@@ -506,62 +626,148 @@ function ActionModals({
         </div>
       </Modal>
 
-      <Modal isOpen={mode === "log"} onClose={closeModal} title={`Log Interaction - ${entry.companyName}`} size="sm"
+      <Modal
+        isOpen={mode === "log"}
+        onClose={closeModal}
+        title={`Log Interaction - ${entry.companyName}`}
+        size="sm"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-            <button className="btn btn-primary" disabled={logSubmitting || !resolvedCycleId || !summary.trim()} onClick={() => {
-              void onLog({
-                companyId: entry.companyId,
-                companySeasonCycleId: resolvedCycleId,
-                action,
-                contactId: contactId || undefined,
-                summary,
-                outcome: outcome || undefined,
-                nextFollowUpAt: nextFollowUpAt ? new Date(`${nextFollowUpAt}T09:00:00`).toISOString() : undefined,
-              }).then(closeModal);
-            }}>
+            <button className="btn btn-secondary" onClick={closeModal}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              disabled={logSubmitting || !resolvedCycleId || !summary.trim()}
+              onClick={() => {
+                void onLog({
+                  companyId: entry.companyId,
+                  companySeasonCycleId: resolvedCycleId,
+                  action,
+                  contactId: contactId || undefined,
+                  summary,
+                  outcome: outcome || undefined,
+                  nextFollowUpAt: nextFollowUpAt
+                    ? new Date(`${nextFollowUpAt}T09:00:00`).toISOString()
+                    : undefined,
+                }).then(closeModal);
+              }}
+            >
               {logSubmitting ? "Saving..." : "Log"}
             </button>
           </>
-        }>
+        }
+      >
         <div className="space-y-4">
-          {logError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{logError}</div>}
+          {logError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {logError}
+            </div>
+          )}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Season *</label>
-            <SeasonSelect seasons={entry.seasons} value={resolvedCycleId} onChange={setCycleId} />
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Season *
+            </label>
+            <SeasonSelect
+              seasons={entry.seasons}
+              value={resolvedCycleId}
+              onChange={setCycleId}
+            />
           </div>
           <div className="flex gap-2">
             {(["call", "email", "note"] as const).map((item) => (
-              <button key={item} onClick={() => setAction(item)} className={`flex-1 rounded-lg border py-2 text-xs font-medium capitalize ${action === item ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 text-slate-600"}`}>{item}</button>
+              <button
+                key={item}
+                onClick={() => setAction(item)}
+                className={`flex-1 rounded-lg border py-2 text-xs font-medium capitalize ${action === item ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 text-slate-600"}`}
+              >
+                {item}
+              </button>
             ))}
           </div>
-          <ContactSelect contacts={entry.contacts} value={contactId} onChange={setContactId} placeholder="Company-wide note (optional)" />
-          <textarea rows={3} className="input-base" value={summary} onChange={(event) => setSummary(event.target.value)} placeholder="What happened in this interaction?" />
-          <input className="input-base" value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="Interested, callback requested, no response..." />
-          <input type="date" className="input-base" value={nextFollowUpAt} onChange={(event) => setNextFollowUpAt(event.target.value)} />
+          <ContactSelect
+            contacts={entry.contacts}
+            value={contactId}
+            onChange={setContactId}
+            placeholder="Company-wide note (optional)"
+          />
+          <textarea
+            rows={3}
+            className="input-base"
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+            placeholder="What happened in this interaction?"
+          />
+          <input
+            className="input-base"
+            value={outcome}
+            onChange={(event) => setOutcome(event.target.value)}
+            placeholder="Interested, callback requested, no response..."
+          />
+          <input
+            type="date"
+            className="input-base"
+            value={nextFollowUpAt}
+            onChange={(event) => setNextFollowUpAt(event.target.value)}
+          />
         </div>
       </Modal>
 
-      <Modal isOpen={mode === "call"} onClose={closeModal} title={`Call - ${entry.companyName}`} size="sm"
+      <Modal
+        isOpen={mode === "call"}
+        onClose={closeModal}
+        title={`Call - ${entry.companyName}`}
+        size="sm"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>
-            <a href={selectedContact?.phones[0] ? `tel:${selectedContact.phones[0]}` : undefined} className={`btn btn-primary ${!selectedContact?.phones[0] ? "pointer-events-none opacity-45" : ""}`}>
+            <button className="btn btn-secondary" onClick={closeModal}>
+              Cancel
+            </button>
+            <a
+              href={
+                selectedContact?.phones[0]
+                  ? `tel:${selectedContact.phones[0]}`
+                  : undefined
+              }
+              className={`btn btn-primary ${!selectedContact?.phones[0] ? "pointer-events-none opacity-45" : ""}`}
+            >
               <Phone size={14} />
               Call Now
             </a>
           </>
-        }>
+        }
+      >
         <div className="space-y-4">
-          <ContactSelect contacts={entry.contacts} value={contactId} onChange={setContactId} placeholder="Select a contact to call" />
+          <ContactSelect
+            contacts={entry.contacts}
+            value={contactId}
+            onChange={setContactId}
+            placeholder="Select a contact to call"
+          />
           {selectedContact ? (
             <div className="rounded-lg border border-[#DBEAFE] bg-[#EFF6FF] px-4 py-3 space-y-1">
-              <p className="text-sm font-semibold text-slate-800">{selectedContact.name}</p>
-              <p className="text-xs text-slate-500">{selectedContact.designation}</p>
-              {selectedContact.phones.map((phone) => <a key={phone} href={`tel:${phone}`} className="flex items-center gap-2 text-sm font-medium text-[#1D4ED8] hover:underline"><Phone size={13} />{phone}</a>)}
+              <p className="text-sm font-semibold text-slate-800">
+                {selectedContact.name}
+              </p>
+              <p className="text-xs text-slate-500">
+                {selectedContact.designation}
+              </p>
+              {selectedContact.phones.map((phone) => (
+                <a
+                  key={phone}
+                  href={`tel:${phone}`}
+                  className="flex items-center gap-2 text-sm font-medium text-[#1D4ED8] hover:underline"
+                >
+                  <Phone size={13} />
+                  {phone}
+                </a>
+              ))}
             </div>
-          ) : <p className="py-2 text-center text-xs text-slate-400">Select a contact to see phone numbers.</p>}
+          ) : (
+            <p className="py-2 text-center text-xs text-slate-400">
+              Select a contact to see phone numbers.
+            </p>
+          )}
         </div>
       </Modal>
 
@@ -572,7 +778,9 @@ function ActionModals({
         size="sm"
         footer={
           <>
-            <button className="btn btn-secondary" onClick={closeModal}>Cancel</button>
+            <button className="btn btn-secondary" onClick={closeModal}>
+              Cancel
+            </button>
             <button
               className="btn btn-primary"
               disabled={statusSubmitting || !cycleId}
@@ -590,20 +798,50 @@ function ActionModals({
         }
       >
         <div className="space-y-4">
-          {statusError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{statusError}</div>}
+          {statusError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {statusError}
+            </div>
+          )}
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Season</label>
-            <SeasonSelect seasons={entry.seasons} value={resolvedCycleId} onChange={setCycleId} />
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Season
+            </label>
+            <SeasonSelect
+              seasons={entry.seasons}
+              value={resolvedCycleId}
+              onChange={setCycleId}
+            />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-            <select className="input-base" value={statusValue} onChange={(event) => setStatusValue(event.target.value as OutreachStatus)}>
-              {STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Status
+            </label>
+            <select
+              className="input-base"
+              value={statusValue}
+              onChange={(event) =>
+                setStatusValue(event.target.value as OutreachStatus)
+              }
+            >
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Note</label>
-            <textarea rows={3} className="input-base" value={statusNote} onChange={(event) => setStatusNote(event.target.value)} placeholder="Optional context for this status change" />
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Note
+            </label>
+            <textarea
+              rows={3}
+              className="input-base"
+              value={statusNote}
+              onChange={(event) => setStatusNote(event.target.value)}
+              placeholder="Optional context for this status change"
+            />
           </div>
         </div>
       </Modal>
@@ -626,9 +864,15 @@ export default function OutreachPage() {
   const [mailError, setMailError] = useState<string | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(
+    null,
+  );
   const detailsCardRef = useRef<HTMLDivElement | null>(null);
+  const detailLeftColumnRef = useRef<HTMLDivElement | null>(null);
   const [taskListHeight, setTaskListHeight] = useState<number | null>(null);
+  const [detailColumnsHeight, setDetailColumnsHeight] = useState<number | null>(
+    null,
+  );
 
   const loadOutreach = useCallback(async () => {
     setLoading(true);
@@ -746,6 +990,29 @@ export default function OutreachPage() {
     };
   }, [selectedEntry]);
 
+  useEffect(() => {
+    const element = detailLeftColumnRef.current;
+    if (!element) {
+      setDetailColumnsHeight(null);
+      return;
+    }
+
+    const updateHeight = () => {
+      setDetailColumnsHeight(element.getBoundingClientRect().height);
+    };
+
+    updateHeight();
+
+    const observer = new ResizeObserver(() => {
+      updateHeight();
+    });
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [selectedEntry]);
+
   const followUpsDue = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -786,8 +1053,12 @@ export default function OutreachPage() {
     setMailError(null);
     setMailSubmitting(true);
     try {
-      const entry = entries.find((item) => item.companyId === payload.companyId);
-      const contact = entry?.contacts.find((item) => item.id === payload.contactId);
+      const entry = entries.find(
+        (item) => item.companyId === payload.companyId,
+      );
+      const contact = entry?.contacts.find(
+        (item) => item.id === payload.contactId,
+      );
       if (!contact) throw new Error("Please select a contact");
       await requestJson("/api/v1/mail/requests", {
         method: "POST",
@@ -894,26 +1165,43 @@ export default function OutreachPage() {
   return (
     <div className="-mt-6 xl:mt-0 space-y-5 px-4 pb-6 animate-fade-in xl:h-full xl:overflow-y-auto hide-scrollbar">
       <div className="relative z-0 pt-10">
-        <div className="card relative overflow-hidden px-5 py-4 sm:px-6 sm:py-5" style={{ background: "#FFFFFF", borderColor: "#DBEAFE" }}>
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-[#2563EB]">Personal Outreach Desk</p>
+        <div
+          className="card relative overflow-hidden px-5 py-4 sm:px-6 sm:py-5"
+          style={{ background: "#FFFFFF", borderColor: "#DBEAFE" }}
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-[#2563EB]">
+            Personal Outreach Desk
+          </p>
           <h1 className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
             Hello {currentUserName}, check the tasks lined up for you.
           </h1>
           <p className="mt-1.5 text-sm font-bold text-[#2563EB]">
-            This page shows your assigned companies once, with all active seasons you own under each card.
+            This page shows your assigned companies once, with all active
+            seasons you own under each card.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
               { title: "Companies", value: stats.assigned, icon: Building2 },
               { title: "Contacted", value: stats.contacted, icon: PhoneCall },
               { title: "Pending", value: stats.pending, icon: Clock },
-              { title: "Follow-ups Due", value: stats.followUpsDue, icon: CheckCircle2 },
+              {
+                title: "Follow-ups Due",
+                value: stats.followUpsDue,
+                icon: CheckCircle2,
+              },
             ].map((item) => (
-              <div key={item.title} className="rounded-xl border border-[#3B82F6] bg-[#3B82F6] px-3 py-2.5 shadow-sm">
+              <div
+                key={item.title}
+                className="rounded-xl border border-[#3B82F6] bg-[#3B82F6] px-3 py-2.5 shadow-sm"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-black">{item.title}</p>
-                    <p className="mt-1 text-2xl font-bold leading-none text-white">{item.value}</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-black">
+                      {item.title}
+                    </p>
+                    <p className="mt-1 text-2xl font-bold leading-none text-white">
+                      {item.value}
+                    </p>
                   </div>
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DBEAFE] bg-white">
                     <item.icon size={20} color="#2563EB" />
@@ -928,13 +1216,38 @@ export default function OutreachPage() {
       <div className="card">
         <div className="border-b border-(--card-border) px-4 py-3">
           <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-            <SearchBar value={search} onChange={setSearch} placeholder="Search by company, industry, or contact..." className="flex-1 min-w-0" />
+            <SearchBar
+              value={search}
+              onChange={setSearch}
+              placeholder="Search by company, industry, or contact..."
+              className="flex-1 min-w-0"
+            />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:shrink-0">
-              <FilterSelect multiple value={statusFilter} onChange={setStatusFilter} options={STATUS_OPTIONS} placeholder="Status" className="w-full sm:w-40 md:w-44" />
-              <FilterSelect multiple value={seasonFilter} onChange={setSeasonFilter} options={seasonOptions} placeholder="Season" className="w-full sm:w-44 md:w-52" />
+              <FilterSelect
+                multiple
+                value={statusFilter}
+                onChange={setStatusFilter}
+                options={STATUS_OPTIONS}
+                placeholder="Status"
+                className="w-full sm:w-40 md:w-44"
+              />
+              <FilterSelect
+                multiple
+                value={seasonFilter}
+                onChange={setSeasonFilter}
+                options={seasonOptions}
+                placeholder="Season"
+                className="w-full sm:w-44 md:w-52"
+              />
             </div>
             {statusFilter.length + seasonFilter.length > 0 && (
-              <button className="btn btn-ghost btn-sm shrink-0 text-slate-500 hover:text-slate-700" onClick={() => { setStatusFilter([]); setSeasonFilter([]); }}>
+              <button
+                className="btn btn-ghost btn-sm shrink-0 text-slate-500 hover:text-slate-700"
+                onClick={() => {
+                  setStatusFilter([]);
+                  setSeasonFilter([]);
+                }}
+              >
                 Clear
               </button>
             )}
@@ -944,11 +1257,23 @@ export default function OutreachPage() {
 
       <div className="card p-4">
         {pageError ? (
-          <EmptyState icon={Building2} title="Unable to load outreach queue" description={pageError} />
+          <EmptyState
+            icon={Building2}
+            title="Unable to load outreach queue"
+            description={pageError}
+          />
         ) : entries.length === 0 ? (
-          <EmptyState icon={Building2} title="No companies assigned yet" description="Once assignments are made to you, they will appear here for outreach actions." />
+          <EmptyState
+            icon={Building2}
+            title="No companies assigned yet"
+            description="Once assignments are made to you, they will appear here for outreach actions."
+          />
         ) : filtered.length === 0 ? (
-          <EmptyState icon={Building2} title="No companies match these filters" description="Try clearing filters to see your complete outreach queue." />
+          <EmptyState
+            icon={Building2}
+            title="No companies match these filters"
+            description="Try clearing filters to see your complete outreach queue."
+          />
         ) : (
           <div className="overflow-x-auto pb-1">
             <div className="grid min-w-[1040px] grid-cols-[420px_minmax(0,1fr)] items-start gap-4">
@@ -1042,7 +1367,10 @@ export default function OutreachPage() {
                           Last Contacted
                         </p>
                         <p className="mt-1 flex items-center gap-1 text-sm font-medium text-slate-700">
-                          <Clock size={12} className="shrink-0 text-slate-400" />
+                          <Clock
+                            size={12}
+                            className="shrink-0 text-slate-400"
+                          />
                           {formatDate(latestContacted(selectedEntry.seasons))}
                         </p>
                       </div>
@@ -1065,8 +1393,11 @@ export default function OutreachPage() {
                       </div>
                     </div>
 
-                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-                      <div className="space-y-4">
+                    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+                      <div
+                        ref={detailLeftColumnRef}
+                        className="flex flex-col space-y-4"
+                      >
                         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
                           <div className="flex items-center justify-between gap-3">
                             <h4 className="text-sm font-semibold text-slate-800">
@@ -1116,7 +1447,10 @@ export default function OutreachPage() {
                                               href={`tel:${phone}`}
                                               className="flex items-center gap-1.5 hover:text-[#1D4ED8]"
                                             >
-                                              <Phone size={12} className="shrink-0" />
+                                              <Phone
+                                                size={12}
+                                                className="shrink-0"
+                                              />
                                               {phone}
                                             </a>
                                           ))
@@ -1137,7 +1471,10 @@ export default function OutreachPage() {
                                               href={`mailto:${email}`}
                                               className="flex items-center gap-1.5 hover:text-[#1D4ED8]"
                                             >
-                                              <Mail size={12} className="shrink-0" />
+                                              <Mail
+                                                size={12}
+                                                className="shrink-0"
+                                              />
                                               {email}
                                             </a>
                                           ))
@@ -1163,54 +1500,91 @@ export default function OutreachPage() {
                               Status and Actions
                             </h4>
                             <p className="mt-1 text-xs text-slate-500">
-                              Update season status, log interactions, or queue outreach.
+                              Update season status, log interactions, or queue
+                              outreach.
                             </p>
                           </div>
-                          <ActionModals entry={selectedEntry} templates={templates} mailSubmitting={mailSubmitting} logSubmitting={logSubmitting} statusSubmitting={statusSubmitting} mailError={mailError} logError={logError} statusError={statusError} onQueueMail={handleQueueMail} onLog={handleLog} onUpdateStatus={handleStatusUpdate} />
+                          <ActionModals
+                            entry={selectedEntry}
+                            templates={templates}
+                            mailSubmitting={mailSubmitting}
+                            logSubmitting={logSubmitting}
+                            statusSubmitting={statusSubmitting}
+                            mailError={mailError}
+                            logError={logError}
+                            statusError={statusError}
+                            onQueueMail={handleQueueMail}
+                            onLog={handleLog}
+                            onUpdateStatus={handleStatusUpdate}
+                          />
                         </div>
                       </div>
 
-                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-                          <div className="mb-4 flex items-center justify-between gap-3">
-                            <div>
-                              <h4 className="text-sm font-semibold text-slate-800">
-                                Activity Timeline
-                              </h4>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Calls, mails, and notes logged for this company.
-                              </p>
-                            </div>
-                            <Badge size="sm" variant="gray">
-                              {selectedEntry.interactions.length}
-                            </Badge>
+                      <div
+                        className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4"
+                        style={{
+                          height: detailColumnsHeight
+                            ? `${Math.ceil(detailColumnsHeight)}px`
+                            : undefined,
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-3 pb-4">
+                          <div>
+                            <h4 className="text-sm font-semibold text-slate-800">
+                              Activity Timeline
+                            </h4>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Calls, mails, and notes logged for this company.
+                            </p>
                           </div>
+                          <Badge size="sm" variant="gray">
+                            {selectedEntry.interactions.length}
+                          </Badge>
+                        </div>
 
-                          {selectedEntry.interactions.length > 0 ? (
-                            <div className="max-h-[28rem] overflow-y-auto pr-1">
-                              <div className="space-y-0">
-                                {selectedEntry.interactions.map((interaction, index) => {
-                                  const meta = getInteractionMeta(interaction.action);
+                        {selectedEntry.interactions.length > 0 ? (
+                          <div className="schedule-scroll min-h-0 flex-1 overflow-y-auto pr-1">
+                            <div className="space-y-0 pr-2">
+                              {selectedEntry.interactions.map(
+                                (interaction, index) => {
+                                  const meta = getInteractionMeta(
+                                    interaction.action,
+                                  );
                                   const Icon = meta.icon;
-                                  const isLast = index === selectedEntry.interactions.length - 1;
+                                  const isLast =
+                                    index ===
+                                    selectedEntry.interactions.length - 1;
 
                                   return (
-                                    <div key={interaction.id} className="flex gap-3">
+                                    <div
+                                      key={interaction.id}
+                                      className="flex gap-3"
+                                    >
                                       <div className="flex shrink-0 flex-col items-center">
                                         <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#DBEAFE] bg-[#EFF6FF]">
-                                          <Icon size={14} className="text-[#2563EB]" />
+                                          <Icon
+                                            size={14}
+                                            className="text-[#2563EB]"
+                                          />
                                         </div>
                                         {!isLast && (
                                           <div className="my-1 w-0.5 flex-1 bg-slate-100" />
                                         )}
                                       </div>
 
-                                      <div className={`${isLast ? "pb-0" : "pb-5"} min-w-0 flex-1`}>
+                                      <div
+                                        className={`${isLast ? "pb-0" : "pb-5"} min-w-0 flex-1`}
+                                      >
                                         <div className="flex flex-wrap items-center gap-2">
-                                          <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.badgeClass}`}>
+                                          <span
+                                            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.badgeClass}`}
+                                          >
                                             {meta.label}
                                           </span>
                                           <span className="text-[11px] text-slate-400">
-                                            {formatDateTime(interaction.createdAt)}
+                                            {formatDateTime(
+                                              interaction.createdAt,
+                                            )}
                                           </span>
                                         </div>
                                         <p className="mt-2 text-sm font-medium text-slate-800">
@@ -1234,7 +1608,10 @@ export default function OutreachPage() {
                                           ) : null}
                                           {interaction.nextFollowUpAt ? (
                                             <span className="rounded-full bg-[#EFF6FF] px-2 py-1 text-[#1D4ED8]">
-                                              Follow-up: {formatDate(interaction.nextFollowUpAt)}
+                                              Follow-up:{" "}
+                                              {formatDate(
+                                                interaction.nextFollowUpAt,
+                                              )}
                                             </span>
                                           ) : null}
                                         </div>
@@ -1244,14 +1621,15 @@ export default function OutreachPage() {
                                       </div>
                                     </div>
                                   );
-                                })}
-                              </div>
+                                },
+                              )}
                             </div>
-                          ) : (
-                            <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-sm text-slate-500">
-                              Logged outreach activity will appear here.
-                            </div>
-                          )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-sm text-slate-500">
+                            Logged outreach activity will appear here.
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
