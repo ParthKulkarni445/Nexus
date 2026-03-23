@@ -7,7 +7,7 @@ import {
   forbidden,
   serverError,
 } from "@/lib/api/response";
-import { validateBody } from "@/lib/api/validation";
+import { uuidLikeSchema, validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
 import { headers } from "next/headers";
@@ -15,11 +15,10 @@ import { headers } from "next/headers";
 const bulkAssignmentSchema = z.object({
   assignments: z.array(
     z.object({
-      itemType: z.enum(["company", "contact"]),
-      itemId: z.string().trim().min(1),
-      assigneeUserId: z.string().trim().min(1),
+      companySeasonCycleId: uuidLikeSchema,
+      assigneeUserId: uuidLikeSchema,
       notes: z.string().optional(),
-    })
+    }),
   ),
 });
 
@@ -46,28 +45,31 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const createdAssignments = await db.$transaction(
+    const updatedCycles = await db.$transaction(
       validation.assignments.map((assignment) =>
-        db.companyAssignment.create({
+        db.companySeasonCycle.update({
+          where: { id: assignment.companySeasonCycleId },
           data: {
-            ...assignment,
-            assignedBy: user.id,
+            ownerUserId: assignment.assigneeUserId,
+            updatedBy: user.id,
+            updatedField: "owner_user_id",
+            updatedAt: new Date(),
           },
-        })
-      )
+        }),
+      ),
     );
 
     await createAuditLog({
       actorId: user.id,
-      action: "bulk_create_assignments",
-      targetType: "assignment",
-      meta: { count: createdAssignments.length },
+      action: "bulk_assign_company_season_cycles",
+      targetType: "company_season_cycle",
+      meta: { count: updatedCycles.length },
       ...clientInfo,
     });
 
     return success({
-      message: `${createdAssignments.length} assignments created successfully`,
-      assignments: createdAssignments,
+      message: `${updatedCycles.length} season cycles assigned successfully`,
+      cycles: updatedCycles,
     });
   } catch (error) {
     console.error("Error creating bulk assignments:", error);

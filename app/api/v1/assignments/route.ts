@@ -5,30 +5,42 @@ import {
   success,
   unauthorized,
   forbidden,
+  notFound,
   serverError,
 } from "@/lib/api/response";
-import { validateBody } from "@/lib/api/validation";
+import { uuidLikeSchema, validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
 import { headers } from "next/headers";
 
 const createAssignmentSchema = z.object({
-  itemType: z.enum(["company", "contact"]),
-  itemId: z.string().trim().min(1),
-  assigneeUserId: z.string().trim().min(1),
+  companySeasonCycleId: uuidLikeSchema,
+  assigneeUserId: uuidLikeSchema,
   notes: z.string().optional(),
 });
 
 type AssignmentListItem = {
-  assignmentId: string;
+  companySeasonCycleId: string;
   companyId: string;
   companyName: string;
   industry: string | null;
   status: string;
   coordinatorId: string;
   coordinatorName: string;
+  seasonId: string;
   season: string;
   assignedAt: string;
+};
+
+type UnassignedCycleItem = {
+  companySeasonCycleId: string;
+  companyId: string;
+  companyName: string;
+  industry: string | null;
+  status: string;
+  seasonId: string;
+  season: string;
+  updatedAt: string;
 };
 
 export async function GET() {
@@ -45,7 +57,7 @@ export async function GET() {
   }
 
   try {
-    const [coordinatorRows, assignmentRows] = await Promise.all([
+    const [coordinatorRows, cycleRows] = await Promise.all([
       db.user.findMany({
         where: {
           role: "coordinator",
@@ -58,129 +70,73 @@ export async function GET() {
         },
         orderBy: { name: "asc" },
       }),
-      db.companyAssignment.findMany({
-        where: {
-          itemType: "company",
-          isActive: true,
-        },
-        select: {
-          id: true,
-          itemId: true,
-          assigneeUserId: true,
-          assignedAt: true,
-          assigneeUser: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-        orderBy: { assignedAt: "desc" },
-      }),
-    ]);
-
-    const latestAssignmentByCompany = new Map<
-      string,
-      (typeof assignmentRows)[number]
-    >();
-
-    for (const row of assignmentRows) {
-      if (!latestAssignmentByCompany.has(row.itemId)) {
-        latestAssignmentByCompany.set(row.itemId, row);
-      }
-    }
-
-    const latestAssignments = Array.from(latestAssignmentByCompany.values());
-    const companyIds = latestAssignments.map((item) => item.itemId);
-
-    const [companyRows, cycleRows] = await Promise.all([
-      companyIds.length > 0
-        ? db.company.findMany({
-            where: { id: { in: companyIds } },
+      db.companySeasonCycle.findMany({
+        include: {
+          company: {
             select: {
               id: true,
               name: true,
               industry: true,
             },
-          })
-        : Promise.resolve([]),
-      companyIds.length > 0
-        ? db.companySeasonCycle.findMany({
-            where: { companyId: { in: companyIds } },
+          },
+          season: {
             select: {
-              companyId: true,
-              status: true,
-              updatedAt: true,
-              season: {
-                select: {
-                  name: true,
-                },
-              },
+              id: true,
+              name: true,
             },
-            orderBy: { updatedAt: "desc" },
-          })
-        : Promise.resolve([]),
+          },
+          owner: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: [
+          { updatedAt: "desc" },
+          { createdAt: "desc" },
+        ],
+      }),
     ]);
 
-    const companyById = new Map(companyRows.map((row) => [row.id, row]));
-    const latestCycleByCompany = new Map<string, (typeof cycleRows)[number]>();
-
-    for (const row of cycleRows) {
-      if (!latestCycleByCompany.has(row.companyId)) {
-        latestCycleByCompany.set(row.companyId, row);
+    const assignments: AssignmentListItem[] = cycleRows.flatMap((cycle) => {
+      if (!cycle.owner) {
+        return [];
       }
-    }
 
-    const assignments: AssignmentListItem[] = latestAssignments.flatMap(
-      (assignment) => {
-        const company = companyById.get(assignment.itemId);
-        if (!company) return [];
-
-        const latestCycle = latestCycleByCompany.get(assignment.itemId);
-
-        return [
-          {
-            assignmentId: assignment.id,
-            companyId: company.id,
-            companyName: company.name,
-            industry: company.industry,
-            status: latestCycle?.status ?? "not_contacted",
-            coordinatorId: assignment.assigneeUserId,
-            coordinatorName: assignment.assigneeUser.name,
-            season: latestCycle?.season?.name ?? "No active season",
-            assignedAt: assignment.assignedAt.toISOString(),
-          },
-        ];
-      }
-    );
-
-    const assignedCompanyIds = assignments.map((item) => item.companyId);
-
-    const unassignedCompanyRows = await db.company.findMany({
-      where:
-        assignedCompanyIds.length > 0
-          ? {
-              id: {
-                notIn: assignedCompanyIds,
-              },
-            }
-          : undefined,
-      select: {
-        id: true,
-        name: true,
-        industry: true,
-      },
-      orderBy: { name: "asc" },
+      return [
+        {
+          companySeasonCycleId: cycle.id,
+          companyId: cycle.company.id,
+          companyName: cycle.company.name,
+          industry: cycle.company.industry,
+          status: cycle.status,
+          coordinatorId: cycle.owner.id,
+          coordinatorName: cycle.owner.name,
+          seasonId: cycle.season.id,
+          season: cycle.season.name,
+          assignedAt: cycle.updatedAt.toISOString(),
+        },
+      ];
     });
+
+    const unassignedCycles: UnassignedCycleItem[] = cycleRows
+      .filter((cycle) => !cycle.ownerUserId)
+      .map((cycle) => ({
+        companySeasonCycleId: cycle.id,
+        companyId: cycle.company.id,
+        companyName: cycle.company.name,
+        industry: cycle.company.industry,
+        status: cycle.status,
+        seasonId: cycle.season.id,
+        season: cycle.season.name,
+        updatedAt: cycle.updatedAt.toISOString(),
+      }));
 
     return success({
       coordinators: coordinatorRows,
       assignments,
-      unassignedCompanies: unassignedCompanyRows.map((company) => ({
-        companyId: company.id,
-        companyName: company.name,
-        industry: company.industry,
-      })),
+      unassignedCycles,
     });
   } catch (error) {
     console.error("Error fetching assignments:", error);
@@ -211,23 +167,42 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const assignment = await db.companyAssignment.create({
+    const existingCycle = await db.companySeasonCycle.findUnique({
+      where: { id: validation.companySeasonCycleId },
+      select: {
+        id: true,
+        ownerUserId: true,
+      },
+    });
+
+    if (!existingCycle) {
+      return notFound("Company season cycle not found");
+    }
+
+    const updatedCycle = await db.companySeasonCycle.update({
+      where: { id: validation.companySeasonCycleId },
       data: {
-        ...validation,
-        assignedBy: user.id,
+        ownerUserId: validation.assigneeUserId,
+        updatedBy: user.id,
+        updatedField: "owner_user_id",
+        updatedAt: new Date(),
       },
     });
 
     await createAuditLog({
       actorId: user.id,
-      action: "create_assignment",
-      targetType: "assignment",
-      targetId: assignment.id,
-      meta: validation,
+      action: "assign_company_season_cycle",
+      targetType: "company_season_cycle",
+      targetId: validation.companySeasonCycleId,
+      meta: {
+        from: existingCycle.ownerUserId,
+        to: validation.assigneeUserId,
+        note: validation.notes,
+      },
       ...clientInfo,
     });
 
-    return success(assignment);
+    return success(updatedCycle);
   } catch (error) {
     console.error("Error creating assignment:", error);
     return serverError();

@@ -65,7 +65,8 @@ type CompanyDetailResponse = {
   }>;
   assignments: Array<{
     id: string;
-    itemType: string;
+    seasonId: string;
+    seasonName: string;
     assigneeUserId: string;
     assigneeName: string | null;
     assignedAt: string;
@@ -120,7 +121,7 @@ type UiHistory = {
 type UiAssignment = {
   id: string;
   assignee: string;
-  type: string;
+  season: string;
   assignedAt: string;
   notes: string;
 };
@@ -530,7 +531,7 @@ export default function CompanyDetailPage() {
         return {
           id: assignment.id,
           assignee: assigneeName,
-          type: assignment.itemType || "coordinator",
+          season: assignment.seasonName || "Season",
           assignedAt: assignment.assignedAt,
           notes: assignment.notes ?? "",
         };
@@ -994,15 +995,15 @@ export default function CompanyDetailPage() {
             <div className="p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-slate-700">
-                  Assigned Coordinators
+                  Season Owners
                 </p>
               </div>
 
               {assignments.length === 0 ? (
                 <EmptyState
                   icon={Users}
-                  title="No assignments"
-                  description="Coordinator assignments will appear here"
+                  title="No season owners"
+                  description="Season-cycle ownership will appear here"
                 />
               ) : (
                 <div className="space-y-3">
@@ -1039,7 +1040,7 @@ export default function CompanyDetailPage() {
                           </p>
                         )}
                       </div>
-                      <Badge variant="purple">{assignment.type}</Badge>
+                      <Badge variant="purple">{assignment.season}</Badge>
                     </div>
                   ))}
                 </div>

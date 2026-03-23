@@ -311,13 +311,13 @@ body::before {
 }
 
 .btn-secondary {
-  background: var(--muted-bg);
-  color: var(--foreground);
+  background: #484848;
+  color: #fff;
   border-color: var(--card-border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #E2E8F0;
+  background: #8f8f8f;
 }
 
 .btn-danger {

@@ -92,8 +92,7 @@ export async function GET(request: NextRequest) {
 
     const companyIds = companiesList.map((company) => company.id);
 
-    const [contactCountRows, cycleRows, assignmentRows, interactionRows] =
-      await Promise.all([
+    const [contactCountRows, cycleRows, interactionRows] = await Promise.all([
       db.companyContact.groupBy({
         by: ["companyId"],
         where: { companyId: { in: companyIds } },
@@ -111,19 +110,6 @@ export async function GET(request: NextRequest) {
           updatedAt: true,
         },
         orderBy: { updatedAt: "desc" },
-      }),
-      db.companyAssignment.findMany({
-        where: {
-          itemType: "company",
-          isActive: true,
-          itemId: { in: companyIds },
-        },
-        select: {
-          itemId: true,
-          assigneeUserId: true,
-          assignedAt: true,
-        },
-        orderBy: { assignedAt: "desc" },
       }),
       db.contactInteraction.groupBy({
         by: ["companyId"],
@@ -155,16 +141,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const latestAssignmentByCompany = new Map<
-      string,
-      (typeof assignmentRows)[number]
-    >();
-    for (const row of assignmentRows) {
-      if (!latestAssignmentByCompany.has(row.itemId)) {
-        latestAssignmentByCompany.set(row.itemId, row);
-      }
-    }
-
     const userIds = new Set<string>();
     for (const row of cycleRows) {
       if (row.updatedBy) {
@@ -173,9 +149,6 @@ export async function GET(request: NextRequest) {
       if (row.ownerUserId) {
         userIds.add(row.ownerUserId);
       }
-    }
-    for (const row of assignmentRows) {
-      userIds.add(row.assigneeUserId);
     }
 
     const usersById = new Map<string, string>();
@@ -194,7 +167,6 @@ export async function GET(request: NextRequest) {
 
     const enrichedCompanies = companiesList.map((company) => {
       const cycle = latestCycleByCompany.get(company.id);
-      const assignment = latestAssignmentByCompany.get(company.id);
 
       let lastUpdated = company.updatedAt;
       let updatedField = "company";
@@ -208,12 +180,6 @@ export async function GET(request: NextRequest) {
           : cycle.ownerUserId
             ? (usersById.get(cycle.ownerUserId) ?? "System")
             : "System";
-      }
-
-      if (assignment && assignment.assignedAt <= now && assignment.assignedAt > lastUpdated) {
-        lastUpdated = assignment.assignedAt;
-        updatedField = "assignment";
-        lastUpdatedBy = usersById.get(assignment.assigneeUserId) ?? "System";
       }
 
       const latestContactUpdate = latestContactUpdateByCompany.get(company.id);
@@ -230,11 +196,9 @@ export async function GET(request: NextRequest) {
         lastUpdatedBy = "System";
       }
 
-      const assignedTo = assignment
-        ? (usersById.get(assignment.assigneeUserId) ?? "Unassigned")
-        : cycle?.ownerUserId
-          ? (usersById.get(cycle.ownerUserId) ?? "Unassigned")
-          : "Unassigned";
+      const assignedTo = cycle?.ownerUserId
+        ? (usersById.get(cycle.ownerUserId) ?? "Unassigned")
+        : "Unassigned";
 
       return {
         ...company,

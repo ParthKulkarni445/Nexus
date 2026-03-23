@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { badRequest } from "./response";
 
+export const uuidLikeSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+    "Invalid identifier format",
+  );
+
 /**
  * Validate request body against a Zod schema
  */

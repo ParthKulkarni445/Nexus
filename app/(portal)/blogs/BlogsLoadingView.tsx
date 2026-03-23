@@ -43,7 +43,7 @@ function QueueCardSkeleton() {
 
 export default function BlogsLoadingView() {
   return (
-    <div className="-mt-6 xl:mt-0 space-y-5 px-4 pb-6 pt-6 animate-fade-in-opacity xl:h-full xl:overflow-y-auto hide-scrollbar">
+    <div className="-mt-6 xl:mt-0 space-y-5 px-4 pb-6 pt-6 xl:h-full xl:overflow-y-auto hide-scrollbar">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] items-stretch">
         <div className="min-w-0 space-y-4">
           <div className="card overflow-visible flex flex-col">

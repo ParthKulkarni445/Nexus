@@ -15,16 +15,36 @@ function PanelSkeleton() {
         {Array.from({ length: 4 }, (_, index) => (
           <div
             key={index}
-            className="rounded-2xl border border-[#DBEAFE] bg-white p-4"
+            className="w-full rounded-2xl border border-[#DBEAFE] bg-white p-4"
           >
-            <div className="flex items-start gap-3">
-              <div className="shimmer h-10 w-10 rounded-xl" />
-              <div className="min-w-0 flex-1 space-y-2">
-                <div className="shimmer h-4 w-40 rounded-full" />
-                <div className="shimmer h-3 w-3/4 rounded-full" />
-                <div className="flex flex-wrap gap-2">
-                  <div className="shimmer h-5 w-16 rounded-full" />
-                  <div className="shimmer h-5 w-24 rounded-full" />
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+              <div className="flex min-w-0 flex-1 gap-3">
+                <div className="mt-1 shrink-0">
+                  <div className="shimmer h-4 w-4 rounded" />
+                </div>
+                <div className="min-w-0 flex-1 space-y-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap gap-2">
+                        <div className="shimmer h-5 w-40 rounded-full" />
+                        <div className="shimmer h-5 w-20 rounded-full" />
+                        <div className="shimmer h-5 w-16 rounded-full" />
+                      </div>
+                      <div className="shimmer h-4 w-full rounded-full" />
+                      <div className="shimmer h-4 w-10/12 rounded-full" />
+                    </div>
+                    <div className="shimmer h-6 w-24 rounded-full" />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <div className="shimmer h-4 w-24 rounded-full" />
+                    <div className="shimmer h-4 w-36 rounded-full" />
+                    <div className="shimmer h-4 w-28 rounded-full" />
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-2 xl:w-auto xl:justify-end">
+                    <div className="shimmer h-8 w-16 rounded-lg" />
+                    <div className="shimmer h-8 w-20 rounded-lg" />
+                    <div className="shimmer h-8 w-16 rounded-lg" />
+                  </div>
                 </div>
               </div>
             </div>

@@ -25,30 +25,64 @@ export async function GET(request: NextRequest) {
   const companyId = searchParams.get("companyId");
 
   try {
-    let assignmentIds: string[] | undefined;
+    let cycleIds: string[] | undefined;
 
     if (companyId) {
-      const companyAssignments = await db.companyAssignment.findMany({
+      const companyCycles = await db.companySeasonCycle.findMany({
         where: {
-          itemType: "company",
-          itemId: companyId,
+          companyId,
         },
         select: { id: true },
       });
 
-      assignmentIds = companyAssignments.map((assignment) => assignment.id);
+      cycleIds = companyCycles.map((cycle) => cycle.id);
     }
 
-    const history = await db.companyAssignmentHistory.findMany({
+    const history = await db.auditLog.findMany({
       where:
-        assignmentIds !== undefined
-          ? { assignmentId: { in: assignmentIds } }
-          : undefined,
-      orderBy: { changedAt: "desc" },
+        cycleIds !== undefined
+          ? {
+              targetType: "company_season_cycle",
+              targetId: { in: cycleIds },
+              action: {
+                in: [
+                  "assign_company_season_cycle",
+                  "bulk_assign_company_season_cycles",
+                  "reassign_company_season_cycle",
+                ],
+              },
+            }
+          : {
+              targetType: "company_season_cycle",
+              action: {
+                in: [
+                  "assign_company_season_cycle",
+                  "bulk_assign_company_season_cycles",
+                  "reassign_company_season_cycle",
+                ],
+              },
+            },
+      include: {
+        actor: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
       take: companyId ? undefined : 100,
     });
 
-    return success(history);
+    return success(
+      history.map((entry) => ({
+        id: entry.id,
+        targetId: entry.targetId,
+        action: entry.action,
+        changedBy: entry.actor?.name ?? "System",
+        meta: entry.meta,
+        changedAt: entry.createdAt,
+      })),
+    );
   } catch (error) {
     console.error("Error fetching assignment history:", error);
     return serverError();

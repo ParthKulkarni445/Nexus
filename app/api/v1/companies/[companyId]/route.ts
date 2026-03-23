@@ -45,7 +45,7 @@ export async function GET(
       return notFound("Company not found");
     }
 
-    const [contacts, assignments, interactions, recentDrives, latestCycle] =
+    const [contacts, seasonAssignments, interactions, recentDrives, latestCycle] =
       await Promise.all([
         db.companyContact.findMany({
           where: { companyId },
@@ -63,10 +63,30 @@ export async function GET(
           },
           orderBy: { createdAt: "desc" },
         }),
-        db.companyAssignment.findMany({
-          where: { itemId: companyId, itemType: "company", isActive: true },
-          include: { assigneeUser: { select: { name: true } } },
-          orderBy: { assignedAt: "desc" },
+        db.companySeasonCycle.findMany({
+          where: {
+            companyId,
+            ownerUserId: {
+              not: null,
+            },
+          },
+          select: {
+            id: true,
+            ownerUserId: true,
+            updatedAt: true,
+            season: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            owner: {
+              select: {
+                name: true,
+              },
+            },
+          },
+          orderBy: { updatedAt: "desc" },
         }),
         db.contactInteraction.findMany({
           where: { companyId },
@@ -121,13 +141,14 @@ export async function GET(
     return success({
       company,
       contacts,
-      assignments: assignments.map((assignment) => ({
+      assignments: seasonAssignments.map((assignment) => ({
         id: assignment.id,
-        itemType: assignment.itemType,
-        assigneeUserId: assignment.assigneeUserId,
-        assigneeName: assignment.assigneeUser.name,
-        assignedAt: assignment.assignedAt,
-        notes: assignment.notes,
+        seasonId: assignment.season.id,
+        seasonName: assignment.season.name,
+        assigneeUserId: assignment.ownerUserId,
+        assigneeName: assignment.owner?.name ?? null,
+        assignedAt: assignment.updatedAt,
+        notes: null,
       })),
       recentInteractions: interactions,
       recentDrives,

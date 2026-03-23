@@ -41,21 +41,27 @@ type Coordinator = {
 };
 
 type AssignmentListItem = {
-  assignmentId: string;
+  companySeasonCycleId: string;
   companyId: string;
   companyName: string;
   industry: string | null;
   status: string;
   coordinatorId: string;
   coordinatorName: string;
+  seasonId: string;
   season: string;
   assignedAt: string;
 };
 
-type UnassignedCompany = {
+type UnassignedCycle = {
+  companySeasonCycleId: string;
   companyId: string;
   companyName: string;
   industry: string | null;
+  status: string;
+  seasonId: string;
+  season: string;
+  updatedAt: string;
 };
 
 type AssignmentsDashboardResponse = {
@@ -65,7 +71,15 @@ type AssignmentsDashboardResponse = {
     coordinatorType?: string | null;
   }>;
   assignments: AssignmentListItem[];
-  unassignedCompanies: UnassignedCompany[];
+  unassignedCycles: UnassignedCycle[];
+};
+
+type SeasonRecord = {
+  id: string;
+  name: string;
+  seasonType: "intern" | "placement";
+  academicYear: string;
+  isActive: boolean;
 };
 
 type ApiErrorEnvelope = {
@@ -139,7 +153,7 @@ function AssignModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  companies: UnassignedCompany[];
+  companies: UnassignedCycle[];
   isBulk: boolean;
   coordinators: Coordinator[];
   isSubmitting: boolean;
@@ -177,8 +191,8 @@ function AssignModal({
       onClose={onClose}
       title={
         isBulk
-          ? "Bulk Assign Companies"
-          : `Assign - ${companies[0]?.companyName || "Company"}`
+          ? "Bulk Assign Season Cycles"
+          : `Assign - ${companies[0]?.companyName || "Season Cycle"}`
       }
       size="md"
       footer={
@@ -429,12 +443,14 @@ export default function AssignmentsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [coordinatorFilter, setCoordinatorFilter] = useState<string[]>([]);
+  const [selectedSeasonId, setSelectedSeasonId] = useState("");
 
   const [coordinators, setCoordinators] = useState<Coordinator[]>([]);
+  const [seasons, setSeasons] = useState<SeasonRecord[]>([]);
   const [assignments, setAssignments] = useState<AssignmentListItem[]>([]);
-  const [unassignedCompanies, setUnassignedCompanies] = useState<
-    UnassignedCompany[]
-  >([]);
+  const [unassignedCycles, setUnassignedCycles] = useState<UnassignedCycle[]>(
+    [],
+  );
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -443,7 +459,7 @@ export default function AssignmentsPage() {
   const [isReassignSubmitting, setIsReassignSubmitting] = useState(false);
 
   const [assignModal, setAssignModal] = useState<{
-    companies: UnassignedCompany[];
+    companies: UnassignedCycle[];
     bulk: boolean;
   } | null>(null);
   const [reassignModal, setReassignModal] = useState<AssignmentListItem | null>(
@@ -459,9 +475,10 @@ export default function AssignmentsPage() {
     setLoadError(null);
 
     try {
-      const response = await requestApi<AssignmentsDashboardResponse>(
-        "/api/v1/assignments",
-      );
+      const [response, seasonList] = await Promise.all([
+        requestApi<AssignmentsDashboardResponse>("/api/v1/assignments"),
+        requestApi<SeasonRecord[]>("/api/v1/seasons"),
+      ]);
 
       setCoordinators(
         response.coordinators.map((coordinator) => ({
@@ -469,8 +486,18 @@ export default function AssignmentsPage() {
           avatar: getInitials(coordinator.name),
         })),
       );
+      setSeasons(seasonList);
       setAssignments(response.assignments);
-      setUnassignedCompanies(response.unassignedCompanies);
+      setUnassignedCycles(response.unassignedCycles);
+      setSelectedSeasonId((current) => {
+        if (current && seasonList.some((season) => season.id === current)) {
+          return current;
+        }
+
+        return (
+          seasonList.find((season) => season.isActive)?.id ?? seasonList[0]?.id ?? ""
+        );
+      });
     } catch (error) {
       setLoadError(
         error instanceof Error
@@ -489,11 +516,11 @@ export default function AssignmentsPage() {
   useEffect(() => {
     setSelectedUnassigned((previous) => {
       const validIds = new Set(
-        unassignedCompanies.map((company) => company.companyId),
+        unassignedCycles.map((cycle) => cycle.companySeasonCycleId),
       );
       return new Set(Array.from(previous).filter((id) => validIds.has(id)));
     });
-  }, [unassignedCompanies]);
+  }, [unassignedCycles]);
 
   const coordinatorOptions = useMemo(
     () =>
@@ -504,9 +531,20 @@ export default function AssignmentsPage() {
     [coordinators],
   );
 
+  const seasonOptions = useMemo(
+    () =>
+      seasons.map((season) => ({
+        value: season.id,
+        label: `${season.name} (${season.academicYear})`,
+      })),
+    [seasons],
+  );
+
   const stats = useMemo(() => {
     const assignmentCountByCoordinator = new Map<string, number>();
-    for (const assignment of assignments) {
+    for (const assignment of assignments.filter(
+      (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
+    )) {
       assignmentCountByCoordinator.set(
         assignment.coordinatorId,
         (assignmentCountByCoordinator.get(assignment.coordinatorId) ?? 0) + 1,
@@ -522,11 +560,15 @@ export default function AssignmentsPage() {
     }));
 
     return {
-      assigned: assignments.length,
-      unassigned: unassignedCompanies.length,
+      assigned: assignments.filter(
+        (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
+      ).length,
+      unassigned: unassignedCycles.filter(
+        (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
+      ).length,
       byCoord,
     };
-  }, [coordinators, assignments, unassignedCompanies]);
+  }, [coordinators, assignments, unassignedCycles, selectedSeasonId]);
 
   const topCoordinatorLoads = useMemo(
     () =>
@@ -560,6 +602,10 @@ export default function AssignmentsPage() {
       );
     }
 
+    if (selectedSeasonId) {
+      data = data.filter((assignment) => assignment.seasonId === selectedSeasonId);
+    }
+
     if (statusFilter.length > 0) {
       data = data.filter((assignment) =>
         statusFilter.includes(assignment.status),
@@ -573,10 +619,10 @@ export default function AssignmentsPage() {
     }
 
     return data;
-  }, [assignments, search, statusFilter, coordinatorFilter]);
+  }, [assignments, search, statusFilter, coordinatorFilter, selectedSeasonId]);
 
   const filteredUnassigned = useMemo(() => {
-    let data = unassignedCompanies;
+    let data = unassignedCycles;
 
     if (search) {
       const query = search.toLowerCase();
@@ -585,8 +631,12 @@ export default function AssignmentsPage() {
       );
     }
 
+    if (selectedSeasonId) {
+      data = data.filter((company) => company.seasonId === selectedSeasonId);
+    }
+
     return data;
-  }, [unassignedCompanies, search]);
+  }, [unassignedCycles, search, selectedSeasonId]);
 
   const groupedByCoordinator = useMemo(() => {
     const groups: Record<string, AssignmentListItem[]> = {};
@@ -655,29 +705,16 @@ export default function AssignmentsPage() {
 
     setIsAssignSubmitting(true);
     try {
-      if (assignModal.bulk) {
-        await requestApi("/api/v1/assignments/bulk", {
-          method: "POST",
-          body: JSON.stringify({
-            assignments: assignModal.companies.map((company) => ({
-              itemType: "company",
-              itemId: company.companyId,
-              assigneeUserId: input.assigneeUserId,
-              notes: input.notes,
-            })),
-          }),
-        });
-      } else {
-        await requestApi("/api/v1/assignments", {
-          method: "POST",
-          body: JSON.stringify({
-            itemType: "company",
-            itemId: assignModal.companies[0].companyId,
+      await requestApi("/api/v1/assignments/bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          assignments: assignModal.companies.map((company) => ({
+            companySeasonCycleId: company.companySeasonCycleId,
             assigneeUserId: input.assigneeUserId,
             notes: input.notes,
-          }),
-        });
-      }
+          })),
+        }),
+      });
 
       await loadAssignmentsData();
       setAssignModal(null);
@@ -696,7 +733,7 @@ export default function AssignmentsPage() {
     setIsReassignSubmitting(true);
     try {
       await requestApi(
-        `/api/v1/assignments/${reassignModal.assignmentId}/reassign`,
+        `/api/v1/assignments/${reassignModal.companySeasonCycleId}/reassign`,
         {
           method: "PUT",
           body: JSON.stringify(input),
@@ -752,6 +789,22 @@ export default function AssignmentsPage() {
                     : "flex-col sm:flex-row sm:items-center"
                 }`}
               >
+                <select
+                  className={`input-base min-w-0 ${
+                    tab === "assigned"
+                      ? "xl:min-w-[260px] xl:max-w-[320px]"
+                      : "sm:w-64"
+                  }`}
+                  value={selectedSeasonId}
+                  onChange={(event) => setSelectedSeasonId(event.target.value)}
+                >
+                  <option value="">Select season</option>
+                  {seasonOptions.map((season) => (
+                    <option key={season.value} value={season.value}>
+                      {season.label}
+                    </option>
+                  ))}
+                </select>
                 <SearchBar
                   value={search}
                   onChange={setSearch}
@@ -805,8 +858,8 @@ export default function AssignmentsPage() {
                     className="btn btn-primary btn-sm gap-1 shrink-0"
                     onClick={() =>
                       setAssignModal({
-                        companies: unassignedCompanies.filter((company) =>
-                          selectedUnassigned.has(company.companyId),
+                        companies: unassignedCycles.filter((company) =>
+                          selectedUnassigned.has(company.companySeasonCycleId),
                         ),
                         bulk: selectedUnassigned.size > 1,
                       })
@@ -868,7 +921,7 @@ export default function AssignmentsPage() {
                         className="border border-[#DBEAFE] rounded-xl overflow-hidden"
                       >
                         <button
-                          className="w-full flex items-center justify-between px-4 py-3 bg-slate-200 transition-colors"
+                          className="w-full flex items-center justify-between px-4 py-3 bg-slate-300 transition-colors"
                           onClick={() => toggleGroup(coordinatorName)}
                         >
                           <div className="flex items-center gap-3">
@@ -906,7 +959,7 @@ export default function AssignmentsPage() {
                           <div className="divide-y divide-[#EFF6FF]">
                             {entries.map((assignment) => (
                               <div
-                                key={assignment.assignmentId}
+                                key={assignment.companySeasonCycleId}
                                 className="flex items-center gap-4 px-4 py-3 hover:bg-[#F5F9FF] transition-colors"
                               >
                                 <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
@@ -959,22 +1012,22 @@ export default function AssignmentsPage() {
                 ) : filteredUnassigned.length === 0 ? (
                   <EmptyState
                     icon={CheckCircle2}
-                    title="All companies are assigned!"
-                    description="Every company in this season has been assigned to a coordinator."
+                    title="All season cycles are assigned!"
+                    description="Every season-cycle task has been assigned to a coordinator."
                   />
                 ) : (
                   filteredUnassigned.map((company) => (
                     <div
-                      key={company.companyId}
+                      key={company.companySeasonCycleId}
                       className="flex items-center gap-4 p-3 border border-[#DBEAFE] rounded-xl hover:bg-[#F5F9FF] transition-colors group"
                     >
                       <button
                         onClick={() =>
-                          toggleSelectUnassigned(company.companyId)
+                          toggleSelectUnassigned(company.companySeasonCycleId)
                         }
                         className="text-slate-300 group-hover:text-slate-400 hover:text-[#2563EB]! transition-colors shrink-0"
                       >
-                        {selectedUnassigned.has(company.companyId) ? (
+                        {selectedUnassigned.has(company.companySeasonCycleId) ? (
                           <CheckCircle2 size={16} className="text-[#2563EB]" />
                         ) : (
                           <div className="w-4 h-4 rounded border border-slate-300 group-hover:border-[#3B82F6]" />
@@ -991,11 +1044,11 @@ export default function AssignmentsPage() {
                           {company.companyName}
                         </Link>
                         <p className="text-xs text-slate-400">
-                          {company.industry || "Unspecified"}
+                          {company.industry || "Unspecified"} · {company.season}
                         </p>
                       </div>
                       <Badge variant="warning" size="sm" dot>
-                        Unassigned
+                        {company.status.replace(/_/g, " ")}
                       </Badge>
                       <button
                         className="btn btn-primary btn-sm gap-1 shrink-0"

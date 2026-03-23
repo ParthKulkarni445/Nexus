@@ -9,19 +9,19 @@ import {
   notFound,
   serverError,
 } from "@/lib/api/response";
-import { validateBody } from "@/lib/api/validation";
+import { uuidLikeSchema, validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
 import { headers } from "next/headers";
 
 const reassignSchema = z.object({
-  newAssigneeUserId: z.string().trim().min(1),
+  newAssigneeUserId: uuidLikeSchema,
   reason: z.string().min(1),
 });
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: Promise<{ assignmentId: string }> }
+  { params }: { params: Promise<{ assignmentId: string }> },
 ) {
   const user = await getCurrentUser();
 
@@ -46,55 +46,48 @@ export async function PUT(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const currentAssignment = await db.companyAssignment.findUnique({
+    const currentCycle = await db.companySeasonCycle.findUnique({
       where: { id: assignmentId },
+      select: {
+        id: true,
+        ownerUserId: true,
+      },
     });
 
-    if (!currentAssignment) {
-      return notFound("Assignment not found");
+    if (!currentCycle) {
+      return notFound("Company season cycle not found");
     }
 
-    const updatedAssignment = await db.$transaction(async (tx) => {
-      await tx.companyAssignmentHistory.create({
-        data: {
-          assignmentId,
-          fromUserId: currentAssignment.assigneeUserId,
-          toUserId: validation.newAssigneeUserId,
-          changedBy: user.id,
-          reason: validation.reason,
-        },
-      });
-
-      return tx.companyAssignment.update({
-        where: { id: assignmentId },
-        data: {
-          assigneeUserId: validation.newAssigneeUserId,
-          assignedBy: user.id,
-          updatedAt: new Date(),
-        },
-      });
+    const updatedCycle = await db.companySeasonCycle.update({
+      where: { id: assignmentId },
+      data: {
+        ownerUserId: validation.newAssigneeUserId,
+        updatedBy: user.id,
+        updatedField: "owner_user_id",
+        updatedAt: new Date(),
+      },
     });
 
     await createAuditLog({
       actorId: user.id,
-      action: "reassign_assignment",
-      targetType: "assignment",
+      action: "reassign_company_season_cycle",
+      targetType: "company_season_cycle",
       targetId: assignmentId,
       meta: {
-        from: currentAssignment.assigneeUserId,
+        from: currentCycle.ownerUserId,
         to: validation.newAssigneeUserId,
         reason: validation.reason,
       },
       ...clientInfo,
     });
 
-    return success(updatedAssignment);
+    return success(updatedCycle);
   } catch (error: unknown) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2025"
     ) {
-      return notFound("Assignment not found");
+      return notFound("Company season cycle not found");
     }
 
     console.error("Error reassigning:", error);
