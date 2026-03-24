@@ -8,8 +8,6 @@ import {
   PhoneCall,
   Mail,
   Users,
-  Briefcase,
-  CalendarClock,
   Bell,
   BookOpen,
   Menu,
@@ -28,9 +26,6 @@ const navItems = [
   { label: "Outreach", href: "/outreach", icon: PhoneCall },
   { label: "Mailing", href: "/mailing", icon: Mail },
   { label: "Assignments", href: "/assignments", icon: Users },
-  { label: "Drives", href: "/drives", icon: Briefcase },
-  { label: "Schedule", href: "/schedule", icon: CalendarClock },
-  { label: "Schedule Admin", href: "/admin/schedules", icon: CalendarClock },
   { label: "Blogs", href: "/blogs", icon: BookOpen },
 ];
 

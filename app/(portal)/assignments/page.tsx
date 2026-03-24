@@ -778,26 +778,20 @@ export default function AssignmentsPage() {
         </div>
       )}
 
-      <div
-        className={`flex flex-col gap-5 pt-6 xl:flex-row ${
-          isLoading ? "xl:items-stretch" : "xl:items-start"
-        }`}
-      >
+      <div className="flex flex-col gap-5 pt-6 xl:flex-row xl:items-stretch">
         <div className="min-w-0 flex-1 space-y-5 xl:flex xl:flex-col">
           <div className="card overflow-visible flex flex-col">
             <div className="px-4 py-3 border-b border-(--card-border)">
               <div
-                className={`flex gap-2 ${
-                  tab === "assigned"
-                    ? "flex-col xl:flex-row xl:flex-wrap xl:items-center"
-                    : "flex-col sm:flex-row sm:items-center"
+                className={`flex gap-2 items-center ${
+                  tab === "assigned" ? "flex-col xl:flex-row xl:flex-wrap" : ""
                 }`}
               >
                 <select
                   className={`input-base min-w-0 ${
                     tab === "assigned"
                       ? "xl:min-w-[260px] xl:max-w-[320px]"
-                      : "sm:w-64"
+                      : "flex-1"
                   }`}
                   value={selectedSeasonId}
                   onChange={(event) => setSelectedSeasonId(event.target.value)}
