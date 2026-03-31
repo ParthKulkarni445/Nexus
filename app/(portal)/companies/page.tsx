@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Plus,
   Download,
+  Upload,
   Building2,
   Info,
   Filter,
@@ -1020,6 +1021,7 @@ export default function CompaniesPage() {
                 placeholder="Search companies..."
                 className="flex-1 min-w-0"
               />
+              <div className="ml-auto flex items-center gap-2 shrink-0">
               <button
                 className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
                   showFilters
@@ -1041,6 +1043,10 @@ export default function CompaniesPage() {
                 <Download size={14} />
                 Export
               </button>
+              <button className="btn btn-secondary btn-sm gap-1.5 shrink-0">
+                <Upload size={14} />
+                Import
+              </button>
               <button
                 className="btn btn-primary btn-sm gap-1.5 shrink-0"
                 onClick={() => {
@@ -1052,6 +1058,7 @@ export default function CompaniesPage() {
                 <Plus size={14} />
                 Add
               </button>
+              </div>
             </div>
 
             {/* Filter row */}
