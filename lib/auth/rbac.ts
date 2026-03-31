@@ -24,6 +24,7 @@ export type RoutePolicy = {
 export const APP_PROTECTED_PATH_PREFIXES = [
   "/companies",
   "/outreach",
+  "/confirmed",
   "/mailing",
   "/assignments",
   "/drives",
