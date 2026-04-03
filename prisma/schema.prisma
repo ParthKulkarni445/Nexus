@@ -41,6 +41,7 @@ model User {
   approvedTemplates        EmailTemplate[]              @relation("TemplateApprover")
   createdTemplates         EmailTemplate[]              @relation("TemplateCreator")
   uploadedMailAssets       MailAsset[]                  @relation("MailAssetUploader")
+  uploadedStudentEntries   CompanySeasonStudentEntry[]
   requestedMailRequests    MailRequest[]                @relation("MailRequestRequester")
   reviewedMailRequests     MailRequest[]                @relation("MailRequestReviewer")
   notifications            Notification[]
@@ -199,6 +200,7 @@ model CompanySeasonCycle {
   drives          Drive[]
   emails          Email[]
   mailRequests    MailRequest[]
+  studentEntries  CompanySeasonStudentEntry[]
 
   @@unique([companyId, seasonId])
   @@index([seasonId, status, updatedAt], map: "company_season_cycles_season_status_updated_idx")
@@ -206,6 +208,21 @@ model CompanySeasonCycle {
   @@index([companyId, updatedAt], map: "company_season_cycles_company_updated_idx")
   @@index([ownerUserId, updatedAt], map: "company_season_cycles_owner_updated_idx")
   @@map("company_season_cycles")
+}
+
+model CompanySeasonStudentEntry {
+  id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companySeasonCycleId String             @map("company_season_cycle_id") @db.Uuid
+  entryNumber          String             @map("entry_number") @db.VarChar(20)
+  uploadedBy           String?            @map("uploaded_by") @db.Uuid
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  companySeasonCycle   CompanySeasonCycle @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade)
+  uploader             User?              @relation(fields: [uploadedBy], references: [id])
+
+  @@unique([companySeasonCycleId, entryNumber], map: "company_season_student_entries_cycle_entry_key")
+  @@index([companySeasonCycleId], map: "company_season_student_entries_cycle_idx")
+  @@index([entryNumber], map: "company_season_student_entries_entry_idx")
+  @@map("company_season_student_entries")
 }
 
 model CompanySeasonStatusHistory {
@@ -593,6 +610,14 @@ model StudentDataConsent {
   student                  User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@map("student_data_consent")
+}
+
+model mailbox_sync_states {
+  mailbox_email   String    @id @db.VarChar(255)
+  last_history_id String?   @db.VarChar(255)
+  last_synced_at  DateTime? @db.Timestamptz(6)
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
 }
 
 enum UserRole {

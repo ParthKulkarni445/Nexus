@@ -39,7 +39,7 @@ function resolveEmbedUrl() {
   return null;
 }
 
-export default function CalenderPage() {
+export default function StudentCalenderPage() {
   const embedUrl = resolveEmbedUrl();
 
   return (
@@ -48,7 +48,7 @@ export default function CalenderPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Calender</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Google Calender view for placement operations.
+            Student view of placement schedule synced with Google Calender.
           </p>
         </div>
 
@@ -56,7 +56,7 @@ export default function CalenderPage() {
           {embedUrl ? (
             <iframe
               src={embedUrl}
-              title="Google Calender"
+              title="Student Google Calender"
               className="w-full h-[72vh] rounded-xl border border-slate-200 bg-white"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"

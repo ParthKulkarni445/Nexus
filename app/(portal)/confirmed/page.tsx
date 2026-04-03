@@ -5,9 +5,9 @@ import {
   AlertCircle,
   Building2,
   CalendarPlus,
+  Eye,
   FileSpreadsheet,
   Loader2,
-  Mail,
   PhoneCall,
   Search,
   Send,
@@ -25,15 +25,6 @@ type ApiResponse<T> = {
   error?: {
     message?: string;
   };
-};
-
-type MailAttachmentMeta = {
-  id?: string;
-  fileName: string;
-  mimeType?: string | null;
-  sizeBytes?: number | null;
-  storagePath: string;
-  publicUrl: string;
 };
 
 type ConfirmedDrive = {
@@ -79,6 +70,30 @@ type ConfirmedCompany = {
     phones: string[];
     emails: string[];
   }>;
+  studentEntryNumbers: string[];
+};
+
+type UploadStudentInfoResponse = {
+  companySeasonCycleId: string;
+  uploadedCount: number;
+  invalidRows: number[];
+  sampleEntryNumbers: string[];
+};
+
+type AttendanceCompareRow = {
+  entryNumber: string;
+  attendanceStatus: string;
+  matched: boolean;
+};
+
+type CompareAttendanceResponse = {
+  companySeasonCycleId: string;
+  detectedAttendanceColumn: string;
+  matchedCount: number;
+  missingCount: number;
+  uploadedCount: number;
+  rows: AttendanceCompareRow[];
+  unmatchedAttendanceEntries: string[];
 };
 
 type ConfirmedPayload = {
@@ -88,18 +103,23 @@ type ConfirmedPayload = {
   telegramTemplates: TelegramTemplate[];
 };
 
-type ScheduleFormState = {
-  title: string;
-  description: string;
-  startTime: string;
-  endTime: string;
+type MePayload = {
+  user: {
+    email?: string | null;
+  };
 };
 
-const DEFAULT_SCHEDULE_FORM: ScheduleFormState = {
-  title: "",
-  description: "",
-  startTime: "",
-  endTime: "",
+type InstructionTask = "upload" | "compare";
+
+type StudentUploadPreview = {
+  companyId: string;
+  companySeasonCycleId: string;
+  companyName: string;
+  file: File;
+  rollHeader: string;
+  validEntries: string[];
+  invalidRows: number[];
+  totalDataRows: number;
 };
 
 function htmlToText(value: string | null | undefined) {
@@ -110,6 +130,23 @@ function htmlToText(value: string | null | undefined) {
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
     .trim();
+}
+
+function toGoogleDateTime(value: string) {
+  return new Date(value)
+    .toISOString()
+    .replace(/[-:]/g, "")
+    .replace(/\.\d{3}Z$/, "Z");
+}
+
+function normalizeHeader(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function normalizeEntryNumber(rawValue: string) {
+  const compact = rawValue.trim().toUpperCase().replace(/\s+/g, "");
+  if (!compact) return null;
+  return /^\d{4}[A-Z]{3}\d{4}$/.test(compact) ? compact : null;
 }
 
 async function requestJson<T>(url: string, init?: RequestInit) {
@@ -139,33 +176,6 @@ async function requestJson<T>(url: string, init?: RequestInit) {
   return body.data;
 }
 
-function UploadedFileName({
-  attachment,
-  uploading,
-}: {
-  attachment: MailAttachmentMeta | null;
-  uploading: boolean;
-}) {
-  if (uploading) {
-    return (
-      <p className="text-xs text-slate-500 inline-flex items-center gap-1">
-        <Loader2 size={12} className="animate-spin" />
-        Uploading...
-      </p>
-    );
-  }
-
-  if (!attachment) {
-    return <p className="text-xs text-slate-500">No file selected</p>;
-  }
-
-  return (
-    <p className="text-xs text-emerald-700 font-medium truncate" title={attachment.fileName}>
-      {attachment.fileName}
-    </p>
-  );
-}
-
 export default function ConfirmedPage() {
   const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
@@ -182,18 +192,24 @@ export default function ConfirmedPage() {
   const [telegramModalOpen, setTelegramModalOpen] = useState(false);
   const [telegramCompanyId, setTelegramCompanyId] = useState("");
   const [telegramTemplateId, setTelegramTemplateId] = useState("");
+  const [studentPreviewCompanyId, setStudentPreviewCompanyId] = useState("");
+  const [instructionModalTask, setInstructionModalTask] = useState<InstructionTask | null>(null);
+  const [instructionModalCompanyId, setInstructionModalCompanyId] = useState("");
+  const [compareResultModalOpen, setCompareResultModalOpen] = useState(false);
+  const [compareResultCompanyId, setCompareResultCompanyId] = useState("");
+  const [compareResultCompanyName, setCompareResultCompanyName] = useState("");
+  const [compareResultPayload, setCompareResultPayload] = useState<CompareAttendanceResponse | null>(null);
+  const [studentUploadPreview, setStudentUploadPreview] = useState<StudentUploadPreview | null>(null);
 
-  const [sheetOneByCompany, setSheetOneByCompany] = useState<Record<string, MailAttachmentMeta | null>>({});
-  const [sheetTwoByCompany, setSheetTwoByCompany] = useState<Record<string, MailAttachmentMeta | null>>({});
-  const [uploadingBySlot, setUploadingBySlot] = useState<Record<string, boolean>>({});
+  const [uploadingStudentByCompany, setUploadingStudentByCompany] = useState<Record<string, boolean>>({});
+  const [comparingAttendanceByCompany, setComparingAttendanceByCompany] = useState<
+    Record<string, boolean>
+  >({});
 
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
   const [submittingAction, setSubmittingAction] = useState<Record<string, boolean>>({});
-
-  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
-  const [scheduleTargetCompanyId, setScheduleTargetCompanyId] = useState("");
-  const [scheduleForm, setScheduleForm] = useState<ScheduleFormState>(DEFAULT_SCHEDULE_FORM);
+  const [loggedInUserEmail, setLoggedInUserEmail] = useState("");
 
   async function fetchConfirmedData(nextDriveId?: string) {
     setLoading(true);
@@ -219,6 +235,17 @@ export default function ConfirmedPage() {
 
   useEffect(() => {
     void fetchConfirmedData();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const payload = await requestJson<MePayload>("/api/v1/auth/me");
+        setLoggedInUserEmail(payload.user.email?.trim() ?? "");
+      } catch {
+        setLoggedInUserEmail("");
+      }
+    })();
   }, []);
 
   const filteredCompanies = useMemo(() => {
@@ -247,6 +274,16 @@ export default function ConfirmedPage() {
     return telegramCompany.contacts.find((contact) => contact.id === selectedContactId) ?? null;
   }, [telegramCompany, selectedContactByCompany]);
 
+  const studentPreviewCompany = useMemo(
+    () => acceptedCompanies.find((company) => company.companyId === studentPreviewCompanyId) ?? null,
+    [acceptedCompanies, studentPreviewCompanyId],
+  );
+
+  const instructionModalCompany = useMemo(
+    () => acceptedCompanies.find((company) => company.companyId === instructionModalCompanyId) ?? null,
+    [acceptedCompanies, instructionModalCompanyId],
+  );
+
   const driveOptions = drives.map((drive) => ({
     value: drive.id,
     label: `${drive.title} (${drive.seasonName})`,
@@ -263,68 +300,178 @@ export default function ConfirmedPage() {
     await fetchConfirmedData(nextDriveId);
   }
 
-  async function uploadAttachment(file: File) {
-    const formData = new FormData();
-    formData.append("file", file);
+  function downloadAttendanceComparison(company: ConfirmedCompany, payload: CompareAttendanceResponse) {
+    const rows = [
+      "entry_number,attendance_status,matched",
+      ...payload.rows.map(
+        (row) => `${row.entryNumber},${JSON.stringify(row.attendanceStatus)},${row.matched ? "yes" : "no"}`,
+      ),
+    ];
 
-    return requestJson<MailAttachmentMeta>("/api/v1/mail/attachments/upload", {
-      method: "POST",
-      body: formData,
-    });
-  }
-
-  async function onUploadSheet(
-    companyId: string,
-    slot: "sheetOne" | "sheetTwo",
-    event: ChangeEvent<HTMLInputElement>,
-  ) {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
-
-    const key = `${companyId}:${slot}`;
-    setUploadingBySlot((prev) => ({ ...prev, [key]: true }));
-    setActionError("");
-    setActionMessage("");
-
-    try {
-      const uploaded = await uploadAttachment(file);
-      if (slot === "sheetOne") {
-        setSheetOneByCompany((prev) => ({ ...prev, [companyId]: uploaded }));
-      } else {
-        setSheetTwoByCompany((prev) => ({ ...prev, [companyId]: uploaded }));
-      }
-      setActionMessage(`Uploaded ${file.name}`);
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Upload failed");
-    } finally {
-      setUploadingBySlot((prev) => ({ ...prev, [key]: false }));
-      event.target.value = "";
+    if (payload.unmatchedAttendanceEntries.length > 0) {
+      rows.push("", "attendance_entries_not_in_uploaded_list");
+      rows.push(...payload.unmatchedAttendanceEntries);
     }
-  }
 
-  function downloadPlaceholderComparison(company: ConfirmedCompany) {
-    const superset = sheetOneByCompany[company.companyId]?.fileName ?? "";
-    const acadly = sheetTwoByCompany[company.companyId]?.fileName ?? "";
-    const csv = [
-      "company,companySeasonCycleId,superset_sheet,acadly_attendence_sheet,note",
-      `"${company.companyName}","${company.companySeasonCycleId}","${superset}","${acadly}","comparison logic pending"`,
-    ].join("\n");
-
+    const csv = rows.join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${company.companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-comparison.csv`;
+    a.download = `${company.companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-attendance-comparison.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
-  function getAttachmentsForCompany(companyId: string) {
-    const slot1 = sheetOneByCompany[companyId] ?? null;
-    const slot2 = sheetTwoByCompany[companyId] ?? null;
-    return [slot1, slot2].filter(Boolean) as MailAttachmentMeta[];
+  async function onUploadStudentInfo(company: ConfirmedCompany, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    event.target.value = "";
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const xlsx = await import("xlsx");
+      const workbook = xlsx.read(await file.arrayBuffer(), { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        throw new Error("Uploaded file is empty.");
+      }
+
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = xlsx.utils.sheet_to_json<string[]>(worksheet, {
+        header: 1,
+        blankrows: false,
+        defval: "",
+        raw: false,
+      });
+
+      if (rows.length === 0) {
+        throw new Error("Uploaded file is empty.");
+      }
+
+      const headers = rows[0].map((header, index) => {
+        const trimmed = String(header).trim();
+        return index === 0 ? trimmed.replace(/^\ufeff/, "") : trimmed;
+      });
+
+      const rollHeader = headers.find((header) => normalizeHeader(header) === "roll no");
+
+      if (!rollHeader) {
+        throw new Error("Missing required column 'Roll No'.");
+      }
+
+      const rollIndex = headers.findIndex((header) => header === rollHeader);
+      const validEntrySet = new Set<string>();
+      const invalidRows: number[] = [];
+
+      for (let i = 1; i < rows.length; i += 1) {
+        const value = String(rows[i]?.[rollIndex] ?? "").trim();
+        if (!value) continue;
+        const normalized = normalizeEntryNumber(value);
+        if (!normalized) {
+          invalidRows.push(i + 1);
+          continue;
+        }
+        validEntrySet.add(normalized);
+      }
+
+      const validEntries = Array.from(validEntrySet).sort((a, b) => a.localeCompare(b));
+      if (validEntries.length === 0) {
+        throw new Error("No valid Roll No values found in YYYYBBBNNNN format.");
+      }
+
+      setStudentUploadPreview({
+        companyId: company.companyId,
+        companySeasonCycleId: company.companySeasonCycleId,
+        companyName: company.companyName,
+        file,
+        rollHeader,
+        validEntries,
+        invalidRows,
+        totalDataRows: Math.max(rows.length - 1, 0),
+      });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Unable to preview student file");
+    }
+  }
+
+  async function submitStudentUploadPreview() {
+    if (!studentUploadPreview) return;
+
+    const company = acceptedCompanies.find((item) => item.companyId === studentUploadPreview.companyId);
+    if (!company) {
+      setActionError("Selected company was not found for upload.");
+      return;
+    }
+
+    setUploadingStudentByCompany((prev) => ({ ...prev, [company.companyId]: true }));
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", studentUploadPreview.file);
+      formData.append("companySeasonCycleId", company.companySeasonCycleId);
+
+      const payload = await requestJson<UploadStudentInfoResponse>("/api/v1/confirmed/student-info", {
+        method: "POST",
+        body: formData,
+      });
+
+      await fetchConfirmedData(selectedDrive || undefined);
+      setActionMessage(
+        `Uploaded ${payload.uploadedCount} entry numbers for ${company.companyName}` +
+          (payload.invalidRows.length > 0
+            ? ` (ignored invalid rows: ${payload.invalidRows.slice(0, 5).join(", ")}${payload.invalidRows.length > 5 ? ", ..." : ""})`
+            : ""),
+      );
+      setStudentUploadPreview(null);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Student info upload failed");
+    } finally {
+      setUploadingStudentByCompany((prev) => ({ ...prev, [company.companyId]: false }));
+    }
+  }
+
+  async function onCompareAttendance(company: ConfirmedCompany, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) return;
+
+    setComparingAttendanceByCompany((prev) => ({ ...prev, [company.companyId]: true }));
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("companySeasonCycleId", company.companySeasonCycleId);
+
+      const payload = await requestJson<CompareAttendanceResponse>(
+        "/api/v1/confirmed/compare-attendance",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      setCompareResultCompanyId(company.companyId);
+      setCompareResultCompanyName(company.companyName);
+      setCompareResultPayload(payload);
+      setCompareResultModalOpen(true);
+      setActionMessage(
+        `Attendance compared for ${company.companyName}: ${payload.matchedCount} matched, ${payload.missingCount} missing.`,
+      );
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Attendance comparison failed");
+    } finally {
+      setComparingAttendanceByCompany((prev) => ({ ...prev, [company.companyId]: false }));
+      event.target.value = "";
+    }
   }
 
   async function logCall(company: ConfirmedCompany) {
@@ -359,58 +506,69 @@ export default function ConfirmedPage() {
   }
 
   function openScheduleModal(company: ConfirmedCompany) {
-    setScheduleTargetCompanyId(company.companyId);
-    setScheduleForm({
-      ...DEFAULT_SCHEDULE_FORM,
-      title: `${company.companyName} - Hiring Event`,
+    const selectedContactId = selectedContactByCompany[company.companyId];
+    const selectedContact =
+      company.contacts.find((contact) => contact.id === selectedContactId) ?? null;
+
+    const title = `${company.companyName} - OA`;
+    const details = [
+      `Company: ${company.companyName}`,
+      `Season: ${company.season.name}`,
+      company.roles.length > 0 ? `Roles: ${company.roles.join(", ")}` : "",
+      company.notes ? `Notes: ${company.notes}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const params = new URLSearchParams({
+      action: "TEMPLATE",
+      text: title,
+      details,
+      sf: "true",
+      output: "xml",
     });
-    setScheduleModalOpen(true);
-  }
 
-  async function createSchedule() {
-    if (!scheduleTargetCompanyId) return;
+    const invitees = Array.from(
+      new Set([
+        ...(selectedContact?.emails ?? []),
+        loggedInUserEmail,
+        ...company.studentEntryNumbers.map((entry) => `${entry}@iitrpr.ac.in`),
+      ]),
+    )
+      .map((email) => email.trim())
+      .filter(Boolean);
 
-    setSubmittingAction((prev) => ({ ...prev, schedule: true }));
-    setActionError("");
-    setActionMessage("");
-
-    try {
-      await requestJson("/api/v1/schedules", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId: scheduleTargetCompanyId,
-          title: scheduleForm.title,
-          description: scheduleForm.description || undefined,
-          startTime: new Date(scheduleForm.startTime).toISOString(),
-          endTime: new Date(scheduleForm.endTime).toISOString(),
-        }),
-      });
-
-      setScheduleModalOpen(false);
-      setActionMessage("Schedule event created.");
-    } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to create schedule");
-    } finally {
-      setSubmittingAction((prev) => ({ ...prev, schedule: false }));
+    if (invitees.length > 0) {
+      params.set("add", invitees.join(","));
     }
+
+    const driveForCompany = drives.find(
+      (drive) => drive.id === selectedDrive && drive.companyId === company.companyId,
+    );
+
+    if (driveForCompany?.startAt && driveForCompany?.endAt) {
+      params.set(
+        "dates",
+        `${toGoogleDateTime(driveForCompany.startAt)}/${toGoogleDateTime(
+          driveForCompany.endAt,
+        )}`,
+      );
+    }
+
+    const url = `https://calendar.google.com/calendar/render?${params.toString()}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+    setActionError("");
+    setActionMessage("Opened Google Calendar with prefilled event.");
   }
 
-  async function sendMailRequest(company: ConfirmedCompany, mode: "students" | "company") {
-    const actionKey = `mail:${mode}:${company.companyId}`;
+  async function sendMailRequest(company: ConfirmedCompany) {
+    const actionKey = `mail:students:${company.companyId}`;
     setSubmittingAction((prev) => ({ ...prev, [actionKey]: true }));
     setActionError("");
     setActionMessage("");
 
     try {
-      const selectedContactId = selectedContactByCompany[company.companyId];
-      const contact = company.contacts.find((item) => item.id === selectedContactId) ?? null;
       const body = (manualTelegramByCompany[company.companyId] ?? "").trim();
-      const attachments = getAttachmentsForCompany(company.companyId);
-
-      if (mode === "company" && !contact) {
-        throw new Error("Choose an HR/contact before sending company mail request.");
-      }
 
       await requestJson("/api/v1/mail/requests", {
         method: "POST",
@@ -419,35 +577,21 @@ export default function ConfirmedPage() {
           companyId: company.companyId,
           companySeasonCycleId: company.companySeasonCycleId,
           requestType: "custom",
-          customSubject:
-            mode === "students"
-              ? `${company.companyName} update for students`
-              : `${company.companyName} follow-up`,
+          customSubject: `${company.companyName} update for students`,
           customBody: body || undefined,
-          recipientFilter:
-            mode === "students"
-              ? { audience: "all_students", source: "confirmed_tab" }
-              : {
-                  audience: "company_contact",
-                  contactId: contact?.id,
-                  emails: contact?.emails ?? [],
-                },
+          recipientFilter: { audience: "all_students", source: "confirmed_tab" },
           previewPayload: {
             source: "confirmed_tab",
-            mode,
+            mode: "students",
             companyName: company.companyName,
-            contactName: contact?.name ?? null,
+            contactName: null,
           },
-          attachments,
+          attachments: [],
           urgency: 3,
         }),
       });
 
-      setActionMessage(
-        mode === "students"
-          ? "Mailing request queued for students."
-          : "Mailing request queued for selected company contact.",
-      );
+      setActionMessage("Mailing request queued for students.");
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Unable to create mail request");
     } finally {
@@ -506,6 +650,61 @@ export default function ConfirmedPage() {
       ...prev,
       [telegramCompany.companyId]: `${companyContext}\n\n${candidate}`,
     }));
+  }
+
+  function triggerFilePicker(inputId: string) {
+    const input = document.getElementById(inputId) as HTMLInputElement | null;
+    input?.click();
+  }
+
+  function openInstructionModal(company: ConfirmedCompany, task: InstructionTask) {
+    setInstructionModalCompanyId(company.companyId);
+    setInstructionModalTask(task);
+  }
+
+  function closeInstructionModal() {
+    setInstructionModalTask(null);
+    setInstructionModalCompanyId("");
+  }
+
+  function downloadTemplateCsv(task: InstructionTask) {
+    const csv =
+      task === "upload"
+        ? [
+            "Roll No,Student Name,Any Other Column",
+            "2025CSE0123,Example Student,Optional value",
+          ].join("\n")
+        : [
+            "Student Email,Status,Optional Column",
+            "2025CSE0123@iitrpr.ac.in,Present,Optional value",
+          ].join("\n");
+
+    const fileName =
+      task === "upload"
+        ? "student-upload-template.csv"
+        : "attendance-compare-template.csv";
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  }
+
+  function continueFromInstruction() {
+    if (!instructionModalCompanyId || !instructionModalTask) return;
+
+    const inputId =
+      instructionModalTask === "upload"
+        ? `upload-students-${instructionModalCompanyId}`
+        : `compare-attendance-${instructionModalCompanyId}`;
+
+    closeInstructionModal();
+    triggerFilePicker(inputId);
   }
 
   return (
@@ -584,10 +783,9 @@ export default function ConfirmedPage() {
           {filteredCompanies.map((company) => {
               const isActive = selectedCompanyId === company.companyId;
               const contactValue = selectedContactByCompany[company.companyId] ?? "";
-              const slot1 = sheetOneByCompany[company.companyId] ?? null;
-              const slot2 = sheetTwoByCompany[company.companyId] ?? null;
               const hasContacts = company.contacts.length > 0;
               const hasSelectedContact = Boolean(contactValue);
+              const hasUploadedStudents = company.studentEntryNumbers.length > 0;
 
               return (
                 <article
@@ -655,7 +853,7 @@ export default function ConfirmedPage() {
                     ) : null}
                   </div>
 
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
                     <button
                       type="button"
                       onClick={() => void logCall(company)}
@@ -668,28 +866,25 @@ export default function ConfirmedPage() {
                     <button
                       type="button"
                       onClick={() => openScheduleModal(company)}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8] px-3 py-2 text-sm font-medium hover:bg-[#DBEAFE] transition-colors"
+                      disabled={!hasUploadedStudents}
+                      title={
+                        hasUploadedStudents
+                          ? "Schedule event with participants"
+                          : "Upload students first to enable scheduling"
+                      }
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8] px-3 py-2 text-sm font-medium hover:bg-[#DBEAFE] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <CalendarPlus size={15} />
                       Schedule Event
                     </button>
                     <button
                       type="button"
-                      onClick={() => void sendMailRequest(company, "students")}
+                      onClick={() => void sendMailRequest(company)}
                       disabled={submittingAction[`mail:students:${company.companyId}`]}
                       className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 px-3 py-2 text-sm font-medium hover:bg-amber-100 transition-colors disabled:opacity-60"
                     >
                       <Users size={15} />
                       Request Mailing Team
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void sendMailRequest(company, "company")}
-                      disabled={submittingAction[`mail:company:${company.companyId}`] || !hasSelectedContact}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 px-3 py-2 text-sm font-medium hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Mail size={15} />
-                      Mail Company
                     </button>
                     <button
                       type="button"
@@ -702,65 +897,70 @@ export default function ConfirmedPage() {
                   </div>
 
                   <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3">
-                    <p className="text-xs font-semibold text-slate-700 mb-2">
-                      Upload two files for this company (CSV/XLS/XLSX)
-                    </p>
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-3 items-stretch">
-                      <div className="rounded-lg border border-slate-200 bg-white p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileSpreadsheet size={15} className="text-[#2563EB]" />
-                          <p className="text-sm font-semibold text-slate-800">Supsrset sheet</p>
-                        </div>
-                        <label className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100 transition-colors">
-                          <Upload size={13} />
-                          Choose CSV/XLSX
-                          <input
-                            type="file"
-                            accept=".csv,.xls,.xlsx"
-                            className="hidden"
-                            onChange={(event) => void onUploadSheet(company.companyId, "sheetOne", event)}
-                          />
-                        </label>
-                        <div className="mt-2">
-                          <UploadedFileName
-                            attachment={slot1}
-                            uploading={Boolean(uploadingBySlot[`${company.companyId}:sheetOne`])}
-                          />
-                        </div>
-                      </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-slate-700">
+                        Students Uploaded: <span className="text-slate-900">{company.studentEntryNumbers.length}</span>
+                      </p>
+                      <p className="text-xs text-slate-500">Format: YYYYBBBNNNN</p>
+                    </div>
 
-                      <div className="flex items-center justify-center">
-                        <button
-                          type="button"
-                          onClick={() => downloadPlaceholderComparison(company)}
-                          className="inline-flex items-center justify-center whitespace-nowrap rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-xs font-semibold text-[#1D4ED8] hover:bg-[#DBEAFE]"
-                        >
-                          Compare
-                        </button>
-                      </div>
+                    <input
+                      id={`upload-students-${company.companyId}`}
+                      type="file"
+                      accept=".csv,.xls,.xlsx"
+                      className="hidden"
+                      onChange={(event) => void onUploadStudentInfo(company, event)}
+                      disabled={Boolean(uploadingStudentByCompany[company.companyId])}
+                    />
+                    <input
+                      id={`compare-attendance-${company.companyId}`}
+                      type="file"
+                      accept=".csv,.xls,.xlsx"
+                      className="hidden"
+                      onChange={(event) => void onCompareAttendance(company, event)}
+                      disabled={Boolean(comparingAttendanceByCompany[company.companyId])}
+                    />
 
-                      <div className="rounded-lg border border-slate-200 bg-white p-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileSpreadsheet size={15} className="text-[#2563EB]" />
-                          <p className="text-sm font-semibold text-slate-800">Acadly attendence</p>
-                        </div>
-                        <label className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100 transition-colors">
-                          <Upload size={13} />
-                          Choose CSV/XLSX
-                          <input
-                            type="file"
-                            accept=".csv,.xls,.xlsx"
-                            className="hidden"
-                            onChange={(event) => void onUploadSheet(company.companyId, "sheetTwo", event)}
-                          />
-                        </label>
-                        <div className="mt-2">
-                          <UploadedFileName
-                            attachment={slot2}
-                            uploading={Boolean(uploadingBySlot[`${company.companyId}:sheetTwo`])}
-                          />
-                        </div>
-                      </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openInstructionModal(company, "upload")}
+                        disabled={Boolean(uploadingStudentByCompany[company.companyId])}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <Upload size={12} />
+                        {uploadingStudentByCompany[company.companyId] ? "Uploading..." : "Upload Students"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setStudentPreviewCompanyId(company.companyId)}
+                        disabled={!hasUploadedStudents}
+                        title={
+                          hasUploadedStudents
+                            ? "Preview uploaded students"
+                            : "Upload students first to preview the list"
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1.5 text-xs font-semibold text-[#1D4ED8] hover:bg-[#DBEAFE] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <Eye size={12} />
+                        Preview List
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => openInstructionModal(company, "compare")}
+                        disabled={Boolean(comparingAttendanceByCompany[company.companyId]) || !hasUploadedStudents}
+                        title={
+                          hasUploadedStudents
+                            ? "Compare attendance"
+                            : "Upload students first to enable compare attendance"
+                        }
+                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <FileSpreadsheet size={12} />
+                        {comparingAttendanceByCompany[company.companyId] ? "Comparing..." : "Compare Attendance"}
+                      </button>
                     </div>
                   </div>
                 </article>
@@ -859,91 +1059,274 @@ export default function ConfirmedPage() {
       </Modal>
 
       <Modal
-        isOpen={scheduleModalOpen}
-        onClose={() => setScheduleModalOpen(false)}
-        title="Schedule Event"
+        isOpen={Boolean(studentPreviewCompany)}
+        onClose={() => setStudentPreviewCompanyId("")}
+        title={studentPreviewCompany ? `Students - ${studentPreviewCompany.companyName}` : "Students"}
+        size="lg"
+        footer={
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setStudentPreviewCompanyId("")}
+          >
+            Close
+          </button>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-slate-600">
+            Uploaded students: <span className="font-semibold text-slate-800">{studentPreviewCompany?.studentEntryNumbers.length ?? 0}</span>
+          </p>
+
+          {studentPreviewCompany && studentPreviewCompany.studentEntryNumbers.length > 0 ? (
+            <div className="max-h-80 overflow-auto rounded-lg border border-slate-200">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">#</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Entry Number</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Email</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentPreviewCompany.studentEntryNumbers.map((entry, index) => (
+                    <tr key={entry} className="border-b border-slate-100 last:border-b-0">
+                      <td className="px-3 py-2 text-slate-600">{index + 1}</td>
+                      <td className="px-3 py-2 font-medium text-slate-900">{entry}</td>
+                      <td className="px-3 py-2 text-slate-700">{entry}@iitrpr.ac.in</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">No students uploaded yet for this company.</p>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(instructionModalTask && instructionModalCompany)}
+        onClose={closeInstructionModal}
+        title={
+          instructionModalTask === "upload"
+            ? `Upload Students Instructions - ${instructionModalCompany?.companyName ?? ""}`
+            : `Compare Attendance Instructions - ${instructionModalCompany?.companyName ?? ""}`
+        }
         size="md"
+        footer={
+          <>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={closeInstructionModal}>
+              Cancel
+            </button>
+            {instructionModalTask === "upload" ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  downloadTemplateCsv("upload");
+                }}
+              >
+                Download Template
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={continueFromInstruction}
+              disabled={!instructionModalTask || !instructionModalCompany}
+            >
+              Continue
+            </button>
+          </>
+        }
+      >
+        {instructionModalTask === "upload" ? (
+          <div className="space-y-2 text-sm text-slate-700">
+            <p>
+              File can have <span className="font-semibold">any number of columns</span>.
+            </p>
+            <p>
+              One required column must be exactly: <span className="font-semibold">Roll No</span>.
+            </p>
+            <p>
+              Roll No format must be: <span className="font-semibold">YYYYBBBNNNN</span> (example: 2025CSE0123).
+            </p>
+          </div>
+        ) : instructionModalTask === "compare" ? (
+          <div className="space-y-2 text-sm text-slate-700">
+            <p>
+              Upload <span className="font-semibold">CSV exported from Acadly</span>.
+            </p>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={compareResultModalOpen}
+        onClose={() => setCompareResultModalOpen(false)}
+        title={compareResultCompanyName ? `Attendance Records - ${compareResultCompanyName}` : "Attendance Records"}
+        size="lg"
         footer={
           <>
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => setScheduleModalOpen(false)}
+              onClick={() => setCompareResultModalOpen(false)}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                const company = acceptedCompanies.find((item) => item.companyId === compareResultCompanyId);
+                if (!company || !compareResultPayload) return;
+                downloadAttendanceComparison(company, compareResultPayload);
+              }}
+              disabled={!compareResultPayload}
+            >
+              Download CSV
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {compareResultPayload ? (
+            <>
+              <p className="text-xs text-slate-600">
+                Matched: <span className="font-semibold text-emerald-700">{compareResultPayload.matchedCount}</span>
+                {" "}| Missing: <span className="font-semibold text-rose-700">{compareResultPayload.missingCount}</span>
+              </p>
+
+              <div className="max-h-80 overflow-auto rounded-lg border border-slate-200">
+                <table className="w-full text-xs">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-700">#</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-700">Entry Number</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-700">Status</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-700">Matched</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {compareResultPayload.rows.map((row, index) => (
+                      <tr key={`${row.entryNumber}-${index}`} className="border-b border-slate-100 last:border-b-0">
+                        <td className="px-3 py-2 text-slate-600">{index + 1}</td>
+                        <td className="px-3 py-2 font-medium text-slate-900">{row.entryNumber}</td>
+                        <td className="px-3 py-2 text-slate-700">{row.attendanceStatus}</td>
+                        <td className="px-3 py-2">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold ${
+                              row.matched
+                                ? "bg-emerald-100 text-emerald-700"
+                                : "bg-rose-100 text-rose-700"
+                            }`}
+                          >
+                            {row.matched ? "Yes" : "No"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-slate-500">No records to display.</p>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(studentUploadPreview)}
+        onClose={() => {
+          const companyId = studentUploadPreview?.companyId ?? "";
+          if (companyId && uploadingStudentByCompany[companyId]) {
+            return;
+          }
+          setStudentUploadPreview(null);
+        }}
+        title={
+          studentUploadPreview
+            ? `Preview Student Upload - ${studentUploadPreview.companyName}`
+            : "Preview Student Upload"
+        }
+        size="lg"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setStudentUploadPreview(null)}
+              disabled={Boolean(
+                studentUploadPreview && uploadingStudentByCompany[studentUploadPreview.companyId],
+              )}
             >
               Cancel
             </button>
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              onClick={() => void createSchedule()}
-              disabled={submittingAction.schedule}
+              onClick={() => void submitStudentUploadPreview()}
+              disabled={Boolean(
+                !studentUploadPreview ||
+                  (studentUploadPreview && uploadingStudentByCompany[studentUploadPreview.companyId]),
+              )}
             >
-              {submittingAction.schedule ? "Saving..." : "Create"}
+              {studentUploadPreview && uploadingStudentByCompany[studentUploadPreview.companyId]
+                ? "Uploading..."
+                : "Confirm Upload"}
             </button>
           </>
         }
       >
-        <div className="space-y-3">
-          <label className="block">
-            <span className="text-xs font-semibold text-slate-600">Title</span>
-            <input
-              className="input-base mt-1"
-              value={scheduleForm.title}
-              onChange={(event) =>
-                setScheduleForm((prev) => ({
-                  ...prev,
-                  title: event.target.value,
-                }))
-              }
-            />
-          </label>
+        {studentUploadPreview ? (
+          <div className="space-y-3">
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <p>
+                File: <span className="font-semibold">{studentUploadPreview.file.name}</span>
+              </p>
+              <p>
+                Detected column: <span className="font-semibold">{studentUploadPreview.rollHeader}</span>
+              </p>
+              <p>
+                Valid entries: <span className="font-semibold text-emerald-700">{studentUploadPreview.validEntries.length}</span>
+                {" "}| Invalid rows: <span className="font-semibold text-rose-700">{studentUploadPreview.invalidRows.length}</span>
+                {" "}| Data rows: <span className="font-semibold">{studentUploadPreview.totalDataRows}</span>
+              </p>
+            </div>
 
-          <label className="block">
-            <span className="text-xs font-semibold text-slate-600">Description</span>
-            <textarea
-              className="input-base mt-1 min-h-20 resize-y"
-              value={scheduleForm.description}
-              onChange={(event) =>
-                setScheduleForm((prev) => ({
-                  ...prev,
-                  description: event.target.value,
-                }))
-              }
-            />
-          </label>
+            <div className="max-h-80 overflow-auto rounded-lg border border-slate-200">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">#</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Entry Number</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Email</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {studentUploadPreview.validEntries.slice(0, 200).map((entry, index) => (
+                    <tr key={entry} className="border-b border-slate-100 last:border-b-0">
+                      <td className="px-3 py-2 text-slate-600">{index + 1}</td>
+                      <td className="px-3 py-2 font-medium text-slate-900">{entry}</td>
+                      <td className="px-3 py-2 text-slate-700">{entry}@iitrpr.ac.in</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-600">Start</span>
-              <input
-                type="datetime-local"
-                className="input-base mt-1"
-                value={scheduleForm.startTime}
-                onChange={(event) =>
-                  setScheduleForm((prev) => ({
-                    ...prev,
-                    startTime: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="block">
-              <span className="text-xs font-semibold text-slate-600">End</span>
-              <input
-                type="datetime-local"
-                className="input-base mt-1"
-                value={scheduleForm.endTime}
-                onChange={(event) =>
-                  setScheduleForm((prev) => ({
-                    ...prev,
-                    endTime: event.target.value,
-                  }))
-                }
-              />
-            </label>
+            {studentUploadPreview.validEntries.length > 200 ? (
+              <p className="text-xs text-slate-500">
+                Showing first 200 entries in preview. All valid entries will be uploaded.
+              </p>
+            ) : null}
           </div>
-        </div>
+        ) : null}
       </Modal>
+
     </div>
   );
 }

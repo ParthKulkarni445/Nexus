@@ -46,6 +46,8 @@ type BlogsPageClientProps = {
   initialCompanies: ApiCompany[];
   initialModerationQueue: BlogPost[];
   initialCanViewModeration: boolean;
+  allowCreate?: boolean;
+  showModerationPanel?: boolean;
 };
 
 function buildContent(content: string) {
@@ -89,6 +91,8 @@ export default function BlogsPageClient({
   initialCompanies,
   initialModerationQueue,
   initialCanViewModeration,
+  allowCreate = true,
+  showModerationPanel = true,
 }: BlogsPageClientProps) {
   const [blogs, setBlogs] = useState<BlogPost[]>(initialBlogs);
   const [companies] = useState<ApiCompany[]>(initialCompanies);
@@ -444,7 +448,13 @@ export default function BlogsPageClient({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] items-stretch">
+      <div
+        className={`grid grid-cols-1 gap-4 items-stretch ${
+          showModerationPanel
+            ? "xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]"
+            : "xl:grid-cols-1"
+        }`}
+      >
         <div className="min-w-0 space-y-4">
           <div className="card overflow-visible flex flex-col">
             <div className="px-4 py-3 border-b border-(--card-border)">
@@ -498,14 +508,16 @@ export default function BlogsPageClient({
                 <h2 className="text-sm font-semibold text-slate-900">
                   Latest Blogs
                 </h2>
-                <button
-                  type="button"
-                  onClick={openCreateModal}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#1D4ED8] bg-[#2563EB] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1D4ED8]"
-                >
-                  <BookOpen size={16} />
-                  Create Blog
-                </button>
+                {allowCreate && (
+                  <button
+                    type="button"
+                    onClick={openCreateModal}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#1D4ED8] bg-[#2563EB] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1D4ED8]"
+                  >
+                    <BookOpen size={16} />
+                    Create Blog
+                  </button>
+                )}
               </div>
             </div>
 
@@ -615,68 +627,70 @@ export default function BlogsPageClient({
           </section>
         </div>
 
-        <aside className="card p-4 h-full">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Moderation Queue
-            </h2>
-            <Badge variant="danger" size="sm">
-              {moderationQueue.length} in queue
-            </Badge>
-          </div>
+        {showModerationPanel && (
+          <aside className="card p-4 h-full">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-slate-900">
+                Moderation Queue
+              </h2>
+              <Badge variant="danger" size="sm">
+                {moderationQueue.length} in queue
+              </Badge>
+            </div>
 
-          <div className="mt-3 space-y-3">
-            {actionError && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
-                {actionError}
-              </div>
-            )}
-
-            {!canViewModeration && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                You do not have permission to view moderation items.
-              </div>
-            )}
-
-            {canViewModeration && moderationQueue.length === 0 && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                No pending blogs in moderation queue.
-              </div>
-            )}
-
-            {moderationQueue.map((blog) => (
-              <div
-                key={blog.id}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-3"
-              >
-                <p className="text-sm font-medium text-slate-900">
-                  {blog.title}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {blog.company} • {blog.author}
-                </p>
-
-                <div className="mt-2 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-2 text-xs text-[#1D4ED8]">
-                  {blog.moderationNote ?? "No moderator note yet."}
+            <div className="mt-3 space-y-3">
+              {actionError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
+                  {actionError}
                 </div>
+              )}
 
-                <div className="mt-2 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    disabled={activeBlogId === blog.id}
-                    onClick={() => {
-                      openReviewModal(blog);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <ShieldCheck size={13} />
-                    Review
-                  </button>
+              {!canViewModeration && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                  You do not have permission to view moderation items.
                 </div>
-              </div>
-            ))}
-          </div>
-        </aside>
+              )}
+
+              {canViewModeration && moderationQueue.length === 0 && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                  No pending blogs in moderation queue.
+                </div>
+              )}
+
+              {moderationQueue.map((blog) => (
+                <div
+                  key={blog.id}
+                  className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                >
+                  <p className="text-sm font-medium text-slate-900">
+                    {blog.title}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {blog.company} • {blog.author}
+                  </p>
+
+                  <div className="mt-2 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-2 text-xs text-[#1D4ED8]">
+                    {blog.moderationNote ?? "No moderator note yet."}
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={activeBlogId === blog.id}
+                      onClick={() => {
+                        openReviewModal(blog);
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <ShieldCheck size={13} />
+                      Review
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
       </div>
 
       <Modal
@@ -724,201 +738,205 @@ export default function BlogsPageClient({
         )}
       </Modal>
 
-      <Modal
-        isOpen={isCreateModalOpen}
-        onClose={closeCreateModal}
-        title="Create Blog"
-        size="lg"
-        footer={
-          <>
-            <button className="btn btn-secondary" onClick={closeCreateModal}>
-              Cancel
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                void submitCreateBlog();
-              }}
-              disabled={isCreating}
-            >
-              <BookOpen size={14} />
-              {isCreating ? "Submitting..." : "Submit"}
-            </button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <p className="rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-3 py-2 text-xs text-[#1D4ED8]">
-            Student blogs require moderation, while TPO blogs are published
-            directly.
-          </p>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Company *
-            </label>
-            <select
-              className="input-base"
-              value={createCompanyId}
-              onChange={(event) => setCreateCompanyId(event.target.value)}
-              disabled={isCreating}
-            >
-              <option value="">-- Select company --</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Title *
-            </label>
-            <input
-              className="input-base"
-              value={createTitle}
-              onChange={(event) => setCreateTitle(event.target.value)}
-              placeholder="Enter blog title"
-              disabled={isCreating}
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Blog Content *
-            </label>
-            <RichTextEditor
-              value={createBody}
-              onChange={setCreateBody}
-              placeholder="Write your blog content here..."
-            />
-            <p className="mt-1 text-xs text-slate-500">
-              Format text with headings, lists, and links.
-            </p>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Tags
-            </label>
-            <input
-              className="input-base"
-              value={createTags}
-              onChange={(event) => setCreateTags(event.target.value)}
-              placeholder="Comma separated tags (example: interview, prep, experience)"
-              disabled={isCreating}
-            />
-          </div>
-
-          <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={createAiAssisted}
-              onChange={(event) => setCreateAiAssisted(event.target.checked)}
-              disabled={isCreating}
-            />
-            AI-assisted content
-          </label>
-
-          {createError && (
-            <p className="text-xs font-medium text-red-600">{createError}</p>
-          )}
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={Boolean(reviewingBlog)}
-        onClose={closeReviewModal}
-        title={reviewingBlog ? `Review - ${reviewingBlog.title}` : "Review"}
-        size="xl"
-        footer={
-          <>
-            <button className="btn btn-secondary" onClick={closeReviewModal}>
-              Cancel
-            </button>
-            <button
-              className="btn btn-danger"
-              onClick={submitRejectFromReview}
-              disabled={!reviewingBlog || activeBlogId === reviewingBlog.id}
-            >
-              <ShieldCheck size={14} />
-              {activeBlogId && reviewingBlog?.id === activeBlogId
-                ? "Saving..."
-                : "Reject"}
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                if (!reviewingBlog) {
-                  return;
-                }
-
-                void approveBlog(reviewingBlog.id);
-              }}
-              disabled={!reviewingBlog || activeBlogId === reviewingBlog.id}
-            >
-              <CircleCheck size={14} />
-              {activeBlogId && reviewingBlog?.id === activeBlogId
-                ? "Approving..."
-                : "Approve"}
-            </button>
-          </>
-        }
-      >
-        {reviewingBlog && (
+      {allowCreate && (
+        <Modal
+          isOpen={isCreateModalOpen}
+          onClose={closeCreateModal}
+          title="Create Blog"
+          size="lg"
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={closeCreateModal}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  void submitCreateBlog();
+                }}
+                disabled={isCreating}
+              >
+                <BookOpen size={14} />
+                {isCreating ? "Submitting..." : "Submit"}
+              </button>
+            </>
+          }
+        >
           <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-base font-semibold text-slate-900">
-                {reviewingBlog.title}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                {reviewingBlog.company} • {reviewingBlog.author} •{" "}
-                {formatDate(reviewingBlog.date)}
-              </p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                {reviewingBlog.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            </div>
+            <p className="rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-3 py-2 text-xs text-[#1D4ED8]">
+              Student blogs require moderation, while TPO blogs are published
+              directly.
+            </p>
 
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Blog Content
-              </p>
-              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                {reviewingBlog.content || "No content available."}
-              </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Company *
+              </label>
+              <select
+                className="input-base"
+                value={createCompanyId}
+                onChange={(event) => setCreateCompanyId(event.target.value)}
+                disabled={isCreating}
+              >
+                <option value="">-- Select company --</option>
+                {companies.map((company) => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
-                Rejection Note (required only when rejecting)
+                Title *
               </label>
-              <textarea
-                rows={3}
+              <input
                 className="input-base"
-                value={reviewNote}
-                onChange={(event) => setReviewNote(event.target.value)}
-                placeholder="Mention what should be changed before approval..."
-                disabled={activeBlogId === reviewingBlog.id}
+                value={createTitle}
+                onChange={(event) => setCreateTitle(event.target.value)}
+                placeholder="Enter blog title"
+                disabled={isCreating}
               />
-              {reviewFormError && (
-                <p className="mt-1 text-xs font-medium text-red-600">
-                  {reviewFormError}
-                </p>
-              )}
             </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Blog Content *
+              </label>
+              <RichTextEditor
+                value={createBody}
+                onChange={setCreateBody}
+                placeholder="Write your blog content here..."
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Format text with headings, lists, and links.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Tags
+              </label>
+              <input
+                className="input-base"
+                value={createTags}
+                onChange={(event) => setCreateTags(event.target.value)}
+                placeholder="Comma separated tags (example: interview, prep, experience)"
+                disabled={isCreating}
+              />
+            </div>
+
+            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={createAiAssisted}
+                onChange={(event) => setCreateAiAssisted(event.target.checked)}
+                disabled={isCreating}
+              />
+              AI-assisted content
+            </label>
+
+            {createError && (
+              <p className="text-xs font-medium text-red-600">{createError}</p>
+            )}
           </div>
-        )}
-      </Modal>
+        </Modal>
+      )}
+
+      {showModerationPanel && (
+        <Modal
+          isOpen={Boolean(reviewingBlog)}
+          onClose={closeReviewModal}
+          title={reviewingBlog ? `Review - ${reviewingBlog.title}` : "Review"}
+          size="xl"
+          footer={
+            <>
+              <button className="btn btn-secondary" onClick={closeReviewModal}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-danger"
+                onClick={submitRejectFromReview}
+                disabled={!reviewingBlog || activeBlogId === reviewingBlog.id}
+              >
+                <ShieldCheck size={14} />
+                {activeBlogId && reviewingBlog?.id === activeBlogId
+                  ? "Saving..."
+                  : "Reject"}
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => {
+                  if (!reviewingBlog) {
+                    return;
+                  }
+
+                  void approveBlog(reviewingBlog.id);
+                }}
+                disabled={!reviewingBlog || activeBlogId === reviewingBlog.id}
+              >
+                <CircleCheck size={14} />
+                {activeBlogId && reviewingBlog?.id === activeBlogId
+                  ? "Approving..."
+                  : "Approve"}
+              </button>
+            </>
+          }
+        >
+          {reviewingBlog && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-base font-semibold text-slate-900">
+                  {reviewingBlog.title}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {reviewingBlog.company} • {reviewingBlog.author} •{" "}
+                  {formatDate(reviewingBlog.date)}
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {reviewingBlog.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Blog Content
+                </p>
+                <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                  {reviewingBlog.content || "No content available."}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Rejection Note (required only when rejecting)
+                </label>
+                <textarea
+                  rows={3}
+                  className="input-base"
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  placeholder="Mention what should be changed before approval..."
+                  disabled={activeBlogId === reviewingBlog.id}
+                />
+                {reviewFormError && (
+                  <p className="mt-1 text-xs font-medium text-red-600">
+                    {reviewFormError}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
     </div>
   );
 }

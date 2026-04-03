@@ -3,6 +3,18 @@ import { getCurrentUser } from "@/lib/api/auth";
 import { success, unauthorized, serverError, badRequest } from "@/lib/api/response";
 import { db } from "@/lib/db";
 
+function isMissingStudentEntriesTable(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+
+  const code = "code" in error && typeof error.code === "string" ? error.code : "";
+  if (code === "P2021") {
+    return true;
+  }
+
+  const message = "message" in error && typeof error.message === "string" ? error.message : "";
+  return message.includes("company_season_student_entries");
+}
+
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
 
@@ -61,12 +73,12 @@ export async function GET(request: NextRequest) {
 
     const seasonId = selectedDrive.companySeasonCycle.seasonId;
 
-    const acceptedCycles = await db.companySeasonCycle.findMany({
+    const baseQuery = {
       where: {
         seasonId,
-        status: "accepted",
+        status: "accepted" as const,
       },
-      orderBy: [{ updatedAt: "desc" }],
+      orderBy: [{ updatedAt: "desc" as const }],
       include: {
         company: {
           select: {
@@ -81,7 +93,7 @@ export async function GET(request: NextRequest) {
                 emails: true,
                 phones: true,
               },
-              orderBy: [{ lastContactedAt: "desc" }, { createdAt: "desc" }],
+              orderBy: [{ lastContactedAt: "desc" as const }, { createdAt: "desc" as const }],
             },
             drives: {
               where: {
@@ -96,7 +108,7 @@ export async function GET(request: NextRequest) {
                 status: true,
                 startAt: true,
               },
-              orderBy: [{ startAt: "asc" }, { createdAt: "asc" }],
+              orderBy: [{ startAt: "asc" as const }, { createdAt: "asc" as const }],
             },
           },
         },
@@ -109,7 +121,30 @@ export async function GET(request: NextRequest) {
         },
       },
       take: 500,
-    });
+    };
+
+    let acceptedCycles: any[] = [];
+
+    try {
+      acceptedCycles = await db.companySeasonCycle.findMany({
+        ...baseQuery,
+        include: {
+          ...baseQuery.include,
+          studentEntries: {
+            select: {
+              entryNumber: true,
+            },
+            orderBy: [{ entryNumber: "asc" }],
+          },
+        },
+      });
+    } catch (error) {
+      if (!isMissingStudentEntriesTable(error)) {
+        throw error;
+      }
+
+      acceptedCycles = await db.companySeasonCycle.findMany(baseQuery);
+    }
 
     const telegramTemplatesRaw = await db.emailTemplate.findMany({
       where: {
@@ -163,6 +198,7 @@ export async function GET(request: NextRequest) {
         phones: contact.phones,
         emails: contact.emails,
       })),
+      studentEntryNumbers: (cycle.studentEntries ?? []).map((entry: { entryNumber: string }) => entry.entryNumber),
     }));
 
     const telegramTemplates = telegramTemplatesRaw.map((template) => ({

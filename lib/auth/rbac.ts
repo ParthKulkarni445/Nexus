@@ -32,9 +32,17 @@ export const APP_PROTECTED_PATH_PREFIXES = [
   "/notifications",
   "/schedule",
   "/admin",
+  "/student",
 ] as const;
 
 export const APP_ROUTE_POLICIES: RoutePolicy[] = [
+  {
+    route: "/student",
+    label: "Student portal",
+    rule: {
+      roles: ["student"],
+    },
+  },
   {
     route: "/admin",
     label: "Admin pages",
