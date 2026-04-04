@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     const dateStamp = new Date().toISOString().slice(0, 10);
 
-    return new Response(workbookBuffer, {
+    return new Response(new Uint8Array(workbookBuffer), {
       status: 200,
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

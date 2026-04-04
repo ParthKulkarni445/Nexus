@@ -29,7 +29,7 @@ export async function GET() {
     ],
   );
 
-  return new Response(workbookBuffer, {
+  return new Response(new Uint8Array(workbookBuffer), {
     status: 200,
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

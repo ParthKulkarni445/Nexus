@@ -189,9 +189,9 @@ export async function GET(request: NextRequest) {
         seasonType: cycle.season.seasonType,
       },
       roles: cycle.company.drives
-        .map((drive) => drive.title)
-        .filter((title) => title && title.trim().length > 0),
-      contacts: cycle.company.contacts.map((contact) => ({
+        .map((drive: { title: string }) => drive.title)
+        .filter((title: string) => title && title.trim().length > 0),
+      contacts: cycle.company.contacts.map((contact: { id: string; name: string; designation: string; phones: string[]; emails: string[] }) => ({
         id: contact.id,
         name: contact.name,
         designation: contact.designation,
