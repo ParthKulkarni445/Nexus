@@ -12,6 +12,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  phone?: string | null;
   role: UserRole;
   coordinatorType?: CoordinatorType;
   isActive: boolean;
@@ -76,6 +77,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     id: user.id,
     email: user.email,
     name: user.name,
+    phone: user.phone,
     role: user.role as UserRole,
     coordinatorType: user.coordinatorType as CoordinatorType | undefined,
     isActive: user.isActive,

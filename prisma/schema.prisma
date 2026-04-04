@@ -19,6 +19,7 @@ model User {
   isActive                 Boolean                      @default(true) @map("is_active")
   createdAt                DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                DateTime                     @default(now()) @map("updated_at") @db.Timestamptz(6)
+  phone                    String?                      @db.VarChar(30)
   auditLogs                AuditLog[]
   blogVotes                BlogVote[]
   approvedBlogs            Blog[]                       @relation("BlogApprover")
@@ -592,6 +593,16 @@ model StudentDataConsent {
   student                  User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@map("student_data_consent")
+}
+
+model MailboxSyncState {
+  mailboxEmail   String   @id @map("mailbox_email") @db.VarChar(255)
+  lastHistoryId  String?  @map("last_history_id") @db.VarChar(255)
+  lastSyncedAt   DateTime? @map("last_synced_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("mailbox_sync_states")
 }
 
 enum UserRole {

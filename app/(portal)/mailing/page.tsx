@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  ArrowLeft,
   Building2,
   CalendarCheck,
   CheckCircle2,
@@ -35,15 +36,26 @@ import RichTextEditor, {
 } from "@/components/ui/RichTextEditor";
 import SearchBar from "@/components/ui/SearchBar";
 import StatusBadge from "@/components/ui/StatusBadge";
+import {
+  PREDEFINED_TEMPLATE_VARIABLES,
+  appendTemplateVariables,
+} from "@/lib/mailing/templateVariables";
 
-type ViewMode = "queue" | "templates" | "inbound";
+type ViewMode = "queue" | "templates" | "mailbox";
 type MailStatus = "pending" | "queued" | "sent" | "rejected" | "cancelled";
 type MailType = "template" | "custom";
 type TemplateStatus = "draft" | "approved" | "archived";
-type InboundBucket = "unassigned" | "misc" | "company";
+type MailboxBucket = "all";
 
 type ApiResponse<T> = {
   data?: T;
+  meta?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+    [key: string]: unknown;
+  };
   error?: { message?: string };
 };
 
@@ -51,6 +63,7 @@ type MailRequestRecord = {
   id: string;
   companyId?: string | null;
   requestType: MailType;
+  senderEmail?: string | null;
   customSubject?: string | null;
   customBody?: string | null;
   previewPayload?: {
@@ -58,6 +71,15 @@ type MailRequestRecord = {
     htmlBody?: string;
     textBody?: string;
     attachments?: MailAttachmentMeta[];
+  } | null;
+  recipientFilter?: {
+    emails?: string[];
+    ccEmails?: string[];
+    replyContext?: {
+      threadId?: string;
+      messageId?: string;
+      references?: string[];
+    };
   } | null;
   attachments?: MailAttachmentMeta[];
   status: MailStatus;
@@ -136,8 +158,10 @@ type TemplateFormState = {
 
 type TemplateFormFieldValue = TemplateFormState[keyof TemplateFormState];
 
-type InboundEmailRecord = {
+type MailboxEmailRecord = {
   id: string;
+  direction: "inbound" | "outbound";
+  messageId?: string;
   subject?: string | null;
   fromEmail?: string | null;
   toEmails?: string[];
@@ -145,6 +169,7 @@ type InboundEmailRecord = {
   textBody?: string | null;
   htmlBody?: string | null;
   createdAt?: string;
+  references?: string[];
   threadId?: string | null;
   classification?: Record<string, unknown> | null;
   company?: {
@@ -156,6 +181,13 @@ type InboundEmailRecord = {
     fileName: string;
     sizeBytes?: number | null;
   }>;
+};
+
+type MailboxMeta = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 };
 
 const VIEW_OPTIONS: Array<{
@@ -171,28 +203,22 @@ const VIEW_OPTIONS: Array<{
     hint: "Approve coordinator requests and dispatch mail.",
   },
   {
+    value: "mailbox",
+    label: "Mailbox",
+    icon: Inbox,
+    hint: "Monitor inbound and outbound threads from the shared mailbox.",
+  },
+  {
     value: "templates",
     label: "Templates",
     icon: LayoutTemplate,
     hint: "Manage reusable mail templates and approvals.",
-  },
-  {
-    value: "inbound",
-    label: "Inbound",
-    icon: Inbox,
-    hint: "Monitor received mail and classification buckets.",
   },
 ];
 
 const QUEUE_TYPE_OPTIONS = [
   { value: "template", label: "Template" },
   { value: "custom", label: "Custom" },
-];
-
-const INBOUND_BUCKETS: Array<{ value: InboundBucket; label: string }> = [
-  { value: "unassigned", label: "Unassigned" },
-  { value: "company", label: "Mapped" },
-  { value: "misc", label: "Misc" },
 ];
 
 async function requestJson<T>(url: string, init?: RequestInit) {
@@ -281,6 +307,28 @@ function getMailAttachments(mail: MailRequestRecord) {
   return mail.template?.attachments ?? [];
 }
 
+function getMailToRecipients(mail: MailRequestRecord) {
+  const emails = mail.recipientFilter?.emails;
+  if (!emails || emails.length === 0) {
+    return "No recipients selected";
+  }
+
+  return emails.join(", ");
+}
+
+function getMailCcRecipients(mail: MailRequestRecord) {
+  const emails = mail.recipientFilter?.ccEmails;
+  if (!emails || emails.length === 0) {
+    return "-";
+  }
+
+  return emails.join(", ");
+}
+
+function getMailFromAddress(mail: MailRequestRecord) {
+  return mail.senderEmail?.trim() || mail.requester.email || "-";
+}
+
 function getInitials(value: string) {
   return value
     .split(" ")
@@ -288,6 +336,100 @@ function getInitials(value: string) {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
+}
+
+function getMailboxThreadKey(email: MailboxEmailRecord) {
+  return email.threadId?.trim() || email.id;
+}
+
+function parseRecipientInput(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,;]/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function buildReplySubject(value?: string | null) {
+  const normalized = value?.trim() ?? "";
+  if (!normalized) return "Re:";
+  return /^re:/i.test(normalized) ? normalized : `Re: ${normalized}`;
+}
+
+function getMailboxReplyTarget(thread: {
+  latest: MailboxEmailRecord;
+  emails: MailboxEmailRecord[];
+}) {
+  const inbound = [...thread.emails]
+    .filter((email) => email.direction === "inbound")
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt ?? 0).getTime() -
+        new Date(left.createdAt ?? 0).getTime(),
+    )[0];
+
+  return inbound ?? thread.latest;
+}
+
+function buildInboundHtmlDocument(html: string) {
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root { color-scheme: light; }
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+        color: #0f172a;
+        font-family: Arial, sans-serif;
+        overflow: hidden;
+      }
+      body {
+        padding: 16px;
+        overflow-wrap: anywhere;
+      }
+      img, table {
+        max-width: 100%;
+      }
+      a {
+        color: #2563eb;
+      }
+    </style>
+  </head>
+  <body>${html}</body>
+</html>`;
+}
+
+function resizeInboundFrame(frame: HTMLIFrameElement | null) {
+  if (!frame) return;
+
+  const doc = frame.contentDocument;
+  if (!doc) return;
+
+  const bodyHeight = doc.body?.scrollHeight ?? 0;
+  const htmlHeight = doc.documentElement?.scrollHeight ?? 0;
+  const nextHeight = Math.max(bodyHeight, htmlHeight, 240);
+  frame.style.height = `${nextHeight}px`;
+}
+
+function resizeInboundFramePreservingScroll(frame: HTMLIFrameElement | null) {
+  if (!frame || typeof window === "undefined") {
+    resizeInboundFrame(frame);
+    return;
+  }
+
+  const scrollTop = window.scrollY;
+  resizeInboundFrame(frame);
+
+  window.requestAnimationFrame(() => {
+    window.scrollTo({ top: scrollTop });
+  });
 }
 
 function buildTemplateFormState(
@@ -486,39 +628,37 @@ function SectionSkeleton({
 function PreviewModal({
   mail,
   submitting,
+  decisionSubmitting,
   onSave,
+  onApprove,
+  onReject,
   onClose,
 }: {
   mail: MailRequestRecord | null;
   submitting: boolean;
+  decisionSubmitting: boolean;
   onSave: (
     mail: MailRequestRecord,
-    payload: { subject: string; htmlBody: string },
+    payload: { subject: string; htmlBody: string; ccEmails: string[] },
   ) => Promise<void>;
+  onApprove: (mail: MailRequestRecord) => void;
+  onReject: (mail: MailRequestRecord, note: string) => void;
   onClose: () => void;
 }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [subject, setSubject] = useState("");
-  const [contentHtml, setContentHtml] = useState("<p></p>");
+  const [subject, setSubject] = useState(() =>
+    mail ? getMailSubject(mail) : "",
+  );
+  const [contentHtml, setContentHtml] = useState(() =>
+    mail
+      ? normalizeMailEditorHtml(getMailHtml(mail), getMailPreview(mail))
+      : "<p></p>",
+  );
+  const [ccRecipients, setCcRecipients] = useState(() =>
+    mail?.recipientFilter?.ccEmails?.join(", ") ?? "",
+  );
+  const [reviewNote, setReviewNote] = useState(() => mail?.reviewNote ?? "");
   const [errorMessage, setErrorMessage] = useState("");
-
-  useEffect(() => {
-    if (!mail) {
-      setIsEditing(false);
-      setSubject("");
-      setContentHtml("<p></p>");
-      setErrorMessage("");
-      return;
-    }
-
-    const initialSubject = getMailSubject(mail);
-    const initialHtml = getMailHtml(mail);
-
-    setIsEditing(false);
-    setSubject(initialSubject);
-    setContentHtml(normalizeMailEditorHtml(initialHtml, getMailPreview(mail)));
-    setErrorMessage("");
-  }, [mail]);
 
   if (!mail) return null;
 
@@ -539,6 +679,7 @@ function PreviewModal({
       await onSave(currentMail, {
         subject: subject.trim(),
         htmlBody: contentHtml,
+        ccEmails: parseRecipientInput(ccRecipients),
       });
       setIsEditing(false);
     } catch (error) {
@@ -556,12 +697,9 @@ function PreviewModal({
       size="lg"
       footer={
         <>
-          <button className="btn btn-secondary" onClick={onClose}>
-            Close
-          </button>
           {canEdit && !isEditing && (
             <button
-              className="btn btn-primary"
+              className="btn btn-secondary"
               onClick={() => {
                 setIsEditing(true);
                 setErrorMessage("");
@@ -586,6 +724,9 @@ function PreviewModal({
                       getMailPreview(currentMail),
                     ),
                   );
+                  setCcRecipients(
+                    currentMail.recipientFilter?.ccEmails?.join(", ") ?? "",
+                  );
                 }}
                 disabled={submitting}
               >
@@ -602,10 +743,68 @@ function PreviewModal({
               </button>
             </>
           )}
+          {currentMail.status === "pending" && !isEditing && (
+            <>
+              <button
+                className="btn btn-danger"
+                onClick={() => onReject(currentMail, reviewNote)}
+                disabled={decisionSubmitting || !reviewNote.trim()}
+              >
+                <XCircle size={14} />
+                {decisionSubmitting ? "Working..." : "Reject"}
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => onApprove(currentMail)}
+                disabled={decisionSubmitting}
+              >
+                <CheckCircle2 size={14} />
+                {decisionSubmitting ? "Working..." : "Send Now"}
+              </button>
+            </>
+          )}
         </>
       }
     >
       <div className="space-y-3">
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              To
+            </p>
+            <p className="mt-1 text-sm text-slate-900 break-words">
+              {getMailToRecipients(currentMail)}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              From
+            </p>
+            <p className="mt-1 text-sm text-slate-900 break-words">
+              {getMailFromAddress(currentMail)}
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            CC
+          </p>
+          {isEditing ? (
+            <input
+              className="input-base mt-2"
+              value={ccRecipients}
+              onChange={(event) => setCcRecipients(event.target.value)}
+              placeholder="hr@example.com, team@example.com"
+            />
+          ) : (
+            <p className="mt-1 text-sm text-slate-900 break-words">
+              {getMailCcRecipients(currentMail)}
+            </p>
+          )}
+        </div>
+
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Subject
@@ -618,7 +817,7 @@ function PreviewModal({
               placeholder="Email subject"
             />
           ) : (
-            <p className="mt-1 text-sm font-semibold text-slate-900">
+            <p className="mt-1 text-sm font-semibold text-slate-900 break-words">
               {subject}
             </p>
           )}
@@ -675,6 +874,24 @@ function PreviewModal({
           </div>
         )}
 
+        {currentMail.status === "pending" && !isEditing && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Review Note
+            </label>
+            <textarea
+              rows={4}
+              className="input-base mt-2"
+              placeholder="Explain why this request is being rejected..."
+              value={reviewNote}
+              onChange={(event) => setReviewNote(event.target.value)}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Required for rejection. Optional for approval.
+            </p>
+          </div>
+        )}
+
         {errorMessage && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
             {errorMessage}
@@ -685,59 +902,153 @@ function PreviewModal({
   );
 }
 
-function RejectModal({
-  mail,
-  note,
+function MailboxReplyModal({
+  email,
   submitting,
-  onNoteChange,
   onClose,
   onSubmit,
 }: {
-  mail: MailRequestRecord | null;
-  note: string;
+  email: MailboxEmailRecord | null;
   submitting: boolean;
-  onNoteChange: (value: string) => void;
   onClose: () => void;
-  onSubmit: () => void;
+  onSubmit: (payload: {
+    email: MailboxEmailRecord;
+    toEmails: string[];
+    ccEmails: string[];
+    subject: string;
+    htmlBody: string;
+    attachments: MailAttachmentMeta[];
+    sendNow: boolean;
+  }) => Promise<void>;
 }) {
+  const [toRecipients, setToRecipients] = useState(() =>
+    email
+      ? email.direction === "inbound"
+        ? email.fromEmail?.trim() ?? ""
+        : (email.toEmails ?? []).join(", ")
+      : "",
+  );
+  const [ccRecipients, setCcRecipients] = useState(() =>
+    email ? (email.ccEmails ?? []).join(", ") : "",
+  );
+  const [subject, setSubject] = useState(() =>
+    email ? buildReplySubject(email.subject) : "",
+  );
+  const [contentHtml, setContentHtml] = useState("<p></p>");
+  const [attachments, setAttachments] = useState<MailAttachmentMeta[]>([]);
+
+  if (!email) return null;
+
+  const toEmails = parseRecipientInput(toRecipients);
+  const ccEmails = parseRecipientInput(ccRecipients);
+  const plainText = htmlToPlainText(contentHtml);
+  const canSubmit = toEmails.length > 0 && subject.trim() && plainText.trim();
+
   return (
     <Modal
-      isOpen={!!mail}
+      isOpen={Boolean(email)}
       onClose={onClose}
-      title="Reject Mail Request"
-      size="sm"
+      title={`Reply in Thread${email.company?.name ? ` - ${email.company.name}` : ""}`}
+      size="lg"
       footer={
         <>
           <button className="btn btn-secondary" onClick={onClose}>
             Cancel
           </button>
           <button
-            className="btn btn-danger"
-            onClick={onSubmit}
-            disabled={submitting || !note.trim()}
+            className="btn btn-secondary"
+            disabled={submitting || !canSubmit}
+            onClick={() =>
+              void onSubmit({
+                email,
+                toEmails,
+                ccEmails,
+                subject: subject.trim(),
+                htmlBody: contentHtml,
+                attachments,
+                sendNow: false,
+              })
+            }
           >
-            {submitting ? "Rejecting..." : "Reject"}
+            {submitting ? "Working..." : "Queue Reply"}
+          </button>
+          <button
+            className="btn btn-primary"
+            disabled={submitting || !canSubmit}
+            onClick={() =>
+              void onSubmit({
+                email,
+                toEmails,
+                ccEmails,
+                subject: subject.trim(),
+                htmlBody: contentHtml,
+                attachments,
+                sendNow: true,
+              })
+            }
+          >
+            <Send size={14} />
+            {submitting ? "Working..." : "Send Now"}
           </button>
         </>
       }
     >
-      <div className="space-y-3">
-        <p className="text-sm text-slate-600">
-          Reject request from <strong>{mail?.requester.name}</strong> for{" "}
-          <strong>{mail ? getMailCompanyName(mail) : "this company"}</strong>?
-        </p>
+      <div className="space-y-4">
+        <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-sm text-[#1D4ED8]">
+          This reply will stay in the same mailbox thread.
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              To *
+            </label>
+            <input
+              className="input-base"
+              value={toRecipients}
+              onChange={(event) => setToRecipients(event.target.value)}
+              placeholder="hr@example.com, team@example.com"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              CC
+            </label>
+            <input
+              className="input-base"
+              value={ccRecipients}
+              onChange={(event) => setCcRecipients(event.target.value)}
+              placeholder="optional@example.com"
+            />
+          </div>
+        </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">
-            Feedback Note *
+            Subject *
           </label>
-          <textarea
-            rows={4}
+          <input
             className="input-base"
-            placeholder="Explain why this request is being rejected..."
-            value={note}
-            onChange={(event) => onNoteChange(event.target.value)}
+            value={subject}
+            onChange={(event) => setSubject(event.target.value)}
+            placeholder="Email subject"
           />
         </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Reply Content *
+          </label>
+          <RichTextEditor
+            value={contentHtml}
+            onChange={setContentHtml}
+            enterKeyMode="lineBreak"
+            placeholder="Write the reply"
+          />
+        </div>
+        <MailAttachmentInput
+          value={attachments}
+          onChange={setAttachments}
+          disabled={submitting}
+          maxFiles={6}
+        />
       </div>
     </Modal>
   );
@@ -882,6 +1193,36 @@ function TemplateEditorFields({
           Add variable names here, then click a chip to insert placeholders like{" "}
           <code>{"{{company_name}}"}</code> into the editor.
         </p>
+        <div className="mt-3 rounded-xl border border-[#DBEAFE] bg-[#F8FBFF] px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#2563EB]">
+            Predefined Variables
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {PREDEFINED_TEMPLATE_VARIABLES.map((variable) => (
+              <button
+                key={variable.key}
+                type="button"
+                className="rounded-full border border-[#BFDBFE] bg-white px-3 py-1.5 text-xs font-medium text-[#1D4ED8] transition-colors hover:border-[#2563EB]"
+                onClick={() =>
+                  onChange(
+                    "variables",
+                    appendTemplateVariables(form.variables, [variable.key]),
+                  )
+                }
+              >
+                {variable.label}
+              </button>
+            ))}
+          </div>
+          {/* <div className="mt-3 space-y-1 text-[11px] text-slate-500">
+            {PREDEFINED_TEMPLATE_VARIABLES.map((variable) => (
+              <p key={`${variable.key}-hint`}>
+                <strong className="text-slate-700">{variable.label}:</strong>{" "}
+                {variable.description}
+              </p>
+            ))}
+          </div> */}
+        </div>
         {variables.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
             {variables.map((variable) => (
@@ -1203,8 +1544,8 @@ export default function MailingPage() {
   const [previewMail, setPreviewMail] = useState<MailRequestRecord | null>(
     null,
   );
-  const [rejectMail, setRejectMail] = useState<MailRequestRecord | null>(null);
-  const [rejectNote, setRejectNote] = useState("");
+  const [replyMailboxEmail, setReplyMailboxEmail] =
+    useState<MailboxEmailRecord | null>(null);
   const [bulkApproveOpen, setBulkApproveOpen] = useState(false);
   const [bulkSendAt, setBulkSendAt] = useState("");
 
@@ -1222,23 +1563,30 @@ export default function MailingPage() {
   const [templateDeleteOpen, setTemplateDeleteOpen] = useState(false);
   const [isWideTemplateViewport, setIsWideTemplateViewport] = useState(false);
 
-  const [inboundBucket, setInboundBucket] =
-    useState<InboundBucket>("unassigned");
-  const [selectedInboundId, setSelectedInboundId] = useState<string | null>(
+  const [mailboxBucket] = useState<MailboxBucket>("all");
+  const [selectedMailboxId, setSelectedMailboxId] = useState<string | null>(
     null,
   );
 
   const [mailRequests, setMailRequests] = useState<MailRequestRecord[]>([]);
   const [templates, setTemplates] = useState<TemplateRecord[]>([]);
-  const [inboundEmails, setInboundEmails] = useState<InboundEmailRecord[]>([]);
+  const [mailboxEmails, setMailboxEmails] = useState<MailboxEmailRecord[]>([]);
+  const [mailboxPage, setMailboxPage] = useState(1);
+  const [mailboxMeta, setMailboxMeta] = useState<MailboxMeta>({
+    page: 1,
+    limit: 25,
+    total: 0,
+    totalPages: 1,
+  });
 
   const [queueLoading, setQueueLoading] = useState(true);
   const [templatesLoading, setTemplatesLoading] = useState(true);
-  const [inboundLoading, setInboundLoading] = useState(false);
+  const [mailboxLoading, setMailboxLoading] = useState(false);
+  const [mailboxSyncing, setMailboxSyncing] = useState(false);
 
   const [queueError, setQueueError] = useState("");
   const [templatesError, setTemplatesError] = useState("");
-  const [inboundError, setInboundError] = useState("");
+  const [mailboxError, setMailboxError] = useState("");
   const [pageMessage, setPageMessage] = useState("");
 
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
@@ -1246,6 +1594,7 @@ export default function MailingPage() {
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
   const [templateSubmitting, setTemplateSubmitting] = useState(false);
   const [previewSubmitting, setPreviewSubmitting] = useState(false);
+  const [mailboxReplySubmitting, setMailboxReplySubmitting] = useState(false);
 
   async function loadQueue() {
     setQueueLoading(true);
@@ -1281,23 +1630,53 @@ export default function MailingPage() {
     }
   }
 
-  async function loadInbound(bucket: InboundBucket) {
-    setInboundLoading(true);
-    setInboundError("");
+  const loadMailbox = useCallback(async (bucket: MailboxBucket, page = 1) => {
+    setMailboxLoading(true);
+    setMailboxError("");
     try {
-      const response = await requestJson<InboundEmailRecord[]>(
-        `/api/v1/email/inbox?bucket=${bucket}`,
+      const response = await requestJson<MailboxEmailRecord[]>(
+        `/api/v1/email/inbox?bucket=${bucket}&page=${page}&limit=${mailboxMeta.limit}`,
       );
-      setInboundEmails(response.data ?? []);
+      setMailboxEmails(response.data ?? []);
+      setMailboxMeta({
+        page: Number(response.meta?.page ?? page),
+        limit: Number(response.meta?.limit ?? mailboxMeta.limit),
+        total: Number(response.meta?.total ?? 0),
+        totalPages: Number(response.meta?.totalPages ?? 1),
+      });
+      setMailboxPage(Number(response.meta?.page ?? page));
     } catch (error) {
-      setInboundError(
+      setMailboxError(
         error instanceof Error
           ? error.message
-          : "Inbound inbox is not available right now",
+          : "Mailbox is not available right now",
       );
-      setInboundEmails([]);
+      setMailboxEmails([]);
+      setMailboxMeta((current) => ({
+        ...current,
+        total: 0,
+        totalPages: 1,
+      }));
     } finally {
-      setInboundLoading(false);
+      setMailboxLoading(false);
+    }
+  }, [mailboxMeta.limit]);
+
+  async function handleSyncInbound() {
+    setMailboxSyncing(true);
+    setMailboxError("");
+    try {
+      await requestJson<{ syncedCount: number }>("/api/v1/email/inbox/sync", {
+        method: "POST",
+      });
+      await loadMailbox(mailboxBucket, mailboxPage);
+      showMessage("Inbox sync completed.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to sync mailbox";
+      setMailboxError(message);
+      showMessage(message);
+    } finally {
+      setMailboxSyncing(false);
     }
   }
 
@@ -1306,10 +1685,10 @@ export default function MailingPage() {
   }, []);
 
   useEffect(() => {
-    if (mode === "inbound") {
-      void loadInbound(inboundBucket);
+    if (mode === "mailbox") {
+      void loadMailbox(mailboxBucket, mailboxPage);
     }
-  }, [mode, inboundBucket]);
+  }, [loadMailbox, mailboxBucket, mailboxPage, mode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1457,34 +1836,81 @@ export default function MailingPage() {
     filteredTemplates.find((template) => template.id === selectedTemplateId) ??
     null;
 
-  const filteredInbound = useMemo(() => {
+  const filteredMailbox = useMemo(() => {
     const query = search.trim().toLowerCase();
-    if (!query) return inboundEmails;
+    if (!query) return mailboxEmails;
 
-    return inboundEmails.filter((email) =>
+    return mailboxEmails.filter((email) =>
       [email.subject ?? "", email.fromEmail ?? "", email.company?.name ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(query),
     );
-  }, [inboundEmails, search]);
+  }, [mailboxEmails, search]);
+  const mailboxThreads = useMemo(() => {
+    const threadMap = new Map<
+      string,
+      {
+        key: string;
+        latest: MailboxEmailRecord;
+        emails: MailboxEmailRecord[];
+      }
+    >();
+
+    for (const email of filteredMailbox) {
+      const key = getMailboxThreadKey(email);
+      const existing = threadMap.get(key);
+
+      if (!existing) {
+        threadMap.set(key, {
+          key,
+          latest: email,
+          emails: [email],
+        });
+        continue;
+      }
+
+      existing.emails.push(email);
+      if (
+        new Date(email.createdAt ?? 0).getTime() >
+        new Date(existing.latest.createdAt ?? 0).getTime()
+      ) {
+        existing.latest = email;
+      }
+    }
+
+    return Array.from(threadMap.values())
+      .map((thread) => ({
+        ...thread,
+        emails: thread.emails.sort(
+          (left, right) =>
+            new Date(left.createdAt ?? 0).getTime() -
+            new Date(right.createdAt ?? 0).getTime(),
+        ),
+      }))
+      .sort(
+        (left, right) =>
+          new Date(right.latest.createdAt ?? 0).getTime() -
+          new Date(left.latest.createdAt ?? 0).getTime(),
+      );
+  }, [filteredMailbox]);
 
   useEffect(() => {
-    if (!filteredInbound.length) {
-      setSelectedInboundId(null);
+    if (!mailboxThreads.length) {
+      setSelectedMailboxId(null);
       return;
     }
 
     if (
-      !selectedInboundId ||
-      !filteredInbound.some((email) => email.id === selectedInboundId)
+      selectedMailboxId &&
+      !mailboxThreads.some((thread) => thread.key === selectedMailboxId)
     ) {
-      setSelectedInboundId(filteredInbound[0].id);
+      setSelectedMailboxId(null);
     }
-  }, [filteredInbound, selectedInboundId]);
+  }, [mailboxThreads, selectedMailboxId]);
 
-  const selectedInbound =
-    filteredInbound.find((email) => email.id === selectedInboundId) ?? null;
+  const selectedMailboxThread =
+    mailboxThreads.find((thread) => thread.key === selectedMailboxId) ?? null;
 
   function showMessage(message: string) {
     setPageMessage(message);
@@ -1537,16 +1963,20 @@ export default function MailingPage() {
         return next;
       });
       showMessage(
-        sendAt
-          ? "Mail request queued for scheduled send."
-          : "Mail request queued.",
+        updated?.status === "sent"
+          ? "Mail sent successfully."
+          : sendAt
+            ? "Mail request queued for scheduled send."
+            : "Mail request queued.",
       );
+      return true;
     } catch (error) {
       showMessage(
         error instanceof Error
           ? error.message
           : "Unable to approve mail request",
       );
+      return false;
     } finally {
       setBusyIds((current) => {
         const next = new Set(current);
@@ -1556,18 +1986,86 @@ export default function MailingPage() {
     }
   }
 
-  async function handleRejectRequest() {
-    if (!rejectMail || !rejectNote.trim()) return;
-
-    setRejectSubmitting(true);
-    setBusyIds((current) => new Set(current).add(rejectMail.id));
+  async function handleSubmitMailboxReply(payload: {
+    email: MailboxEmailRecord;
+    toEmails: string[];
+    ccEmails: string[];
+    subject: string;
+    htmlBody: string;
+    attachments: MailAttachmentMeta[];
+    sendNow: boolean;
+  }) {
+    setMailboxReplySubmitting(true);
     try {
-      const response = await requestJson<MailRequestRecord>(
-        `/api/v1/mail/requests/${rejectMail.id}/reject`,
+      const createdResponse = await requestJson<MailRequestRecord>(
+        "/api/v1/mail/requests",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reviewNote: rejectNote.trim() }),
+          body: JSON.stringify({
+            companyId: payload.email.company?.id ?? undefined,
+            requestType: "custom",
+            customSubject: payload.subject,
+            customBody: payload.htmlBody,
+            previewPayload: {
+              subject: payload.subject,
+              htmlBody: payload.htmlBody,
+              textBody: htmlToPlainText(payload.htmlBody),
+              attachments: payload.attachments,
+            },
+            attachments: payload.attachments,
+            recipientFilter: {
+              emails: payload.toEmails,
+              ccEmails: payload.ccEmails,
+              replyContext: {
+                threadId: payload.email.threadId ?? undefined,
+                messageId: payload.email.messageId ?? undefined,
+                references: payload.email.references ?? [],
+              },
+            },
+          }),
+        },
+      );
+
+      const created = createdResponse.data;
+      if (!created) {
+        throw new Error("Reply draft could not be created");
+      }
+
+      if (payload.sendNow) {
+        const approved = await handleApproveRequest(created.id);
+        if (approved) {
+          await Promise.all([loadQueue(), loadMailbox(mailboxBucket, mailboxPage)]);
+          setReplyMailboxEmail(null);
+        }
+        return;
+      }
+
+      await loadQueue();
+      setPreviewMail(created);
+      setReplyMailboxEmail(null);
+      showMessage("Reply queued for review.");
+    } catch (error) {
+      showMessage(
+        error instanceof Error ? error.message : "Unable to prepare reply",
+      );
+    } finally {
+      setMailboxReplySubmitting(false);
+    }
+  }
+
+  async function handleRejectRequest(requestId: string, note: string) {
+    if (!note.trim()) return;
+
+    setRejectSubmitting(true);
+    setBusyIds((current) => new Set(current).add(requestId));
+    try {
+      const response = await requestJson<MailRequestRecord>(
+        `/api/v1/mail/requests/${requestId}/reject`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reviewNote: note.trim() }),
         },
       );
 
@@ -1575,12 +2073,14 @@ export default function MailingPage() {
       if (updated) {
         setMailRequests((current) =>
           current.map((mail) =>
-            mail.id === rejectMail.id ? { ...mail, ...updated } : mail,
+            mail.id === requestId ? { ...mail, ...updated } : mail,
           ),
         );
+        setPreviewMail((current) =>
+          current && current.id === requestId ? { ...current, ...updated } : current,
+        );
       }
-      setRejectMail(null);
-      setRejectNote("");
+      setPreviewMail(null);
       showMessage("Mail request rejected.");
     } catch (error) {
       showMessage(
@@ -1592,7 +2092,7 @@ export default function MailingPage() {
       setRejectSubmitting(false);
       setBusyIds((current) => {
         const next = new Set(current);
-        next.delete(rejectMail.id);
+        next.delete(requestId);
         return next;
       });
     }
@@ -1750,18 +2250,18 @@ export default function MailingPage() {
 
   async function handleSavePreviewMail(
     mail: MailRequestRecord,
-    payload: { subject: string; htmlBody: string },
+    payload: { subject: string; htmlBody: string; ccEmails: string[] },
   ) {
     setPreviewSubmitting(true);
     try {
       const response = await requestJson<MailRequestRecord>(
         `/api/v1/mail/requests/${mail.id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        },
-      );
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          },
+        );
 
       const updated = response.data;
       if (updated) {
@@ -1819,7 +2319,7 @@ export default function MailingPage() {
         <div className="px-4 py-3">
           <div
             className={`flex gap-2 ${
-              mode === "inbound"
+              mode === "mailbox"
                 ? "flex-row items-center"
                 : "flex-col xl:flex-row xl:flex-wrap xl:items-center"
             }`}
@@ -1832,19 +2332,19 @@ export default function MailingPage() {
                   ? "Search by company, coordinator, subject, or template..."
                   : mode === "templates"
                     ? "Search templates by name, subject, or slug..."
-                    : "Search inbound mail by sender, company, or subject..."
+                    : "Search mailbox threads by sender, recipient, company, or subject..."
               }
               className={`min-w-0 ${mode === "templates" ? "xl:min-w-[320px] xl:flex-[1.2]" : "flex-1"}`}
             />
 
-            {mode === "inbound" && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm shrink-0 gap-1"
-                onClick={() => void loadInbound(inboundBucket)}
-              >
-                <RefreshCw size={14} />
-                Refresh
+            {mode === "mailbox" && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm shrink-0 gap-1"
+                  onClick={() => void loadMailbox(mailboxBucket, mailboxPage)}
+                >
+                  <RefreshCw size={14} />
+                  Refresh
               </button>
             )}
 
@@ -2018,7 +2518,6 @@ export default function MailingPage() {
             ) : (
               <div className="space-y-3">
                 {filteredQueue.map((mail) => {
-                  const isBusy = busyIds.has(mail.id);
                   const isSelectable =
                     mail.status === "pending" &&
                     mail.requestType === "template";
@@ -2093,6 +2592,20 @@ export default function MailingPage() {
                                 <p className="mt-1 text-sm font-medium text-slate-700">
                                   {getMailSubject(mail)}
                                 </p>
+                                <div className="mt-2 space-y-1 text-xs text-slate-500">
+                                  <p className="break-words">
+                                    <span className="font-semibold text-slate-600">
+                                      To:
+                                    </span>{" "}
+                                    {getMailToRecipients(mail)}
+                                  </p>
+                                  <p className="break-words">
+                                    <span className="font-semibold text-slate-600">
+                                      From:
+                                    </span>{" "}
+                                    {getMailFromAddress(mail)}
+                                  </p>
+                                </div>
                                 <p className="mt-1 line-clamp-2 text-sm text-slate-500">
                                   {getMailPreview(mail)}
                                 </p>
@@ -2151,37 +2664,12 @@ export default function MailingPage() {
 
                         <div className="flex shrink-0 flex-wrap gap-2 xl:w-auto xl:justify-end">
                           <button
-                            className="btn btn-ghost btn-sm gap-1 text-slate-500 hover:text-[#2563EB]"
+                            className="btn btn-primary btn-sm gap-1"
                             onClick={() => setPreviewMail(mail)}
                           >
                             <Eye size={14} />
-                            View
+                            {mail.status === "pending" ? "Review" : "View"}
                           </button>
-                          {mail.status === "pending" && (
-                            <>
-                              <button
-                                className="btn btn-success btn-sm gap-1"
-                                onClick={() =>
-                                  void handleApproveRequest(mail.id)
-                                }
-                                disabled={isBusy}
-                              >
-                                <CheckCircle2 size={13} />
-                                {isBusy ? "Working..." : "Approve"}
-                              </button>
-                              <button
-                                className="btn btn-secondary btn-sm gap-1"
-                                onClick={() => {
-                                  setRejectMail(mail);
-                                  setRejectNote(mail.reviewNote ?? "");
-                                }}
-                                disabled={isBusy}
-                              >
-                                <XCircle size={13} />
-                                Reject
-                              </button>
-                            </>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -2513,70 +3001,219 @@ export default function MailingPage() {
         </div>
       )}
 
-      {mode === "inbound" && (
+      {mode === "mailbox" && (
         <div className="card overflow-hidden">
           <div className="space-y-4 p-4">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap gap-2">
-                {INBOUND_BUCKETS.map((bucket) => (
+              <div className="flex flex-wrap items-center gap-3">
+                {selectedMailboxThread ? (
                   <button
-                    key={bucket.value}
                     type="button"
-                    onClick={() => setInboundBucket(bucket.value)}
-                    className={`rounded-xl px-3 py-2 text-sm font-semibold transition-colors ${
-                      bucket.value === inboundBucket
-                        ? "bg-[#2563EB] text-white"
-                        : "bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE]"
-                    }`}
+                    className="btn btn-secondary btn-sm px-2"
+                    onClick={() => setSelectedMailboxId(null)}
+                    aria-label="Back to mailbox"
                   >
-                    {bucket.label}
+                    <ArrowLeft size={14} />
                   </button>
-                ))}
+                ) : null}
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <span>Mailbox</span>
+                </div>
               </div>
-              <p className="text-sm text-slate-500">
-                Classified against{" "}
-                <strong className="text-slate-700">{inboundBucket}</strong>{" "}
-                bucket
-              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  className="btn btn-secondary btn-sm gap-1"
+                  onClick={() => void handleSyncInbound()}
+                  disabled={mailboxSyncing}
+                >
+                  <RefreshCw size={14} className={mailboxSyncing ? "animate-spin" : ""} />
+                  {mailboxSyncing ? "Syncing..." : "Sync"}
+                </button>
+              </div>
             </div>
 
-            {inboundLoading ? (
-              <SectionSkeleton />
-            ) : inboundError ? (
+            {mailboxLoading ? (
+              <SectionSkeleton detail={false} />
+            ) : mailboxError ? (
               <EmptyState
                 icon={Inbox}
-                title="Inbound inbox is not available yet"
-                description={inboundError}
+                title="Mailbox is not available yet"
+                description={mailboxError}
                 action={
                   <button
                     className="btn btn-secondary btn-sm"
-                    onClick={() => void loadInbound(inboundBucket)}
+                    onClick={() => void loadMailbox(mailboxBucket, mailboxPage)}
                   >
                     Retry
                   </button>
                 }
               />
-            ) : filteredInbound.length === 0 ? (
+            ) : mailboxThreads.length === 0 ? (
               <EmptyState
                 icon={Inbox}
-                title="No inbound emails in this bucket"
-                description="Once the inbox API is ready, received mails will appear here."
+                title="No mailbox threads found"
+                description="Inbound and outbound mailbox threads will appear here."
               />
             ) : (
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.9fr)]">
-                <div className="space-y-3">
-                  {filteredInbound.map((email) => {
-                    const selected = email.id === selectedInboundId;
-                    return (
-                      <button
+              selectedMailboxThread ? (
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-lg font-semibold text-slate-900">
+                        {selectedMailboxThread.latest.subject || "No subject"}
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        {selectedMailboxThread.emails.length} mail
+                        {selectedMailboxThread.emails.length > 1 ? "s" : ""} in
+                        this thread
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm gap-1 self-start"
+                      onClick={() =>
+                        setReplyMailboxEmail(
+                          getMailboxReplyTarget(selectedMailboxThread),
+                        )
+                      }
+                    >
+                      <Send size={14} />
+                      Reply in Thread
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {selectedMailboxThread.emails.map((email) => (
+                      <div
                         key={email.id}
+                        className="rounded-2xl border border-[#DBEAFE] bg-white p-5"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-base font-semibold text-slate-900">
+                            {email.subject || "No subject"}
+                          </h4>
+                          <Badge
+                            variant={email.direction === "inbound" ? "info" : "gray"}
+                            size="sm"
+                          >
+                            {email.direction === "inbound" ? "Inbound" : "Outbound"}
+                          </Badge>
+                          {email.company?.name && (
+                            <Badge variant="info" size="sm">
+                              {email.company.name}
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              To
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-slate-800">
+                              {email.toEmails?.length
+                                ? email.toEmails.join(", ")
+                                : "-"}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              From
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-slate-800">
+                              {email.fromEmail || "-"}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              {email.direction === "inbound" ? "Received" : "Sent"}
+                            </p>
+                            <p className="mt-1 text-sm font-medium text-slate-800">
+                              {formatDateTime(email.createdAt)}
+                            </p>
+                          </div>
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Company Match
+                            </p>
+                            <p className="mt-1 flex items-center gap-1 text-sm font-medium text-slate-800">
+                              <Building2 size={13} />
+                              {email.company?.name ?? "Not mapped"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {email.ccEmails && email.ccEmails.length > 0 && (
+                          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                            <p>
+                              <strong>CC:</strong> {email.ccEmails.join(", ")}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* {email.classification && (
+                          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Classification
+                            </p>
+                            <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-slate-600">
+                              {JSON.stringify(email.classification, null, 2)}
+                            </pre>
+                          </div>
+                        )} */}
+
+                        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+                          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+                            Message body
+                          </div>
+                          {email.htmlBody ? (
+                            <iframe
+                              title={`Mailbox email ${email.id}`}
+                              srcDoc={buildInboundHtmlDocument(email.htmlBody)}
+                              sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                              scrolling="no"
+                              className="w-full bg-white"
+                              style={{ height: 240 }}
+                              onLoad={(event) =>
+                                resizeInboundFramePreservingScroll(
+                                  event.currentTarget as HTMLIFrameElement,
+                                )
+                              }
+                            />
+                          ) : (
+                            <div className="whitespace-pre-wrap p-4 text-sm leading-relaxed text-slate-700">
+                              {email.textBody || "No body content available."}
+                            </div>
+                          )}
+                        </div>
+
+                        {email.attachments && email.attachments.length > 0 && (
+                          <div className="mt-4">
+                            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Attachments
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {email.attachments.map((attachment) => (
+                                <Badge key={attachment.id} variant="gray" size="sm">
+                                  {attachment.fileName}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    {mailboxThreads.map((thread) => (
+                      <button
+                        key={thread.key}
                         type="button"
-                        onClick={() => setSelectedInboundId(email.id)}
-                        className={`w-full rounded-2xl border p-4 text-left transition-all ${
-                          selected
-                            ? "border-[#2563EB] bg-[#EFF6FF]"
-                            : "border-[#DBEAFE] bg-white hover:border-[#BFDBFE]"
-                        }`}
+                        onClick={() => setSelectedMailboxId(thread.key)}
+                        className="w-full rounded-2xl border border-[#DBEAFE] bg-white p-4 text-left transition-all hover:border-[#BFDBFE]"
                       >
                         <div className="flex items-start gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#2563EB]">
@@ -2585,179 +3222,126 @@ export default function MailingPage() {
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
                               <p className="truncate font-semibold text-slate-900">
-                                {email.subject || "No subject"}
+                                {thread.latest.subject || "No subject"}
                               </p>
-                              {email.company?.name && (
+                              <Badge
+                                variant={
+                                  thread.latest.direction === "inbound"
+                                    ? "info"
+                                    : "gray"
+                                }
+                                size="sm"
+                              >
+                                {thread.latest.direction === "inbound"
+                                  ? "Inbound"
+                                  : "Outbound"}
+                              </Badge>
+                              {thread.latest.company?.name && (
                                 <Badge variant="info" size="sm">
-                                  {email.company.name}
+                                  {thread.latest.company.name}
+                                </Badge>
+                              )}
+                              {thread.emails.length > 1 && (
+                                <Badge variant="gray" size="sm">
+                                  {thread.emails.length} in thread
                                 </Badge>
                               )}
                             </div>
                             <p className="mt-1 text-sm text-slate-500">
-                              From {email.fromEmail || "Unknown sender"}
+                              {thread.latest.direction === "inbound"
+                                ? "From "
+                                : "To "}
+                              {thread.latest.direction === "inbound"
+                                ? thread.latest.fromEmail || "Unknown sender"
+                                : thread.latest.toEmails?.length
+                                  ? thread.latest.toEmails.join(", ")
+                                  : "Unknown recipient"}
                             </p>
                             <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                              <span>{formatDateTime(email.createdAt)}</span>
-                              {email.attachments &&
-                                email.attachments.length > 0 && (
+                              <span>{formatDateTime(thread.latest.createdAt)}</span>
+                              {thread.latest.attachments &&
+                                thread.latest.attachments.length > 0 && (
                                   <span className="flex items-center gap-1">
                                     <Paperclip size={11} />
-                                    {email.attachments.length} attachment
-                                    {email.attachments.length > 1 ? "s" : ""}
+                                    {thread.latest.attachments.length} attachment
+                                    {thread.latest.attachments.length > 1
+                                      ? "s"
+                                      : ""}
                                   </span>
                                 )}
                             </div>
                           </div>
                         </div>
                       </button>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
 
-                {selectedInbound && (
-                  <div className="rounded-2xl border border-[#DBEAFE] bg-white p-5">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-semibold text-slate-900">
-                        {selectedInbound.subject || "No subject"}
-                      </h3>
-                      <Badge variant="info" size="sm">
-                        {inboundBucket}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          From
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-slate-800">
-                          {selectedInbound.fromEmail || "-"}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Received
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-slate-800">
-                          {formatDateTime(selectedInbound.createdAt)}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Company Match
-                        </p>
-                        <p className="mt-1 flex items-center gap-1 text-sm font-medium text-slate-800">
-                          <Building2 size={13} />
-                          {selectedInbound.company?.name ?? "Not mapped"}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Thread
-                        </p>
-                        <p className="mt-1 text-sm font-medium text-slate-800">
-                          {selectedInbound.threadId ?? "Standalone message"}
-                        </p>
-                      </div>
-                    </div>
-
-                    {(selectedInbound.toEmails?.length ||
-                      selectedInbound.ccEmails?.length) && (
-                      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                        {selectedInbound.toEmails &&
-                          selectedInbound.toEmails.length > 0 && (
-                            <p>
-                              <strong>To:</strong>{" "}
-                              {selectedInbound.toEmails.join(", ")}
-                            </p>
-                          )}
-                        {selectedInbound.ccEmails &&
-                          selectedInbound.ccEmails.length > 0 && (
-                            <p className="mt-1">
-                              <strong>CC:</strong>{" "}
-                              {selectedInbound.ccEmails.join(", ")}
-                            </p>
-                          )}
-                      </div>
-                    )}
-
-                    {selectedInbound.attachments &&
-                      selectedInbound.attachments.length > 0 && (
-                        <div className="mt-4">
-                          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Attachments
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {selectedInbound.attachments.map((attachment) => (
-                              <Badge
-                                key={attachment.id}
-                                variant="gray"
-                                size="sm"
-                              >
-                                {attachment.fileName}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                    {selectedInbound.classification && (
-                      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Classification
-                        </p>
-                        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-slate-600">
-                          {JSON.stringify(
-                            selectedInbound.classification,
-                            null,
-                            2,
-                          )}
-                        </pre>
-                      </div>
-                    )}
-
-                    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-                      <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
-                        Message body
-                      </div>
-                      {selectedInbound.htmlBody ? (
-                        <div
-                          className="prose prose-sm max-w-none p-4"
-                          dangerouslySetInnerHTML={{
-                            __html: selectedInbound.htmlBody,
-                          }}
-                        />
-                      ) : (
-                        <div className="whitespace-pre-wrap p-4 text-sm leading-relaxed text-slate-700">
-                          {selectedInbound.textBody ||
-                            "No body content available."}
-                        </div>
-                      )}
+                  <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-slate-600">
+                      Page {mailboxMeta.page} of {mailboxMeta.totalPages}
+                      {" · "}
+                      {mailboxMeta.total} mail
+                      {mailboxMeta.total === 1 ? "" : "s"}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() =>
+                          setMailboxPage((current) => Math.max(1, current - 1))
+                        }
+                        disabled={mailboxLoading || mailboxPage <= 1}
+                      >
+                        Previous
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() =>
+                          setMailboxPage((current) =>
+                            Math.min(mailboxMeta.totalPages, current + 1),
+                          )
+                        }
+                        disabled={
+                          mailboxLoading || mailboxPage >= mailboxMeta.totalPages
+                        }
+                      >
+                        Next
+                      </button>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )
             )}
           </div>
         </div>
       )}
 
       <PreviewModal
+        key={previewMail?.id ?? "preview-empty"}
         mail={previewMail}
         submitting={previewSubmitting}
+        decisionSubmitting={
+          previewMail ? busyIds.has(previewMail.id) || rejectSubmitting : false
+        }
         onSave={handleSavePreviewMail}
+        onApprove={(mail) => {
+          void (async () => {
+            const approved = await handleApproveRequest(mail.id);
+            if (approved) {
+              setPreviewMail(null);
+            }
+          })();
+        }}
+        onReject={(mail, note) => void handleRejectRequest(mail.id, note)}
         onClose={() => setPreviewMail(null)}
       />
-      <RejectModal
-        mail={rejectMail}
-        note={rejectNote}
-        submitting={rejectSubmitting}
-        onNoteChange={setRejectNote}
-        onClose={() => {
-          setRejectMail(null);
-          setRejectNote("");
-        }}
-        onSubmit={() => void handleRejectRequest()}
+      <MailboxReplyModal
+        key={replyMailboxEmail?.id ?? "mailbox-reply-empty"}
+        email={replyMailboxEmail}
+        submitting={mailboxReplySubmitting}
+        onClose={() => setReplyMailboxEmail(null)}
+        onSubmit={handleSubmitMailboxReply}
       />
       <BulkApproveModal
         open={bulkApproveOpen}

@@ -2,6 +2,17 @@ import { getCurrentUser } from "@/lib/api/auth";
 import { success, unauthorized, serverError } from "@/lib/api/response";
 import { db } from "@/lib/db";
 
+const TPO_MAIL_ENV_KEYS = [
+  "MAIL_FROM_EMAIL",
+  "SMTP_FROM_EMAIL",
+  "SMTP_USER",
+  "MAIL_USER",
+  "TPO_MAIL",
+  "TPO_EMAIL",
+];
+
+const TPO_CONTACT_ENV_KEYS = ["TPO_CONTACT_PHONE", "TPO_PHONE", "MAIL_CONTACT_PHONE"];
+
 function extractLinkedin(notes: string | null) {
   if (!notes) {
     return "";
@@ -9,6 +20,17 @@ function extractLinkedin(notes: string | null) {
 
   const match = notes.match(/LinkedIn:\s*(\S+)/i);
   return match?.[1] ?? "";
+}
+
+function getFirstConfiguredEnvValue(keys: string[]) {
+  for (const key of keys) {
+    const value = process.env[key]?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
 }
 
 export async function GET() {
@@ -207,6 +229,13 @@ export async function GET() {
       user: {
         id: user.id,
         name: user.name,
+        email: user.email,
+        mailingDefaults: {
+          spocName: user.name,
+          spocContact:
+            user.phone?.trim() || getFirstConfiguredEnvValue(TPO_CONTACT_ENV_KEYS),
+          spocMail: getFirstConfiguredEnvValue(TPO_MAIL_ENV_KEYS),
+        },
       },
       entries,
     });

@@ -52,6 +52,7 @@ type UserSeed = {
   id: string;
   email: string;
   name: string;
+  phone?: string;
   role: UserRole;
   coordinatorType?: CoordinatorType;
   authProvider: string;
@@ -712,6 +713,7 @@ async function seed() {
           id: ids.admin,
           email: "admin@nexus.local",
           name: "Nexus Admin",
+          phone: "+91 9876500000",
           role: "tpo_admin" as const,
           authProvider: "credentials",
           profileMeta: { passwordHash: hashPassword("Admin@123") },
@@ -720,6 +722,7 @@ async function seed() {
           id: ids.ananya,
           email: "ananya@nexus.local",
           name: "Ananya Mehta",
+          phone: "+91 9876500001",
           role: "coordinator" as const,
           coordinatorType: "general" as const,
           authProvider: "credentials",
@@ -729,6 +732,7 @@ async function seed() {
           id: ids.coordinatorLegacy,
           email: "coordinator@nexus.local",
           name: "General Coordinator",
+          phone: "+91 9876500002",
           role: "coordinator" as const,
           coordinatorType: "general" as const,
           authProvider: "credentials",
@@ -738,6 +742,7 @@ async function seed() {
           id: ids.rohan,
           email: "rohan@nexus.local",
           name: "Rohan Sharma",
+          phone: "+91 9876500003",
           role: "coordinator" as const,
           coordinatorType: "general" as const,
           authProvider: "credentials",
@@ -747,6 +752,7 @@ async function seed() {
           id: ids.priya,
           email: "priya@nexus.local",
           name: "Priya Singh",
+          phone: "+91 9876500004",
           role: "coordinator" as const,
           coordinatorType: "general" as const,
           authProvider: "credentials",
@@ -756,6 +762,7 @@ async function seed() {
           id: ids.vibha,
           email: "vibha@nexus.local",
           name: "Vibha Kapoor",
+          phone: "+91 9876500005",
           role: "coordinator" as const,
           coordinatorType: "general" as const,
           authProvider: "credentials",
@@ -765,6 +772,7 @@ async function seed() {
           id: ids.student,
           email: "student@nexus.local",
           name: "Student User",
+          phone: "+91 9876500006",
           role: "student" as const,
           authProvider: "credentials",
           profileMeta: {
@@ -781,6 +789,7 @@ async function seed() {
           update: {
             email: user.email,
             name: user.name,
+            phone: user.phone,
             role: user.role,
             coordinatorType: user.coordinatorType,
             authProvider: user.authProvider,

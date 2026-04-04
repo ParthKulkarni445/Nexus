@@ -13,6 +13,7 @@ import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
 import { headers } from "next/headers";
+import { getConfiguredSenderEmail } from "@/lib/mailing/sendMail";
 
 const mailAttachmentSchema = z.object({
   fileName: z.string().min(1).max(255),
@@ -31,9 +32,37 @@ const createMailRequestSchema = z.object({
   customSubject: z.string().max(500).optional(),
   customBody: z.string().optional(),
   previewPayload: z.record(z.string(), z.any()).optional(),
-  recipientFilter: z.record(z.string(), z.any()).optional(),
+  recipientFilter: z
+    .record(z.string(), z.any())
+    .optional(),
   urgency: z.number().int().min(1).max(5).optional(),
   attachments: z.array(mailAttachmentSchema).max(10).optional(),
+}).superRefine((value, ctx) => {
+  if (value.requestType === "template" && !value.templateId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Template requests must include a templateId",
+      path: ["templateId"],
+    });
+  }
+
+  if (value.requestType === "custom") {
+    if (!value.customSubject?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Custom requests must include a subject",
+        path: ["customSubject"],
+      });
+    }
+
+    if (!value.customBody?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Custom requests must include a body",
+        path: ["customBody"],
+      });
+    }
+  }
 });
 
 function asRecord(value: unknown) {
@@ -82,6 +111,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
 
   try {
+    const senderEmail = getConfiguredSenderEmail();
     const requests = await prisma.mailRequest.findMany({
       where: status ? { status: status as never } : undefined,
       orderBy: { createdAt: "desc" },
@@ -181,6 +211,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...requestItem,
+        senderEmail,
         attachments: requestAttachments,
         template: requestItem.template
           ? {
@@ -210,10 +241,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (
-    !hasRoleOrCoordinatorType(user, ["tpo_admin"], [
-      "mailing_team",
-      "student_representative",
-    ])
+    !hasRoleOrCoordinatorType(user, ["tpo_admin", "coordinator"])
   ) {
     return forbidden("Insufficient permissions to create mail requests");
   }
@@ -324,6 +352,9 @@ export async function POST(request: NextRequest) {
       meta: {
         requestType: restValidation.requestType,
         attachmentCount: resolvedAssets.length,
+        hasReplyContext: Boolean(
+          asRecord(restValidation.recipientFilter)?.replyContext,
+        ),
       },
       ...clientInfo,
     });

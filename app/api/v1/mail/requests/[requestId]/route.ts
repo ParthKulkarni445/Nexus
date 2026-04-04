@@ -18,6 +18,7 @@ import { headers } from "next/headers";
 const updateMailRequestSchema = z.object({
   subject: z.string().trim().min(1).max(500),
   htmlBody: z.string().trim().min(1),
+  ccEmails: z.array(z.string().trim().email()).max(20).optional(),
 });
 
 const mailAttachmentSchema = z.object({
@@ -101,6 +102,7 @@ export async function PUT(
         requestType: true,
         status: true,
         previewPayload: true,
+        recipientFilter: true,
       },
     });
 
@@ -119,12 +121,22 @@ export async function PUT(
       !Array.isArray(existing.previewPayload)
         ? (existing.previewPayload as Prisma.JsonObject)
         : {};
+    const existingRecipientFilter =
+      existing.recipientFilter &&
+      typeof existing.recipientFilter === "object" &&
+      !Array.isArray(existing.recipientFilter)
+        ? (existing.recipientFilter as Prisma.JsonObject)
+        : {};
 
     const previewPayload: Prisma.InputJsonObject = {
       ...existingPreview,
       subject: validation.subject,
       htmlBody: validation.htmlBody,
       textBody: plainText,
+    };
+    const recipientFilter: Prisma.InputJsonObject = {
+      ...existingRecipientFilter,
+      ccEmails: validation.ccEmails ?? [],
     };
 
     const updated = await prisma.mailRequest.update({
@@ -135,10 +147,12 @@ export async function PUT(
               customSubject: validation.subject,
               customBody: validation.htmlBody,
               previewPayload,
+              recipientFilter,
               updatedAt: new Date(),
             }
           : {
               previewPayload,
+              recipientFilter,
               updatedAt: new Date(),
             },
       include: {
@@ -217,6 +231,7 @@ export async function PUT(
       targetId: requestId,
       meta: {
         subject: validation.subject,
+        ccEmails: validation.ccEmails ?? [],
         requestType: existing.requestType,
       },
       ...clientInfo,

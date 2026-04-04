@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
+  ArrowRight,
   Building2,
   CheckCircle2,
   Clock,
@@ -22,6 +24,10 @@ import MailAttachmentInput, {
 } from "@/components/ui/MailAttachmentInput";
 import Modal from "@/components/ui/Modal";
 import SearchBar from "@/components/ui/SearchBar";
+import {
+  PREDEFINED_TEMPLATE_VARIABLES,
+  resolveTemplateVariableValue,
+} from "@/lib/mailing/templateVariables";
 import OutreachLoadingView from "./OutreachLoadingView";
 
 type OutreachStatus =
@@ -38,6 +44,14 @@ type Contact = {
   phones: string[];
   emails: string[];
   linkedin: string;
+};
+
+type ReplyContext = {
+  threadId?: string;
+  messageId: string;
+  references: string[];
+  subject: string;
+  recipientEmail: string;
 };
 
 type SeasonTask = {
@@ -75,7 +89,16 @@ type OutreachCompany = {
 };
 
 type OutreachResponse = {
-  user: { id: string; name: string };
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    mailingDefaults?: {
+      spocName?: string;
+      spocContact?: string;
+      spocMail?: string;
+    };
+  };
   entries: OutreachCompany[];
 };
 
@@ -286,9 +309,26 @@ function interpolateTemplate(
   });
 }
 
+function prettifyVariableLabel(variable: string) {
+  const predefined = PREDEFINED_TEMPLATE_VARIABLES.find(
+    (item) => item.key === variable,
+  );
+
+  if (predefined) {
+    return predefined.label;
+  }
+
+  return variable
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function ActionModals({
   entry,
   templates,
+  currentUser,
   mailSubmitting,
   logSubmitting,
   statusSubmitting,
@@ -298,9 +338,12 @@ function ActionModals({
   onQueueMail,
   onLog,
   onUpdateStatus,
+  replyContext,
+  onReplyContextConsumed,
 }: {
   entry: OutreachCompany;
   templates: MailTemplate[];
+  currentUser: OutreachResponse["user"];
   mailSubmitting: boolean;
   logSubmitting: boolean;
   statusSubmitting: boolean;
@@ -318,6 +361,7 @@ function ActionModals({
     customSubject?: string;
     customBody?: string;
     attachments?: MailAttachmentMeta[];
+    replyContext?: ReplyContext;
   }) => Promise<void>;
   onLog: (payload: {
     companyId: string;
@@ -333,6 +377,8 @@ function ActionModals({
     status: OutreachStatus;
     note?: string;
   }) => Promise<void>;
+  replyContext: ReplyContext | null;
+  onReplyContextConsumed: () => void;
 }) {
   const [mode, setMode] = useState<"none" | "mail" | "log" | "call" | "status">(
     "none",
@@ -362,14 +408,78 @@ function ActionModals({
   const selectedContact = entry.contacts.find(
     (contact) => contact.id === contactId,
   );
+  const replyContact = useMemo(() => {
+    if (!replyContext) return null;
+
+    const normalizedRecipient = replyContext.recipientEmail.toLowerCase();
+    return (
+      entry.contacts.find((contact) =>
+        contact.emails.some(
+          (email) => email.trim().toLowerCase() === normalizedRecipient,
+        ),
+      ) ?? null
+    );
+  }, [entry.contacts, replyContext]);
   const resolvedCycleId =
     cycleId ||
     (entry.seasons.length === 1 ? entry.seasons[0].companySeasonCycleId : "");
+  const effectiveReplyContext = replyContext;
+  const effectiveContactId = contactId || replyContact?.id || "";
+  const effectiveCycleId = resolvedCycleId;
+  const effectiveRequestType = effectiveReplyContext ? "custom" : requestType;
+  const effectiveCustomSubject =
+    effectiveReplyContext && !customSubject
+      ? effectiveReplyContext.subject
+      : customSubject;
+  const autoTemplateValues = useMemo(
+    () => ({
+      companyName: entry.companyName,
+      hrName:
+        entry.contacts.find((contact) => contact.id === effectiveContactId)
+          ?.name ?? "",
+      spocName: currentUser.mailingDefaults?.spocName ?? currentUser.name,
+      spocContact: currentUser.mailingDefaults?.spocContact ?? "",
+      spocMail: currentUser.mailingDefaults?.spocMail ?? "",
+    }),
+    [
+      currentUser.mailingDefaults?.spocContact,
+      currentUser.mailingDefaults?.spocMail,
+      currentUser.mailingDefaults?.spocName,
+      currentUser.name,
+      entry.companyName,
+      effectiveContactId,
+      entry.contacts,
+    ],
+  );
+  const templateVariableDrafts = useMemo(
+    () =>
+      (selectedTemplate?.variables ?? []).map((variable) => {
+        const resolved = resolveTemplateVariableValue(variable, autoTemplateValues);
+        const currentValue = templateVariables[variable] ?? resolved.autoValue;
 
-  const missingVariables = (selectedTemplate?.variables ?? []).filter(
-    (variable) => !templateVariables[variable]?.trim(),
+        return {
+          key: variable,
+          label: resolved.predefined?.label ?? prettifyVariableLabel(variable),
+          value: currentValue,
+          autoFilled: resolved.autoFilled,
+          description:
+            resolved.predefined?.description ??
+            "Enter a custom value for this template variable.",
+        };
+      }),
+    [autoTemplateValues, selectedTemplate?.variables, templateVariables],
+  );
+  const resolvedTemplateVariables = useMemo(
+    () =>
+      Object.fromEntries(
+        templateVariableDrafts.map((variable) => [variable.key, variable.value]),
+      ),
+    [templateVariableDrafts],
   );
 
+  const missingVariables = (selectedTemplate?.variables ?? []).filter(
+    (variable) => !resolvedTemplateVariables[variable]?.trim(),
+  );
   function closeModal() {
     setMode("none");
     setCycleId("");
@@ -386,6 +496,7 @@ function ActionModals({
     setNextFollowUpAt("");
     setStatusValue("not_contacted");
     setStatusNote("");
+    onReplyContextConsumed();
   }
 
   function openStatusEditor(season: SeasonTask) {
@@ -452,9 +563,9 @@ function ActionModals({
       </div>
 
       <Modal
-        isOpen={mode === "mail"}
+        isOpen={mode === "mail" || Boolean(effectiveReplyContext)}
         onClose={closeModal}
-        title={`Send Mail - ${entry.companyName}`}
+        title={`${effectiveReplyContext ? "Reply in Thread" : "Send Mail"} - ${entry.companyName}`}
         size="md"
         footer={
           <>
@@ -465,15 +576,15 @@ function ActionModals({
               className="btn btn-primary"
               disabled={
                 mailSubmitting ||
-                !resolvedCycleId ||
-                !contactId ||
-                (requestType === "template"
+                !effectiveCycleId ||
+                !effectiveContactId ||
+                (effectiveRequestType === "template"
                   ? !templateId || missingVariables.length > 0
-                  : !customSubject || !customBody)
+                  : !effectiveCustomSubject || !customBody)
               }
               onClick={() => {
                 const mergedAttachments = [
-                  ...(requestType === "template"
+                  ...(effectiveRequestType === "template"
                     ? (selectedTemplate?.attachments ?? [])
                     : []),
                   ...attachments,
@@ -486,41 +597,48 @@ function ActionModals({
                 );
                 void onQueueMail({
                   companyId: entry.companyId,
-                  companySeasonCycleId: resolvedCycleId,
-                  contactId,
-                  requestType,
+                  companySeasonCycleId: effectiveCycleId,
+                  contactId: effectiveContactId,
+                  requestType: effectiveRequestType,
                   templateId,
                   templateVariables:
-                    requestType === "template" ? templateVariables : undefined,
+                    effectiveRequestType === "template"
+                      ? resolvedTemplateVariables
+                      : undefined,
                   previewPayload:
-                    requestType === "template" && selectedTemplate
+                    effectiveRequestType === "template" && selectedTemplate
                       ? {
-                          templateVariables,
+                          templateVariables: resolvedTemplateVariables,
                           subject: interpolateTemplate(
                             selectedTemplate.subject,
-                            templateVariables,
+                            resolvedTemplateVariables,
                           ),
                           htmlBody: interpolateTemplate(
                             selectedTemplate.bodyHtml,
-                            templateVariables,
+                            resolvedTemplateVariables,
                           ),
                           textBody: interpolateTemplate(
                             selectedTemplate.bodyText ??
                               selectedTemplate.bodyHtml ??
                               "",
-                            templateVariables,
+                            resolvedTemplateVariables,
                           ),
                           attachments: mergedAttachments,
                         }
                       : undefined,
-                  customSubject,
+                  customSubject: effectiveCustomSubject,
                   customBody,
                   attachments: mergedAttachments,
+                  replyContext: effectiveReplyContext ?? undefined,
                 }).then(closeModal);
               }}
             >
               <Send size={14} />
-              {mailSubmitting ? "Queueing..." : "Send to Queue"}
+              {mailSubmitting
+                ? "Queueing..."
+                : effectiveReplyContext
+                  ? "Queue Reply"
+                  : "Send to Queue"}
             </button>
           </>
         }
@@ -547,23 +665,34 @@ function ActionModals({
             </label>
             <ContactSelect
               contacts={entry.contacts}
-              value={contactId}
+              value={effectiveContactId}
               onChange={setContactId}
               placeholder="Select a contact"
             />
           </div>
-          <div className="flex gap-3">
-            {(["template", "custom"] as const).map((type) => (
-              <button
-                key={type}
-                onClick={() => setRequestType(type)}
-                className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium ${requestType === type ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 bg-white text-slate-600"}`}
-              >
-                {type === "template" ? "Template" : "Custom"}
-              </button>
-            ))}
-          </div>
-          {requestType === "template" ? (
+          {effectiveReplyContext ? (
+            <div className="rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2.5 text-xs text-[#1D4ED8]">
+              Reply will stay in the existing thread with{" "}
+              <span className="font-semibold">
+                {effectiveReplyContext.recipientEmail}
+              </span>
+              {replyContact ? "" : ". Select the matching contact before queueing."}
+            </div>
+          ) : null}
+          {effectiveReplyContext ? null : (
+            <div className="flex gap-3">
+              {(["template", "custom"] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setRequestType(type)}
+                  className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium ${requestType === type ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 bg-white text-slate-600"}`}
+                >
+                  {type === "template" ? "Template" : "Custom"}
+                </button>
+              ))}
+            </div>
+          )}
+          {effectiveRequestType === "template" ? (
             <div className="space-y-4">
               <select
                 className="input-base"
@@ -578,21 +707,27 @@ function ActionModals({
                 ))}
               </select>
               {selectedTemplate?.variables.length ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {selectedTemplate.variables.map((variable) => (
-                    <input
-                      key={variable}
-                      className="input-base"
-                      value={templateVariables[variable] ?? ""}
-                      onChange={(event) =>
-                        setTemplateVariables((current) => ({
-                          ...current,
-                          [variable]: event.target.value,
-                        }))
-                      }
-                      placeholder={`Enter ${variable.replace(/_/g, " ")}`}
-                    />
-                  ))}
+                <div className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {templateVariableDrafts.map((variable) => (
+                      <div key={variable.key} className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          {variable.label}
+                        </label>
+                        <input
+                          className="input-base"
+                          value={variable.value}
+                          onChange={(event) =>
+                            setTemplateVariables((current) => ({
+                              ...current,
+                              [variable.key]: event.target.value,
+                            }))
+                          }
+                          placeholder={`Enter ${variable.label}`}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : null}
             </div>
@@ -600,7 +735,7 @@ function ActionModals({
             <div className="space-y-4">
               <input
                 className="input-base"
-                value={customSubject}
+                value={effectiveCustomSubject}
                 onChange={(event) => setCustomSubject(event.target.value)}
                 placeholder="Email subject"
               />
@@ -621,7 +756,11 @@ function ActionModals({
           />
           <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
             <AlertCircle size={14} className="mt-0.5 shrink-0" />
-            <span>Mail requests are queued for approval before dispatch.</span>
+            <span>
+              Mail requests are queued for approval before dispatch. Coordinators
+              log in with personal accounts, while final sending uses the shared
+              TPO mailbox when it is configured.
+            </span>
           </div>
         </div>
       </Modal>
@@ -850,9 +989,16 @@ function ActionModals({
 }
 
 export default function OutreachPage() {
+  const searchParams = useSearchParams();
   const [entries, setEntries] = useState<OutreachCompany[]>([]);
   const [templates, setTemplates] = useState<MailTemplate[]>([]);
   const [currentUserName, setCurrentUserName] = useState("Coordinator");
+  const [currentUser, setCurrentUser] = useState<OutreachResponse["user"]>({
+    id: "",
+    name: "Coordinator",
+    email: "",
+    mailingDefaults: {},
+  });
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -867,6 +1013,8 @@ export default function OutreachPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(
     null,
   );
+  const [pendingReplyContext, setPendingReplyContext] =
+    useState<ReplyContext | null>(null);
   const detailsCardRef = useRef<HTMLDivElement | null>(null);
   const detailLeftColumnRef = useRef<HTMLDivElement | null>(null);
   const [taskListHeight, setTaskListHeight] = useState<number | null>(null);
@@ -885,6 +1033,14 @@ export default function OutreachPage() {
         })),
       ]);
       setEntries(outreachRes.data?.entries ?? []);
+      setCurrentUser(
+        outreachRes.data?.user ?? {
+          id: "",
+          name: "Coordinator",
+          email: "",
+          mailingDefaults: {},
+        },
+      );
       setCurrentUserName(outreachRes.data?.user.name ?? "Coordinator");
       setTemplates(
         (templatesRes.data ?? []).filter(
@@ -905,6 +1061,32 @@ export default function OutreachPage() {
   useEffect(() => {
     void loadOutreach();
   }, [loadOutreach]);
+
+  useEffect(() => {
+    const companyId = searchParams.get("companyId");
+    const messageId = searchParams.get("replyMessageId");
+    const recipientEmail = searchParams.get("replyRecipientEmail");
+
+    if (companyId) {
+      setSelectedCompanyId(companyId);
+    }
+
+    if (!messageId || !recipientEmail) {
+      return;
+    }
+
+    const referencesValue = searchParams.get("replyReferences") ?? "";
+    setPendingReplyContext({
+      threadId: searchParams.get("replyThreadId") ?? undefined,
+      messageId,
+      references: referencesValue
+        .split("||")
+        .map((value) => value.trim())
+        .filter(Boolean),
+      subject: searchParams.get("replySubject") ?? "",
+      recipientEmail,
+    });
+  }, [searchParams]);
 
   const seasonOptions = useMemo(
     () =>
@@ -1049,6 +1231,7 @@ export default function OutreachPage() {
     customSubject?: string;
     customBody?: string;
     attachments?: MailAttachmentMeta[];
+    replyContext?: ReplyContext;
   }) => {
     setMailError(null);
     setMailSubmitting(true);
@@ -1083,6 +1266,7 @@ export default function OutreachPage() {
           recipientFilter: {
             contactIds: [contact.id],
             emails: contact.emails,
+            replyContext: payload.replyContext,
             templateVariables:
               payload.requestType === "template"
                 ? payload.templateVariables
@@ -1510,6 +1694,7 @@ export default function OutreachPage() {
                           <ActionModals
                             entry={selectedEntry}
                             templates={templates}
+                            currentUser={currentUser}
                             mailSubmitting={mailSubmitting}
                             logSubmitting={logSubmitting}
                             statusSubmitting={statusSubmitting}
@@ -1519,18 +1704,49 @@ export default function OutreachPage() {
                             onQueueMail={handleQueueMail}
                             onLog={handleLog}
                             onUpdateStatus={handleStatusUpdate}
+                            replyContext={
+                              pendingReplyContext &&
+                              pendingReplyContext.recipientEmail &&
+                              selectedEntry.companyId === selectedCompanyId
+                                ? pendingReplyContext
+                                : null
+                            }
+                            onReplyContextConsumed={() =>
+                              setPendingReplyContext(null)
+                            }
                           />
                         </div>
                       </div>
 
                       <div
-                        className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4"
+                        className="flex min-h-0 min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4"
                         style={{
                           height: detailColumnsHeight
                             ? `${Math.ceil(detailColumnsHeight)}px`
                             : undefined,
                         }}
                       >
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h4 className="text-sm font-semibold text-slate-800">
+                                Mail Tracker
+                              </h4>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Track inbound and outbound mail threads mapped
+                                to this company.
+                              </p>
+                            </div>
+                            <Link
+                              href={`/outreach/${selectedEntry.companyId}/mails`}
+                              className="btn btn-primary btn-sm gap-1"
+                            >
+                              Show Mails
+                              <ArrowRight size={14} />
+                            </Link>
+                          </div>
+                        </div>
+
                         <div className="flex items-center justify-between gap-3 pb-4">
                           <div>
                             <h4 className="text-sm font-semibold text-slate-800">
