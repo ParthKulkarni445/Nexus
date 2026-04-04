@@ -23,6 +23,8 @@ import {
   Star,
   ExternalLink,
   Users,
+  Copy,
+  Check,
 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Badge from "@/components/ui/Badge";
@@ -69,6 +71,8 @@ type CompanyDetailResponse = {
     seasonName: string;
     assigneeUserId: string;
     assigneeName: string | null;
+    assigneeEmail: string | null;
+    assigneePhone: string | null;
     assignedAt: string;
     notes: string | null;
   }>;
@@ -121,6 +125,8 @@ type UiHistory = {
 type UiAssignment = {
   id: string;
   assignee: string;
+  email: string;
+  phone: string;
   season: string;
   assignedAt: string;
   notes: string;
@@ -246,6 +252,25 @@ async function requestJson<T>(url: string, init?: RequestInit) {
   }
 
   return body;
+}
+
+async function copyToClipboard(text: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document !== "undefined") {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.setAttribute("readonly", "");
+    textArea.style.position = "absolute";
+    textArea.style.left = "-9999px";
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textArea);
+  }
 }
 
 function ContactCard({
@@ -463,6 +488,10 @@ export default function CompanyDetailPage() {
   const [savingContact, setSavingContact] = useState(false);
   const [deletingContact, setDeletingContact] = useState(false);
   const [savingCompany, setSavingCompany] = useState(false);
+  const [copiedAssignmentId, setCopiedAssignmentId] = useState<string | null>(
+    null,
+  );
+  const [copiedFieldKey, setCopiedFieldKey] = useState<string | null>(null);
 
   const [companyForm, setCompanyForm] = useState<CompanyEditForm>({
     name: "",
@@ -531,6 +560,8 @@ export default function CompanyDetailPage() {
         return {
           id: assignment.id,
           assignee: assigneeName,
+          email: assignment.assigneeEmail ?? "",
+          phone: assignment.assigneePhone ?? "",
           season: assignment.seasonName || "Season",
           assignedAt: assignment.assignedAt,
           notes: assignment.notes ?? "",
@@ -612,6 +643,50 @@ export default function CompanyDetailPage() {
     not_contacted: AlertTriangle,
     rejected: AlertTriangle,
   };
+
+  const handleCopyAssignmentInfo = useCallback(async (assignment: UiAssignment) => {
+    const lines = [assignment.assignee];
+
+    if (assignment.email) {
+      lines.push(`Email: ${assignment.email}`);
+    }
+    if (assignment.phone) {
+      lines.push(`Phone: ${assignment.phone}`);
+    }
+    lines.push(`Season: ${assignment.season}`);
+
+    try {
+      await copyToClipboard(lines.join("\n"));
+      setCopiedAssignmentId(assignment.id);
+      window.setTimeout(() => {
+        setCopiedAssignmentId((current) =>
+          current === assignment.id ? null : current,
+        );
+      }, 1800);
+    } catch {
+      setCopiedAssignmentId(null);
+    }
+  }, []);
+
+    const handleCopySingleField = useCallback(
+      async (assignmentId: string, field: "email" | "phone", value: string) => {
+        if (!value) {
+          return;
+        }
+
+        const key = `${assignmentId}:${field}`;
+        try {
+          await copyToClipboard(value);
+          setCopiedFieldKey(key);
+          window.setTimeout(() => {
+            setCopiedFieldKey((current) => (current === key ? null : current));
+          }, 1500);
+        } catch {
+          setCopiedFieldKey(null);
+        }
+      },
+      [],
+    );
 
   const handleContactSubmit = async (form: CompanyContact) => {
     if (!company) {
@@ -1007,23 +1082,33 @@ export default function CompanyDetailPage() {
                 />
               ) : (
                 <div className="space-y-3">
+                  <div className="hidden md:grid md:grid-cols-[minmax(180px,1.25fr)_minmax(220px,1fr)_minmax(180px,0.9fr)_auto] md:px-4 md:text-xs md:font-semibold md:uppercase md:tracking-wide md:text-slate-500">
+                    <span>Coordinator</span>
+                    <span>Email</span>
+                    <span>Phone</span>
+                    <span className="text-right">Actions</span>
+                  </div>
                   {assignments.map((assignment) => (
                     <div
                       key={assignment.id}
-                      className="card p-4 flex items-center gap-4"
+                      className="card p-4 grid grid-cols-1 md:grid-cols-[minmax(180px,1.25fr)_minmax(220px,1fr)_minmax(180px,0.9fr)_auto] gap-4 items-start md:items-center"
                     >
-                      <div className="w-10 h-10 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-semibold text-sm shrink-0">
-                        {assignment.assignee
-                          .split(" ")
-                          .map((name) => name[0])
-                          .join("")
-                          .slice(0, 2)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900">
-                          {assignment.assignee}
-                        </p>
-                        <p className="text-xs text-slate-500">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-semibold text-sm shrink-0">
+                            {assignment.assignee
+                              .split(" ")
+                              .map((name) => name[0])
+                              .join("")
+                              .slice(0, 2)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-900 truncate">
+                              {assignment.assignee}
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">
                           Assigned since{" "}
                           {new Date(assignment.assignedAt).toLocaleDateString(
                             "en-IN",
@@ -1040,7 +1125,99 @@ export default function CompanyDetailPage() {
                           </p>
                         )}
                       </div>
-                      <Badge variant="purple">{assignment.season}</Badge>
+
+                      <div className="flex items-center gap-2 min-w-0">
+                        <a
+                          href={`mailto:${assignment.email}`}
+                          className={`min-w-0 flex items-center gap-1.5 text-xs ${assignment.email ? "text-slate-500 hover:text-[#2563EB]" : "text-slate-400 pointer-events-none"}`}
+                        >
+                          <Mail size={12} className="shrink-0" />
+                          <span className="truncate">
+                            {assignment.email || "Email not available"}
+                          </span>
+                        </a>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm shrink-0"
+                          disabled={!assignment.email}
+                          onClick={() =>
+                            void handleCopySingleField(
+                              assignment.id,
+                              "email",
+                              assignment.email,
+                            )
+                          }
+                        >
+                          {copiedFieldKey === `${assignment.id}:email` ? (
+                            <>
+                              <Check size={12} />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={12} />
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 min-w-0">
+                        <a
+                          href={`callto:${assignment.phone}`}
+                          className={`min-w-0 flex items-center gap-1.5 text-xs ${assignment.phone ? "text-slate-500 hover:text-[#2563EB]" : "text-slate-400 pointer-events-none"}`}
+                        >
+                          <Phone size={12} className="shrink-0" />
+                          <span className="truncate">
+                            {assignment.phone || "Phone not available"}
+                          </span>
+                        </a>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm shrink-0"
+                          disabled={!assignment.phone}
+                          onClick={() =>
+                            void handleCopySingleField(
+                              assignment.id,
+                              "phone",
+                              assignment.phone,
+                            )
+                          }
+                        >
+                          {copiedFieldKey === `${assignment.id}:phone` ? (
+                            <>
+                              <Check size={12} />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={12} />
+                              Copy
+                            </>
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="shrink-0 flex md:flex-col items-end gap-2 justify-end">
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => void handleCopyAssignmentInfo(assignment)}
+                        >
+                          {copiedAssignmentId === assignment.id ? (
+                            <>
+                              <Check size={12} />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={12} />
+                              Copy
+                            </>
+                          )}
+                        </button>
+                        <Badge variant="purple">{assignment.season}</Badge>
+                      </div>
                     </div>
                   ))}
                 </div>

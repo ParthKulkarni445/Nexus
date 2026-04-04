@@ -83,6 +83,8 @@ export async function GET(
             owner: {
               select: {
                 name: true,
+                email: true,
+                profileMeta: true,
               },
             },
           },
@@ -141,15 +143,33 @@ export async function GET(
     return success({
       company,
       contacts,
-      assignments: seasonAssignments.map((assignment) => ({
+      assignments: seasonAssignments.map((assignment) => {
+        const ownerMeta = (assignment.owner?.profileMeta ?? null) as
+          | Record<string, unknown>
+          | null;
+        const ownerPhone =
+          typeof ownerMeta?.phone === "string"
+            ? ownerMeta.phone
+            : typeof ownerMeta?.phoneNumber === "string"
+              ? ownerMeta.phoneNumber
+              : typeof ownerMeta?.mobile === "string"
+                ? ownerMeta.mobile
+                : typeof ownerMeta?.contactNumber === "string"
+                  ? ownerMeta.contactNumber
+                  : null;
+
+        return {
         id: assignment.id,
         seasonId: assignment.season.id,
         seasonName: assignment.season.name,
         assigneeUserId: assignment.ownerUserId,
         assigneeName: assignment.owner?.name ?? null,
+        assigneeEmail: assignment.owner?.email ?? null,
+        assigneePhone: ownerPhone,
         assignedAt: assignment.updatedAt,
         notes: null,
-      })),
+        };
+      }),
       recentInteractions: interactions,
       recentDrives,
       latestCycle: latestCycle

@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Plus,
   Download,
+  Upload,
+  FileSpreadsheet,
+  Mail,
+  Globe,
+  ArrowRight,
   Building2,
   Info,
   Filter,
@@ -454,6 +459,7 @@ function DeleteModal({
 
 // --- Main Component -----------------------------------------------------------
 export default function CompaniesPage() {
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
@@ -475,6 +481,13 @@ export default function CompaniesPage() {
   const [contactModalOpen, setContactModalOpen] = useState(false);
   const [contactTargetCompany, setContactTargetCompany] =
     useState<Company | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [toolbarMessage, setToolbarMessage] = useState<string | null>(null);
+  const [toolbarError, setToolbarError] = useState<string | null>(null);
+  const [exportingCompanies, setExportingCompanies] = useState(false);
+  const [downloadingImportFormat, setDownloadingImportFormat] =
+    useState(false);
+  const [importingCompanies, setImportingCompanies] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [updateDetails, setUpdateDetails] = useState<{
     company: Company;
@@ -639,6 +652,183 @@ export default function CompaniesPage() {
       );
     } finally {
       setCreatingContact(false);
+    }
+  };
+
+  const handleExportCompanies = async () => {
+    setToolbarMessage(null);
+    setToolbarError(null);
+    setExportingCompanies(true);
+
+    try {
+      const query = new URLSearchParams();
+      if (search.trim()) {
+        query.set("search", search.trim());
+      }
+      if (industryFilter.length === 1) {
+        query.set("industry", industryFilter[0]);
+      }
+
+      const response = await fetch(
+        `/api/v1/companies/export${query.size > 0 ? `?${query.toString()}` : ""}`,
+        {
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) {
+        let message = "Failed to export companies";
+        try {
+          const body = (await response.json()) as ApiResponse<unknown>;
+          message = body.error?.message ?? message;
+        } catch {
+          // Ignore parse errors and use fallback message.
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("content-disposition");
+      const match = contentDisposition?.match(/filename=([^;]+)/i);
+      const filename = match
+        ? match[1].replaceAll('"', "")
+        : `companies-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+
+      setToolbarMessage("Companies exported successfully");
+    } catch (error) {
+      setToolbarError(
+        error instanceof Error ? error.message : "Failed to export companies",
+      );
+    } finally {
+      setExportingCompanies(false);
+    }
+  };
+
+  const handleImportCompaniesClick = () => {
+    setToolbarMessage(null);
+    setToolbarError(null);
+    setImportModalOpen(true);
+  };
+
+  const handleDownloadImportFormat = async () => {
+    setToolbarMessage(null);
+    setToolbarError(null);
+    setDownloadingImportFormat(true);
+
+    try {
+      const response = await fetch("/api/v1/companies/import-template", {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        let message = "Failed to download import format";
+        try {
+          const body = (await response.json()) as ApiResponse<unknown>;
+          message = body.error?.message ?? message;
+        } catch {
+          // Ignore parse errors and use fallback message.
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get("content-disposition");
+      const match = contentDisposition?.match(/filename=([^;]+)/i);
+      const filename = match
+        ? match[1].replaceAll('"', "")
+        : "companies-import-format.xlsx";
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+
+      setToolbarMessage("Import format downloaded");
+    } catch (error) {
+      setToolbarError(
+        error instanceof Error
+          ? error.message
+          : "Failed to download import format",
+      );
+    } finally {
+      setDownloadingImportFormat(false);
+    }
+  };
+
+  const handleUploadFilledFile = () => {
+    importFileInputRef.current?.click();
+  };
+
+  const handleImportFileChange = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setToolbarMessage(null);
+    setToolbarError(null);
+    setImportingCompanies(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/v1/companies/import", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const bodyText = await response.text();
+      let body: ApiResponse<{ total: number; created: number; updated: number }> = {};
+
+      if (bodyText) {
+        try {
+          body = JSON.parse(bodyText) as ApiResponse<{
+            total: number;
+            created: number;
+            updated: number;
+          }>;
+        } catch {
+          body = {};
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(body.error?.message ?? "Failed to import companies");
+      }
+
+      const summary = body.data;
+      setToolbarMessage(
+        summary
+          ? `Import completed: ${summary.total} rows (${summary.created} created, ${summary.updated} updated)`
+          : "Import completed successfully",
+      );
+      setImportModalOpen(false);
+      await fetchCompanies();
+    } catch (error) {
+      setToolbarError(
+        error instanceof Error ? error.message : "Failed to import companies",
+      );
+    } finally {
+      setImportingCompanies(false);
     }
   };
 
@@ -1010,6 +1200,17 @@ export default function CompaniesPage() {
         <div className="card overflow-hidden flex-1 min-w-0 xl:h-full flex flex-col">
           {/* Toolbar */}
           <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
+            {(toolbarMessage || toolbarError) && (
+              <div
+                className={`rounded-lg px-3 py-2 text-sm ${
+                  toolbarError
+                    ? "border border-red-200 bg-red-50 text-red-700"
+                    : "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                }`}
+              >
+                {toolbarError ?? toolbarMessage}
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <SearchBar
                 value={search}
@@ -1020,13 +1221,18 @@ export default function CompaniesPage() {
                 placeholder="Search companies..."
                 className="flex-1 min-w-0"
               />
+              <div className="ml-auto flex items-center gap-2 shrink-0">
               <button
                 className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
                   showFilters
                     ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]"
                     : ""
                 }`}
-                onClick={() => setShowFilters((v) => !v)}
+                onClick={() => {
+                  setToolbarMessage(null);
+                  setToolbarError(null);
+                  setShowFilters((v) => !v);
+                }}
               >
                 <Filter size={14} />
                 Filters
@@ -1037,10 +1243,31 @@ export default function CompaniesPage() {
                 )}
               </button>
               <div className="w-px h-5 bg-(--card-border) shrink-0" />
-              <button className="btn btn-secondary btn-sm gap-1.5 shrink-0">
+              <button
+                className="btn btn-secondary btn-sm gap-1.5 shrink-0"
+                onClick={() => void handleExportCompanies()}
+                disabled={exportingCompanies || importingCompanies}
+              >
                 <Download size={14} />
-                Export
+                {exportingCompanies ? "Exporting..." : "Export"}
               </button>
+              <button
+                className="btn btn-secondary btn-sm gap-1.5 shrink-0"
+                onClick={handleImportCompaniesClick}
+                disabled={importingCompanies || exportingCompanies}
+              >
+                <Upload size={14} />
+                {importingCompanies ? "Importing..." : "Import"}
+              </button>
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                className="hidden"
+                onChange={(event) => {
+                  void handleImportFileChange(event);
+                }}
+              />
               <button
                 className="btn btn-primary btn-sm gap-1.5 shrink-0"
                 onClick={() => {
@@ -1052,6 +1279,7 @@ export default function CompaniesPage() {
                 <Plus size={14} />
                 Add
               </button>
+              </div>
             </div>
 
             {/* Filter row */}
@@ -1461,6 +1689,109 @@ export default function CompaniesPage() {
         submitting={deletingCompany}
         errorMessage={modalError}
       />
+      <Modal
+        isOpen={importModalOpen}
+        onClose={() => {
+          if (importingCompanies || downloadingImportFormat) {
+            return;
+          }
+          setImportModalOpen(false);
+        }}
+        title="Import Companies"
+        size="md"
+        footer={
+          <button
+            className="btn btn-secondary"
+            onClick={() => setImportModalOpen(false)}
+            disabled={importingCompanies || downloadingImportFormat}
+          >
+            Close
+          </button>
+        }
+      >
+        <div className="space-y-5">
+          <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3">
+            <p className="text-sm font-semibold text-[#1D4ED8]">2-step import flow</p>
+            <p className="mt-1 text-sm text-slate-700">
+              Download the template, fill the rows, then upload the same Excel
+              file.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                  Step 1
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  Download import template
+                </p>
+              </div>
+              <FileSpreadsheet size={18} className="text-[#2563EB] shrink-0" />
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              The template already contains the exact required columns and an
+              example row.
+            </p>
+            <button
+              className="btn btn-secondary btn-sm mt-3"
+              onClick={() => void handleDownloadImportFormat()}
+              disabled={downloadingImportFormat || importingCompanies}
+            >
+              {downloadingImportFormat ? "Downloading template..." : "Download .xlsx template"}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-center text-slate-400">
+            <ArrowRight size={16} />
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                  Step 2
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  Upload filled template
+                </p>
+              </div>
+              <Upload size={18} className="text-[#2563EB] shrink-0" />
+            </div>
+            <p className="mt-2 text-sm text-slate-600">
+              Upload only Excel files (.xlsx/.xls) created from the provided
+              template.
+            </p>
+            <button
+              className="btn btn-primary btn-sm mt-3"
+              onClick={handleUploadFilledFile}
+              disabled={importingCompanies || downloadingImportFormat}
+            >
+              {importingCompanies ? "Uploading file..." : "Upload filled file"}
+            </button>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700 space-y-2">
+            <p className="font-semibold text-slate-800">Required columns</p>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">company name</span>
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">industry</span>
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">priority</span>
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">domain</span>
+            </div>
+            <p className="flex items-center gap-1.5">
+              <Globe size={13} className="text-slate-500" />
+              Priority values must be exactly: low, medium, high.
+            </p>
+            <p className="flex items-center gap-1.5">
+              <Mail size={13} className="text-slate-500" />
+              Domain column accepts email (for example hr@acme.com) or plain
+              domain (acme.com).
+            </p>
+          </div>
+        </div>
+      </Modal>
       <ContactModal
         isOpen={contactModalOpen}
         onClose={() => {

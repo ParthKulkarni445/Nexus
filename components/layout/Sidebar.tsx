@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import {
   Building2,
+  CheckCircle2,
   PhoneCall,
   Mail,
   Users,
@@ -24,6 +25,7 @@ import { canAccessAppPath } from "@/lib/auth/rbac";
 const navItems = [
   { label: "Companies", href: "/companies", icon: Building2 },
   { label: "Outreach", href: "/outreach", icon: PhoneCall },
+  { label: "Confirmed", href: "/confirmed", icon: CheckCircle2 },
   { label: "Mailing", href: "/mailing", icon: Mail },
   { label: "Assignments", href: "/assignments", icon: Users },
   { label: "Blogs", href: "/blogs", icon: BookOpen },

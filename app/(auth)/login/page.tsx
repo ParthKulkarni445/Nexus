@@ -31,7 +31,9 @@ export default function LoginPage() {
         );
         return;
       }
-      router.push("/companies");
+      const nextPath =
+        json?.data?.role === "student" ? "/student/blogs" : "/companies";
+      router.push(nextPath);
       router.refresh();
     } catch {
       setApiError("Network error. Please check your connection and try again.");

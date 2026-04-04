@@ -41,10 +41,24 @@ function QueueCardSkeleton() {
   );
 }
 
-export default function BlogsLoadingView() {
+type BlogsLoadingViewProps = {
+  showModerationPanel?: boolean;
+  showCreateButton?: boolean;
+};
+
+export default function BlogsLoadingView({
+  showModerationPanel = true,
+  showCreateButton = true,
+}: BlogsLoadingViewProps) {
   return (
     <div className="-mt-6 xl:mt-0 space-y-5 px-4 pb-6 pt-6 xl:h-full xl:overflow-y-auto hide-scrollbar">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)] items-stretch">
+      <div
+        className={`grid grid-cols-1 gap-4 items-stretch ${
+          showModerationPanel
+            ? "xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]"
+            : "xl:grid-cols-1"
+        }`}
+      >
         <div className="min-w-0 space-y-4">
           <div className="card overflow-visible flex flex-col">
             <div className="px-4 py-3 border-b border-(--card-border)">
@@ -62,7 +76,7 @@ export default function BlogsLoadingView() {
             <div className="border-b border-(--card-border) px-4 py-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="shimmer h-4 w-24 rounded-full" />
-                <div className="shimmer h-9 w-28 rounded-xl" />
+                {showCreateButton && <div className="shimmer h-9 w-28 rounded-xl" />}
               </div>
             </div>
 
@@ -74,18 +88,20 @@ export default function BlogsLoadingView() {
           </section>
         </div>
 
-        <aside className="card p-4 h-full">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="shimmer h-4 w-32 rounded-full" />
-            <div className="shimmer h-6 w-20 rounded-full" />
-          </div>
+        {showModerationPanel && (
+          <aside className="card p-4 h-full">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="shimmer h-4 w-32 rounded-full" />
+              <div className="shimmer h-6 w-20 rounded-full" />
+            </div>
 
-          <div className="space-y-3">
-            {Array.from({ length: 4 }, (_, index) => (
-              <QueueCardSkeleton key={index} />
-            ))}
-          </div>
-        </aside>
+            <div className="space-y-3">
+              {Array.from({ length: 4 }, (_, index) => (
+                <QueueCardSkeleton key={index} />
+              ))}
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );
