@@ -103,6 +103,14 @@ type ConfirmedPayload = {
   telegramTemplates: TelegramTemplate[];
 };
 
+type SeasonRecord = {
+  id: string;
+  name: string;
+  seasonType: "intern" | "placement";
+  academicYear: string;
+  isActive: boolean;
+};
+
 type MePayload = {
   user: {
     email?: string | null;
@@ -181,10 +189,12 @@ export default function ConfirmedPage() {
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
   const [drives, setDrives] = useState<ConfirmedDrive[]>([]);
+  const [seasons, setSeasons] = useState<SeasonRecord[]>([]);
   const [acceptedCompanies, setAcceptedCompanies] = useState<ConfirmedCompany[]>([]);
   const [telegramTemplates, setTelegramTemplates] = useState<TelegramTemplate[]>([]);
 
   const [selectedDrive, setSelectedDrive] = useState("");
+  const [selectedSeasonId, setSelectedSeasonId] = useState("");
   const [query, setQuery] = useState("");
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [selectedContactByCompany, setSelectedContactByCompany] = useState<Record<string, string>>({});
@@ -211,18 +221,44 @@ export default function ConfirmedPage() {
   const [submittingAction, setSubmittingAction] = useState<Record<string, boolean>>({});
   const [loggedInUserEmail, setLoggedInUserEmail] = useState("");
 
-  async function fetchConfirmedData(nextDriveId?: string) {
+  async function fetchConfirmedData(nextDriveId?: string, nextSeasonId?: string) {
     setLoading(true);
     setLoadingError(null);
 
     try {
-      const search = nextDriveId ? `?driveId=${encodeURIComponent(nextDriveId)}` : "";
-      const payload = await requestJson<ConfirmedPayload>(`/api/v1/confirmed${search}`);
+      const params = new URLSearchParams();
+      if (nextDriveId) {
+        params.set("driveId", nextDriveId);
+      }
+      if (nextSeasonId) {
+        params.set("seasonId", nextSeasonId);
+      }
+
+      const search = params.toString();
+      const payload = await requestJson<ConfirmedPayload>(
+        `/api/v1/confirmed${search ? `?${search}` : ""}`,
+      );
 
       setDrives(payload.drives);
       setAcceptedCompanies(payload.acceptedCompanies);
       setTelegramTemplates(payload.telegramTemplates);
       setSelectedDrive(payload.selectedDriveId ?? "");
+      setSelectedSeasonId((current) => {
+        if (nextSeasonId) {
+          return nextSeasonId;
+        }
+
+        if (payload.selectedDriveId) {
+          const matchedDrive = payload.drives.find(
+            (drive) => drive.id === payload.selectedDriveId,
+          );
+          if (matchedDrive) {
+            return matchedDrive.seasonId;
+          }
+        }
+
+        return current;
+      });
       setSelectedCompanyId("");
       setTelegramCompanyId("");
       setTelegramTemplateId("");
@@ -235,6 +271,17 @@ export default function ConfirmedPage() {
 
   useEffect(() => {
     void fetchConfirmedData();
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const seasonList = await requestJson<SeasonRecord[]>("/api/v1/seasons");
+        setSeasons(seasonList);
+      } catch {
+        setSeasons([]);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -284,10 +331,14 @@ export default function ConfirmedPage() {
     [acceptedCompanies, instructionModalCompanyId],
   );
 
-  const driveOptions = drives.map((drive) => ({
-    value: drive.id,
-    label: `${drive.title} (${drive.seasonName})`,
-  }));
+  const seasonOptions = useMemo(
+    () =>
+      seasons.map((season) => ({
+        value: season.id,
+        label: `${season.name} (${season.academicYear})`,
+      })),
+    [seasons],
+  );
 
   const templateOptions = telegramTemplates.map((template) => ({
     value: template.id,
@@ -298,6 +349,16 @@ export default function ConfirmedPage() {
     setActionError("");
     setActionMessage("");
     await fetchConfirmedData(nextDriveId);
+  }
+
+  async function handleSeasonChange(nextSeasonId: string) {
+    setSelectedSeasonId(nextSeasonId);
+
+    const representativeDrive = drives.find(
+      (drive) => drive.seasonId === nextSeasonId,
+    );
+
+    await fetchConfirmedData(representativeDrive?.id ?? undefined, nextSeasonId);
   }
 
   function downloadAttendanceComparison(company: ConfirmedCompany, payload: CompareAttendanceResponse) {
@@ -382,7 +443,7 @@ export default function ConfirmedPage() {
 
       const validEntries = Array.from(validEntrySet).sort((a, b) => a.localeCompare(b));
       if (validEntries.length === 0) {
-        throw new Error("No valid Roll No values found in YYYYBBBNNNN format.");
+        throw new Error("No valid Roll No values found.");
       }
 
       setStudentUploadPreview({
@@ -712,16 +773,21 @@ export default function ConfirmedPage() {
       <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <p className="text-xs font-semibold text-slate-600 mb-1">Select Session (Drive)</p>
-            <FilterSelect
-              value={selectedDrive}
-              onChange={(value) => {
-                void handleDriveChange(value);
+            <p className="text-xs font-semibold text-slate-600 mb-1">Select season</p>
+            <select
+              className="input-base w-full"
+              value={selectedSeasonId}
+              onChange={(event) => {
+                void handleSeasonChange(event.target.value);
               }}
-              options={driveOptions}
-              placeholder="Choose confirmed drive"
-              className="w-full"
-            />
+            >
+              <option value="">Select season</option>
+              {seasonOptions.map((season) => (
+                <option key={season.value} value={season.value}>
+                  {season.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -901,7 +967,6 @@ export default function ConfirmedPage() {
                       <p className="text-xs font-semibold text-slate-700">
                         Students Uploaded: <span className="text-slate-900">{company.studentEntryNumbers.length}</span>
                       </p>
-                      <p className="text-xs text-slate-500">Format: YYYYBBBNNNN</p>
                     </div>
 
                     <input
@@ -1148,9 +1213,6 @@ export default function ConfirmedPage() {
             </p>
             <p>
               One required column must be exactly: <span className="font-semibold">Roll No</span>.
-            </p>
-            <p>
-              Roll No format must be: <span className="font-semibold">YYYYBBBNNNN</span> (example: 2025CSE0123).
             </p>
           </div>
         ) : instructionModalTask === "compare" ? (
