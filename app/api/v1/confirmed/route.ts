@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
 
   const searchParams = request.nextUrl.searchParams;
   const driveId = searchParams.get("driveId");
+  const seasonIdParam = searchParams.get("seasonId");
 
   try {
     const confirmedDrives = await db.drive.findMany({
@@ -54,96 +55,102 @@ export async function GET(request: NextRequest) {
       take: 200,
     });
 
-    if (confirmedDrives.length === 0) {
-      return success({
-        drives: [],
-        selectedDriveId: null,
-        acceptedCompanies: [],
-        telegramTemplates: [],
-      });
-    }
-
     const selectedDrive = driveId
       ? confirmedDrives.find((drive) => drive.id === driveId)
-      : confirmedDrives[0];
+      : seasonIdParam
+        ? confirmedDrives.find(
+            (drive) => drive.companySeasonCycle.seasonId === seasonIdParam,
+          )
+        : confirmedDrives[0];
 
-    if (!selectedDrive) {
+    if (driveId && !selectedDrive) {
       return badRequest("Selected drive was not found in confirmed drives");
     }
 
-    const seasonId = selectedDrive.companySeasonCycle.seasonId;
+    const seasonId =
+      seasonIdParam ?? selectedDrive?.companySeasonCycle.seasonId ?? null;
 
-    const baseQuery = {
-      where: {
-        seasonId,
-        status: "accepted" as const,
-      },
-      orderBy: [{ updatedAt: "desc" as const }],
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-            notes: true,
-            contacts: {
+    const baseQuery = seasonId
+      ? {
+          where: {
+            seasonId,
+            status: "accepted" as const,
+          },
+          orderBy: [{ updatedAt: "desc" as const }],
+          include: {
+            company: {
               select: {
                 id: true,
                 name: true,
-                designation: true,
-                emails: true,
-                phones: true,
-              },
-              orderBy: [{ lastContactedAt: "desc" as const }, { createdAt: "desc" as const }],
-            },
-            drives: {
-              where: {
-                companySeasonCycle: {
-                  seasonId,
+                notes: true,
+                contacts: {
+                  select: {
+                    id: true,
+                    name: true,
+                    designation: true,
+                    emails: true,
+                    phones: true,
+                  },
+                  orderBy: [
+                    { lastContactedAt: "desc" as const },
+                    { createdAt: "desc" as const },
+                  ],
+                },
+                drives: {
+                  where: {
+                    companySeasonCycle: {
+                      seasonId,
+                    },
+                  },
+                  select: {
+                    id: true,
+                    title: true,
+                    stage: true,
+                    status: true,
+                    startAt: true,
+                  },
+                  orderBy: [
+                    { startAt: "asc" as const },
+                    { createdAt: "asc" as const },
+                  ],
                 },
               },
+            },
+            season: {
               select: {
                 id: true,
-                title: true,
-                stage: true,
-                status: true,
-                startAt: true,
+                name: true,
+                seasonType: true,
               },
-              orderBy: [{ startAt: "asc" as const }, { createdAt: "asc" as const }],
             },
           },
-        },
-        season: {
-          select: {
-            id: true,
-            name: true,
-            seasonType: true,
-          },
-        },
-      },
-      take: 500,
-    };
+          take: 500,
+        }
+      : null;
 
     let acceptedCycles: any[] = [];
 
-    try {
-      acceptedCycles = await db.companySeasonCycle.findMany({
-        ...baseQuery,
-        include: {
-          ...baseQuery.include,
-          studentEntries: {
-            select: {
-              entryNumber: true,
+    if (baseQuery) {
+      try {
+        acceptedCycles = await db.companySeasonCycle.findMany({
+          ...baseQuery,
+          include: {
+            ...baseQuery.include,
+            studentEntries: {
+              select: {
+                entryNumber: true,
+              },
+              orderBy: [{ entryNumber: "asc" }],
             },
-            orderBy: [{ entryNumber: "asc" }],
           },
-        },
-      });
-    } catch (error) {
-      if (!isMissingStudentEntriesTable(error)) {
-        throw error;
-      }
+        });
+      } catch (error) {
+        if (!isMissingStudentEntriesTable(error)) {
+          throw error;
+        }
 
-      acceptedCycles = await db.companySeasonCycle.findMany(baseQuery);
+        acceptedCycles = await db.companySeasonCycle.findMany(baseQuery);
+      }
     }
 
     const telegramTemplatesRaw = await db.emailTemplate.findMany({
@@ -212,7 +219,7 @@ export async function GET(request: NextRequest) {
 
     return success({
       drives,
-      selectedDriveId: selectedDrive.id,
+      selectedDriveId: selectedDrive?.id ?? null,
       acceptedCompanies,
       telegramTemplates,
     });

@@ -35,13 +35,13 @@ model User {
   seasonOwnerships         CompanySeasonCycle[]         @relation("SeasonCycleOwner")
   seasonCycleUpdates       CompanySeasonCycle[]         @relation("SeasonCycleUpdatedBy")
   seasonStatusChanges      CompanySeasonStatusHistory[]
+  uploadedStudentEntries   CompanySeasonStudentEntry[]
   interactionsCreated      ContactInteraction[]
   createdDrives            Drive[]
   templateVersionsCreated  EmailTemplateVersion[]
   approvedTemplates        EmailTemplate[]              @relation("TemplateApprover")
   createdTemplates         EmailTemplate[]              @relation("TemplateCreator")
   uploadedMailAssets       MailAsset[]                  @relation("MailAssetUploader")
-  uploadedStudentEntries   CompanySeasonStudentEntry[]
   requestedMailRequests    MailRequest[]                @relation("MailRequestRequester")
   reviewedMailRequests     MailRequest[]                @relation("MailRequestReviewer")
   notifications            Notification[]
@@ -197,11 +197,11 @@ model CompanySeasonCycle {
   season          RecruitmentSeason            @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   updater         User?                        @relation("SeasonCycleUpdatedBy", fields: [updatedBy], references: [id])
   statusHistory   CompanySeasonStatusHistory[]
+  studentEntries  CompanySeasonStudentEntry[]
   interactions    ContactInteraction[]
   drives          Drive[]
   emails          Email[]
   mailRequests    MailRequest[]
-  studentEntries  CompanySeasonStudentEntry[]
 
   @@unique([companyId, seasonId])
   @@index([seasonId, status, updatedAt], map: "company_season_cycles_season_status_updated_idx")
@@ -217,7 +217,7 @@ model CompanySeasonStudentEntry {
   entryNumber          String             @map("entry_number") @db.VarChar(20)
   uploadedBy           String?            @map("uploaded_by") @db.Uuid
   createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  companySeasonCycle   CompanySeasonCycle @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade)
+  companySeasonCycle   CompanySeasonCycle @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade, map: "company_season_student_entries_cycle_fkey")
   uploader             User?              @relation(fields: [uploadedBy], references: [id])
 
   @@unique([companySeasonCycleId, entryNumber], map: "company_season_student_entries_cycle_entry_key")
@@ -629,11 +629,11 @@ model StudentDataConsent {
 }
 
 model MailboxSyncState {
-  mailboxEmail   String   @id @map("mailbox_email") @db.VarChar(255)
-  lastHistoryId  String?  @map("last_history_id") @db.VarChar(255)
-  lastSyncedAt   DateTime? @map("last_synced_at") @db.Timestamptz(6)
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  mailboxEmail  String    @id @map("mailbox_email") @db.VarChar(255)
+  lastHistoryId String?   @map("last_history_id") @db.VarChar(255)
+  lastSyncedAt  DateTime? @map("last_synced_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
 
   @@map("mailbox_sync_states")
 }
