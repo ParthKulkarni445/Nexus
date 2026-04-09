@@ -23,6 +23,20 @@ const mailAttachmentSchema = z.object({
   publicUrl: z.string().min(1).max(500),
 });
 
+const replyContextSchema = z.object({
+  threadId: z.string().trim().min(1).max(255).optional(),
+  messageId: z.string().trim().min(1).max(500),
+  references: z.array(z.string().trim().min(1).max(500)).max(50).default([]),
+});
+
+const recipientFilterSchema = z.object({
+  contactIds: z.array(z.string().uuid()).max(50).optional(),
+  emails: z.array(z.string().trim().email()).max(50).optional(),
+  ccEmails: z.array(z.string().trim().email()).max(20).optional(),
+  replyContext: replyContextSchema.optional(),
+  templateVariables: z.record(z.string(), z.string()).optional(),
+});
+
 const createMailRequestSchema = z.object({
   companyId: z.string().uuid().optional(),
   companySeasonCycleId: z.string().uuid().optional(),
@@ -32,9 +46,7 @@ const createMailRequestSchema = z.object({
   customSubject: z.string().max(500).optional(),
   customBody: z.string().optional(),
   previewPayload: z.record(z.string(), z.any()).optional(),
-  recipientFilter: z
-    .record(z.string(), z.any())
-    .optional(),
+  recipientFilter: recipientFilterSchema.optional(),
   urgency: z.number().int().min(1).max(5).optional(),
   attachments: z.array(mailAttachmentSchema).max(10).optional(),
 }).superRefine((value, ctx) => {
@@ -62,6 +74,17 @@ const createMailRequestSchema = z.object({
         path: ["customBody"],
       });
     }
+  }
+
+  if (
+    !value.recipientFilter?.emails?.length &&
+    !value.recipientFilter?.contactIds?.length
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Mail requests must include at least one recipient email or contact",
+      path: ["recipientFilter"],
+    });
   }
 });
 

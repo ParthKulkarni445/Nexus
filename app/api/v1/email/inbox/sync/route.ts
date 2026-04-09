@@ -11,6 +11,11 @@ import {
   getCurrentMailboxHistoryId,
   type SyncedInboxMessage,
 } from "@/lib/mailing/gmailInbox";
+import {
+  applyThreadCompanyMapping,
+  buildMailboxClassification,
+  getThreadCompanyMapping,
+} from "@/lib/mailing/threadMapping";
 
 function getDomain(email: string) {
   const [, domain = ""] = email.toLowerCase().split("@");
@@ -126,16 +131,40 @@ async function findExistingOutboundEmail(message: SyncedInboxMessage) {
 }
 
 async function upsertMailboxMessage(message: SyncedInboxMessage) {
-  const companyId =
+  const domainMatchedCompanyId =
     message.direction === "inbound"
       ? await resolveCompanyId(message.fromEmail)
       : await resolveCompanyIdFromRecipients([
           ...message.toEmails,
           ...message.ccEmails,
         ]);
-  const classification: Prisma.InputJsonObject = companyId
-    ? { bucket: "company" }
-    : { bucket: "unassigned" };
+  const existingThreadMapping = message.threadId?.trim()
+    ? await getThreadCompanyMapping(message.threadId)
+    : null;
+  const finalCompanyId =
+    existingThreadMapping?.companyId ?? domainMatchedCompanyId ?? null;
+  const mappingSource = existingThreadMapping?.source
+    ? existingThreadMapping.source
+    : domainMatchedCompanyId
+      ? "domain_match"
+      : "unassigned";
+  const confidence = existingThreadMapping?.confidence
+    ? existingThreadMapping.confidence
+    : domainMatchedCompanyId
+      ? message.direction === "inbound"
+        ? "high"
+        : "medium"
+      : null;
+  const classification: Prisma.InputJsonObject = buildMailboxClassification(
+    finalCompanyId,
+    mappingSource,
+    confidence,
+    existingThreadMapping &&
+      domainMatchedCompanyId &&
+      existingThreadMapping.companyId !== domainMatchedCompanyId
+      ? domainMatchedCompanyId
+      : null,
+  ) as Prisma.InputJsonObject;
 
   const existingByMessageId = await db.email.findUnique({
     where: {
@@ -165,7 +194,7 @@ async function upsertMailboxMessage(message: SyncedInboxMessage) {
     references: message.references,
     threadId: message.threadId,
     headers: message.headers,
-    companyId,
+    companyId: finalCompanyId,
     classification,
     providerStatus: message.providerStatus,
     providerEventAt: message.createdAt,
@@ -190,22 +219,50 @@ async function upsertMailboxMessage(message: SyncedInboxMessage) {
         },
       },
     });
+  } else {
+    await db.email.create({
+      data: {
+        ...payload,
+        attachments: {
+          create: message.attachments.map((attachment) => ({
+            fileName: attachment.fileName,
+            mimeType: attachment.mimeType,
+            sizeBytes: attachment.sizeBytes,
+            storagePath: attachment.storagePath,
+          })),
+        },
+      },
+    });
+  }
+
+  if (message.threadId?.trim() && domainMatchedCompanyId && !existingThreadMapping) {
+    await applyThreadCompanyMapping({
+      threadId: message.threadId,
+      companyId: domainMatchedCompanyId,
+      source: "domain_match",
+      confidence: message.direction === "inbound" ? "high" : "medium",
+    });
     return;
   }
 
-  await db.email.create({
-    data: {
-      ...payload,
-      attachments: {
-        create: message.attachments.map((attachment) => ({
-          fileName: attachment.fileName,
-          mimeType: attachment.mimeType,
-          sizeBytes: attachment.sizeBytes,
-          storagePath: attachment.storagePath,
-        })),
-      },
-    },
-  });
+  if (message.threadId?.trim() && existingThreadMapping?.companyId) {
+    await applyThreadCompanyMapping({
+      threadId: message.threadId,
+      companyId: existingThreadMapping.companyId,
+      source:
+        existingThreadMapping.source === "manual_override"
+          ? "manual_override"
+          : existingThreadMapping.source === "mail_request"
+            ? "mail_request"
+            : "domain_match",
+      confidence: existingThreadMapping.confidence,
+      conflictingCompanyId:
+        domainMatchedCompanyId &&
+        domainMatchedCompanyId !== existingThreadMapping.companyId
+          ? domainMatchedCompanyId
+          : null,
+    });
+  }
 }
 
 export async function POST(request: NextRequest) {

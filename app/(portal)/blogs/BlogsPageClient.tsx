@@ -666,12 +666,11 @@ export default function BlogsPageClient({
                     {blog.title}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
-                    {blog.company} • {blog.author}
+                    {blog.company}
                   </p>
-
-                  <div className="mt-2 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-2 text-xs text-[#1D4ED8]">
-                    {blog.moderationNote ?? "No moderator note yet."}
-                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {blog.author} • {formatDate(blog.date)}
+                  </p>
 
                   <div className="mt-2 flex items-center justify-end gap-2">
                     <button

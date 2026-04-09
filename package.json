@@ -12,7 +12,8 @@
         "db:migrate": "dotenv -e .env.local -- prisma migrate dev",
         "db:push": "dotenv -e .env.local -- prisma db push",
         "db:studio": "dotenv -e .env.local -- prisma studio",
-        "db:seed": "tsx scripts/seed.ts"
+        "db:seed": "tsx scripts/seed.ts",
+        "db:backfill:email-threads": "dotenv -e .env.local -- tsx scripts/backfill-email-thread-mappings.ts"
     },
     "dependencies": {
         "@prisma/client": "^6.6.0",

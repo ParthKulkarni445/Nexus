@@ -14,6 +14,7 @@ import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
 import { headers } from "next/headers";
 import { sendMail } from "@/lib/mailing/sendMail";
+import { applyThreadCompanyMapping } from "@/lib/mailing/threadMapping";
 
 const approveSchema = z.object({
   sendAt: z.string().datetime().optional(),
@@ -246,6 +247,15 @@ export async function POST(
           references,
         },
       });
+
+      if (sendResult.threadId && existingRequest.companyId) {
+        await applyThreadCompanyMapping({
+          threadId: sendResult.threadId,
+          companyId: existingRequest.companyId,
+          source: "mail_request",
+          confidence: "high",
+        });
+      }
     }
 
     const approvedRequest = await db.mailRequest.update({

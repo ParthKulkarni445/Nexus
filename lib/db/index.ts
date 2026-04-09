@@ -19,7 +19,7 @@ if (
   !process.env.DIRECT_URL
 ) {
   console.warn(
-    "[db] Runtime is using a Prisma Data Proxy URL. If you see intermittent P5010/fetch failed errors locally, set DATABASE_URL_RUNTIME (or DIRECT_URL) to a direct postgresql:// connection string."
+    "[db] Runtime is using a Prisma Data Proxy URL. If you see local P5010/P5000/P6008 or fetch failed errors, set DATABASE_URL_RUNTIME (or DIRECT_URL) to a direct postgresql:// connection string."
   );
 }
 

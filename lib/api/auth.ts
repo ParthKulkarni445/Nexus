@@ -18,7 +18,7 @@ export interface AuthUser {
   isActive: boolean;
 }
 
-const TRANSIENT_DB_ERROR_CODES = new Set(["P5010"]);
+const TRANSIENT_DB_ERROR_CODES = new Set(["P5010", "P5000"]);
 
 function isTransientDbError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -36,7 +36,9 @@ function isTransientDbError(error: unknown): boolean {
 
   return (
     maybeMessage.includes("Cannot fetch data from service") ||
-    maybeMessage.includes("fetch failed")
+    maybeMessage.includes("fetch failed") ||
+    maybeMessage.includes("P6008") ||
+    maybeMessage.includes("Accelerate was not able to connect to your database")
   );
 }
 

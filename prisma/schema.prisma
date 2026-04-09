@@ -94,6 +94,7 @@ model Company {
   interactions ContactInteraction[]
   drives       Drive[]
   emails       Email[]
+  emailThreads EmailThreadMapping[]
   mailRequests MailRequest[]
   placements   Placement[]
   schedules    Schedule[]
@@ -334,6 +335,21 @@ model Email {
 
   @@index([companyId, createdAt], map: "emails_company_created_idx")
   @@map("emails")
+}
+
+model EmailThreadMapping {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  threadId       String   @unique @map("thread_id") @db.VarChar(255)
+  companyId      String   @map("company_id") @db.Uuid
+  source         String   @db.VarChar(50)
+  confidence     String?  @db.VarChar(50)
+  lastResolvedAt DateTime @default(now()) @map("last_resolved_at") @db.Timestamptz(6)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, updatedAt], map: "email_thread_mappings_company_updated_idx")
+  @@map("email_thread_mappings")
 }
 
 model EmailAttachment {

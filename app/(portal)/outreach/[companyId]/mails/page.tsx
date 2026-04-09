@@ -1,41 +1,16 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import {
-  ArrowLeft,
-  Building2,
-  ChevronRight,
-  CornerUpLeft,
-  Mail,
-  Paperclip,
-} from "lucide-react";
-import Badge from "@/components/ui/Badge";
+import { ArrowLeft, ChevronRight, Mail } from "lucide-react";
 import { getCurrentUser } from "@/lib/api/auth";
 import { db } from "@/lib/db";
-
-function formatDateTime(value: Date) {
-  return value.toLocaleString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import CompanyMailTrackerClient from "./CompanyMailTrackerClient";
 
 function getThreadKey(email: { threadId: string | null; id: string }) {
   return email.threadId?.trim() || email.id;
 }
 
-function getReplyRecipient(email: {
-  direction: "inbound" | "outbound";
-  fromEmail: string;
-  toEmails: string[];
-}) {
-  if (email.direction === "inbound") {
-    return email.fromEmail.trim() || null;
-  }
-
-  return email.toEmails.find((value) => value.trim())?.trim() ?? null;
+function dedupeEmailsById<T extends { id: string }>(emails: T[]) {
+  return Array.from(new Map(emails.map((email) => [email.id, email])).values());
 }
 
 export default async function CompanyMailTrackerPage({
@@ -86,7 +61,7 @@ export default async function CompanyMailTrackerPage({
     notFound();
   }
 
-  const emails = await db.email.findMany({
+  const directlyMappedEmails = await db.email.findMany({
     where: {
       companyId,
     },
@@ -106,6 +81,45 @@ export default async function CompanyMailTrackerPage({
     },
     take: 100,
   });
+
+  const mappedThreadIds = Array.from(
+    new Set(
+      directlyMappedEmails
+        .map((email) => email.threadId?.trim() ?? "")
+        .filter(Boolean),
+    ),
+  );
+
+  const threadExpandedEmails =
+    mappedThreadIds.length > 0
+      ? await db.email.findMany({
+          where: {
+            threadId: {
+              in: mappedThreadIds,
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          include: {
+            attachments: {
+              select: {
+                id: true,
+                fileName: true,
+              },
+              orderBy: {
+                createdAt: "asc",
+              },
+            },
+          },
+          take: 300,
+        })
+      : [];
+
+  const emails = dedupeEmailsById([
+    ...directlyMappedEmails,
+    ...threadExpandedEmails,
+  ]).sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
 
   const threadMap = new Map<
     string,
@@ -161,9 +175,39 @@ export default async function CompanyMailTrackerPage({
     }
   }
 
-  const threads = Array.from(threadMap.values()).sort(
-    (left, right) => right.latestAt.getTime() - left.latestAt.getTime(),
-  );
+  const threads = Array.from(threadMap.values())
+    .map((thread) => ({
+      ...thread,
+      latestAt: thread.latestAt.toISOString(),
+      messages: thread.messages
+        .sort((left, right) => {
+          return (
+            new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+          );
+        })
+        .map((message) => ({
+          id: message.id,
+          direction: message.direction,
+          messageId: message.messageId,
+          threadId: message.threadId,
+          subject: message.subject,
+          fromEmail: message.fromEmail,
+          toEmails: message.toEmails,
+          ccEmails: message.ccEmails,
+          textBody: message.textBody,
+          htmlBody: message.htmlBody,
+          references: message.references,
+          createdAt: message.createdAt.toISOString(),
+          attachments: message.attachments.map((attachment) => ({
+            id: attachment.id,
+            fileName: attachment.fileName,
+          })),
+        })),
+    }))
+    .sort(
+      (left, right) =>
+        new Date(right.latestAt).getTime() - new Date(left.latestAt).getTime(),
+    );
 
   const trackedDomains = Array.from(
     new Set(
@@ -206,204 +250,20 @@ export default async function CompanyMailTrackerPage({
                   {company.name} Mail Tracker
                 </h1>
                 <p className="mt-1 text-sm text-slate-500">
-                  Company-scoped mail threads mapped from company assignment and
-                  tracked sender domains.
+                  Company-scoped mail threads expanded from direct company matches
+                  so the full mailbox thread stays visible here.
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Threads
-            </p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">
-              {threads.length}
-            </p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Messages
-            </p>
-            <p className="mt-1 text-sm font-semibold text-slate-900">
-              {emails.length}
-            </p>
-          </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Tracked Domains
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {trackedDomains.length > 0 ? (
-                trackedDomains.map((domain) => (
-                  <Badge key={domain} variant="gray" size="sm">
-                    {domain}
-                  </Badge>
-                ))
-              ) : (
-                <span className="text-sm text-slate-500">No domains mapped</span>
-              )}
-            </div>
-          </div>
-        </div>
+        <CompanyMailTrackerClient
+          companyId={company.id}
+          trackedDomains={trackedDomains}
+          threads={threads}
+        />
       </div>
-
-      <div className="rounded-2xl border border-[#DBEAFE] bg-white p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-800">Threads</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Inbound messages are matched to the company using its primary
-              domain and additional company domains. Outbound mails are shown
-              from company-linked records.
-            </p>
-          </div>
-          <Badge variant="info" size="sm">
-            {threads.length} thread{threads.length === 1 ? "" : "s"}
-          </Badge>
-        </div>
-
-        {threads.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-            No mails have been mapped to this company yet.
-          </div>
-        ) : (
-          <div className="mt-4 space-y-4">
-            {threads.map((thread) => {
-              const latestMessage = thread.messages.reduce((latest, email) =>
-                email.createdAt > latest.createdAt ? email : latest,
-              );
-              const replyRecipient = getReplyRecipient(latestMessage);
-              const canReply =
-                Boolean(latestMessage.messageId?.trim()) &&
-                Boolean(replyRecipient);
-              const replyParams = canReply
-                ? new URLSearchParams({
-                    companyId: company.id,
-                    replyThreadId: latestMessage.threadId?.trim() || thread.key,
-                    replyMessageId: latestMessage.messageId,
-                    replyRecipientEmail: replyRecipient ?? "",
-                    replySubject: latestMessage.subject || "Re:",
-                    replyReferences: latestMessage.references.join("||"),
-                  }).toString()
-                : null;
-
-              return (
-                <div
-                  key={thread.key}
-                  className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4"
-                >
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-base font-semibold text-slate-900">
-                        {thread.subject}
-                      </p>
-                      <Badge
-                        size="sm"
-                        variant={
-                          thread.direction === "inbound" ? "info" : "gray"
-                        }
-                      >
-                        {thread.direction === "inbound" ? "Inbound" : "Outbound"}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 break-words text-sm text-slate-500">
-                      {thread.direction === "inbound" ? "From" : "To"}{" "}
-                      {thread.participants.join(", ")}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-slate-500">
-                      Latest {formatDateTime(thread.latestAt)}
-                    </p>
-                    {replyParams ? (
-                      <Link
-                        href={`/outreach?${replyParams}`}
-                        className="btn btn-primary btn-sm gap-1"
-                      >
-                        <CornerUpLeft size={13} />
-                        Reply in thread
-                      </Link>
-                    ) : null}
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
-                    <Mail size={11} />
-                    {thread.count} message{thread.count === 1 ? "" : "s"}
-                  </span>
-                  {thread.attachments > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1">
-                      <Paperclip size={11} />
-                      {thread.attachments} attachment
-                      {thread.attachments === 1 ? "" : "s"}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {thread.messages
-                    .sort(
-                      (left, right) =>
-                        right.createdAt.getTime() - left.createdAt.getTime(),
-                    )
-                    .map((email) => (
-                      <div
-                        key={email.id}
-                        className="rounded-xl border border-white bg-white px-4 py-3"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge
-                            size="sm"
-                            variant={
-                              email.direction === "inbound" ? "info" : "gray"
-                            }
-                          >
-                            {email.direction === "inbound"
-                              ? "Inbound"
-                              : "Outbound"}
-                          </Badge>
-                          <span className="text-xs text-slate-500">
-                            {formatDateTime(email.createdAt)}
-                          </span>
-                        </div>
-                        <div className="mt-2 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
-                          <p className="break-words">
-                            <span className="font-semibold text-slate-900">
-                              From:
-                            </span>{" "}
-                            {email.fromEmail}
-                          </p>
-                          <p className="break-words">
-                            <span className="font-semibold text-slate-900">
-                              To:
-                            </span>{" "}
-                            {email.toEmails.length > 0
-                              ? email.toEmails.join(", ")
-                              : "-"}
-                          </p>
-                        </div>
-                        {(email.textBody || email.htmlBody) && (
-                          <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm text-slate-600">
-                            {email.textBody?.trim() ||
-                              email.htmlBody?.replace(/<[^>]+>/g, " ").trim() ||
-                              "No message body available."}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
     </div>
   );
 }

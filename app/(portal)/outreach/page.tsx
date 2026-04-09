@@ -23,6 +23,7 @@ import MailAttachmentInput, {
   type MailAttachmentMeta,
 } from "@/components/ui/MailAttachmentInput";
 import Modal from "@/components/ui/Modal";
+import RichTextEditor from "@/components/ui/RichTextEditor";
 import SearchBar from "@/components/ui/SearchBar";
 import {
   PREDEFINED_TEMPLATE_VARIABLES,
@@ -309,6 +310,34 @@ function interpolateTemplate(
   });
 }
 
+function parseRecipientInput(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,;]/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function htmlToPlainText(value: string) {
+  return value
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
 function prettifyVariableLabel(variable: string) {
   const predefined = PREDEFINED_TEMPLATE_VARIABLES.find(
     (item) => item.key === variable,
@@ -361,6 +390,7 @@ function ActionModals({
     customSubject?: string;
     customBody?: string;
     attachments?: MailAttachmentMeta[];
+    ccEmails?: string[];
     replyContext?: ReplyContext;
   }) => Promise<void>;
   onLog: (payload: {
@@ -394,6 +424,7 @@ function ActionModals({
   >({});
   const [customSubject, setCustomSubject] = useState("");
   const [customBody, setCustomBody] = useState("");
+  const [ccRecipients, setCcRecipients] = useState("");
   const [attachments, setAttachments] = useState<MailAttachmentMeta[]>([]);
   const [action, setAction] = useState<"call" | "email" | "note">("call");
   const [summary, setSummary] = useState("");
@@ -426,7 +457,7 @@ function ActionModals({
   const effectiveReplyContext = replyContext;
   const effectiveContactId = contactId || replyContact?.id || "";
   const effectiveCycleId = resolvedCycleId;
-  const effectiveRequestType = effectiveReplyContext ? "custom" : requestType;
+  const effectiveRequestType = requestType;
   const effectiveCustomSubject =
     effectiveReplyContext && !customSubject
       ? effectiveReplyContext.subject
@@ -454,7 +485,10 @@ function ActionModals({
   const templateVariableDrafts = useMemo(
     () =>
       (selectedTemplate?.variables ?? []).map((variable) => {
-        const resolved = resolveTemplateVariableValue(variable, autoTemplateValues);
+        const resolved = resolveTemplateVariableValue(
+          variable,
+          autoTemplateValues,
+        );
         const currentValue = templateVariables[variable] ?? resolved.autoValue;
 
         return {
@@ -472,7 +506,10 @@ function ActionModals({
   const resolvedTemplateVariables = useMemo(
     () =>
       Object.fromEntries(
-        templateVariableDrafts.map((variable) => [variable.key, variable.value]),
+        templateVariableDrafts.map((variable) => [
+          variable.key,
+          variable.value,
+        ]),
       ),
     [templateVariableDrafts],
   );
@@ -480,6 +517,7 @@ function ActionModals({
   const missingVariables = (selectedTemplate?.variables ?? []).filter(
     (variable) => !resolvedTemplateVariables[variable]?.trim(),
   );
+  const ccEmails = parseRecipientInput(ccRecipients);
   function closeModal() {
     setMode("none");
     setCycleId("");
@@ -489,6 +527,7 @@ function ActionModals({
     setTemplateVariables({});
     setCustomSubject("");
     setCustomBody("");
+    setCcRecipients("");
     setAttachments([]);
     setAction("call");
     setSummary("");
@@ -565,8 +604,8 @@ function ActionModals({
       <Modal
         isOpen={mode === "mail" || Boolean(effectiveReplyContext)}
         onClose={closeModal}
-        title={`${effectiveReplyContext ? "Reply in Thread" : "Send Mail"} - ${entry.companyName}`}
-        size="md"
+        title={`${effectiveReplyContext ? "Reply" : "Send Mail"} - ${entry.companyName}`}
+        size="lg"
         footer={
           <>
             <button className="btn btn-secondary" onClick={closeModal}>
@@ -580,7 +619,7 @@ function ActionModals({
                 !effectiveContactId ||
                 (effectiveRequestType === "template"
                   ? !templateId || missingVariables.length > 0
-                  : !effectiveCustomSubject || !customBody)
+                  : !effectiveCustomSubject || !htmlToPlainText(customBody))
               }
               onClick={() => {
                 const mergedAttachments = [
@@ -629,16 +668,17 @@ function ActionModals({
                   customSubject: effectiveCustomSubject,
                   customBody,
                   attachments: mergedAttachments,
+                  ccEmails,
                   replyContext: effectiveReplyContext ?? undefined,
                 }).then(closeModal);
               }}
             >
               <Send size={14} />
               {mailSubmitting
-                ? "Queueing..."
+                ? "Submitting..."
                 : effectiveReplyContext
-                  ? "Queue Reply"
-                  : "Send to Queue"}
+                  ? "Send Reply for Review"
+                  : "Send for Review"}
             </button>
           </>
         }
@@ -670,28 +710,42 @@ function ActionModals({
               placeholder="Select a contact"
             />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              CC
+            </label>
+            <input
+              className="input-base"
+              value={ccRecipients}
+              onChange={(event) => setCcRecipients(event.target.value)}
+              placeholder="hr@example.com, team@example.com"
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Add multiple CC emails separated by commas, semicolons, or new lines.
+            </p>
+          </div>
           {effectiveReplyContext ? (
             <div className="rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2.5 text-xs text-[#1D4ED8]">
               Reply will stay in the existing thread with{" "}
               <span className="font-semibold">
                 {effectiveReplyContext.recipientEmail}
               </span>
-              {replyContact ? "" : ". Select the matching contact before queueing."}
+              {replyContact
+                ? ""
+                : ". Select the matching contact before queueing."}
             </div>
           ) : null}
-          {effectiveReplyContext ? null : (
-            <div className="flex gap-3">
-              {(["template", "custom"] as const).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setRequestType(type)}
-                  className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium ${requestType === type ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 bg-white text-slate-600"}`}
-                >
-                  {type === "template" ? "Template" : "Custom"}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex gap-3">
+            {(["template", "custom"] as const).map((type) => (
+              <button
+                key={type}
+                onClick={() => setRequestType(type)}
+                className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium ${requestType === type ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 bg-white text-slate-600"}`}
+              >
+                {type === "template" ? "Template" : "Custom"}
+              </button>
+            ))}
+          </div>
           {effectiveRequestType === "template" ? (
             <div className="space-y-4">
               <select
@@ -739,11 +793,10 @@ function ActionModals({
                 onChange={(event) => setCustomSubject(event.target.value)}
                 placeholder="Email subject"
               />
-              <textarea
-                rows={5}
-                className="input-base"
+              <RichTextEditor
                 value={customBody}
-                onChange={(event) => setCustomBody(event.target.value)}
+                onChange={setCustomBody}
+                enterKeyMode="lineBreak"
                 placeholder="Write the email content"
               />
             </div>
@@ -757,9 +810,9 @@ function ActionModals({
           <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
             <AlertCircle size={14} className="mt-0.5 shrink-0" />
             <span>
-              Mail requests are queued for approval before dispatch. Coordinators
-              log in with personal accounts, while final sending uses the shared
-              TPO mailbox when it is configured.
+              Mail requests are submitted for approval before dispatch.
+              Coordinators log in with personal accounts, while final sending
+              uses the shared TPO mailbox when it is configured.
             </span>
           </div>
         </div>
@@ -1231,6 +1284,7 @@ export default function OutreachPage() {
     customSubject?: string;
     customBody?: string;
     attachments?: MailAttachmentMeta[];
+    ccEmails?: string[];
     replyContext?: ReplyContext;
   }) => {
     setMailError(null);
@@ -1266,6 +1320,7 @@ export default function OutreachPage() {
           recipientFilter: {
             contactIds: [contact.id],
             emails: contact.emails,
+            ccEmails: payload.ccEmails ?? [],
             replyContext: payload.replyContext,
             templateVariables:
               payload.requestType === "template"
