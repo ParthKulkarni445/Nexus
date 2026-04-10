@@ -27,8 +27,31 @@ export async function GET(
     const cycles = await db.companySeasonCycle.findMany({
       where: { seasonId },
       include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         drives: true,
         interactions: true,
+      },
+    });
+
+    const placements = await db.placement.findMany({
+      where: { seasonId },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        student: {
+          select: {
+            profileMeta: true,
+          },
+        },
       },
     });
 
@@ -80,6 +103,95 @@ export async function GET(
       });
     });
 
+    const packageValues = placements
+      .map((placement) => Number(placement.packageAmount))
+      .filter((value) => !Number.isNaN(value))
+      .sort((left, right) => left - right);
+
+    const offers = packageValues.length;
+    const totalPackage = packageValues.reduce((sum, value) => sum + value, 0);
+    const avgPackage = offers > 0 ? totalPackage / offers : 0;
+    const minPackage = offers > 0 ? packageValues[0] : 0;
+    const maxPackage = offers > 0 ? packageValues[offers - 1] : 0;
+    const medianPackage =
+      offers === 0
+        ? 0
+        : offers % 2 === 1
+          ? packageValues[(offers - 1) / 2]
+          : (packageValues[offers / 2 - 1] + packageValues[offers / 2]) / 2;
+
+    const branchMap = new Map<
+      string,
+      { offers: number; totalPackage: number; highestPackage: number }
+    >();
+    const companyHiringMap = new Map<string, { name: string; offers: number }>();
+    const packageBands = [
+      { label: "< 5", min: 0, max: 5, count: 0 },
+      { label: "5 - 10", min: 5, max: 10, count: 0 },
+      { label: "10 - 20", min: 10, max: 20, count: 0 },
+      { label: "20+", min: 20, max: Number.POSITIVE_INFINITY, count: 0 },
+    ];
+
+    placements.forEach((placement) => {
+      const packageAmount = Number(placement.packageAmount);
+      const profileMeta =
+        placement.student.profileMeta &&
+        typeof placement.student.profileMeta === "object" &&
+        !Array.isArray(placement.student.profileMeta)
+          ? (placement.student.profileMeta as Record<string, unknown>)
+          : null;
+      const branch =
+        typeof profileMeta?.branch === "string"
+          ? profileMeta.branch.trim()
+          : typeof profileMeta?.department === "string"
+            ? profileMeta.department.trim()
+            : typeof profileMeta?.program === "string"
+              ? profileMeta.program.trim()
+              : "Unknown";
+
+      const branchEntry = branchMap.get(branch) ?? {
+        offers: 0,
+        totalPackage: 0,
+        highestPackage: 0,
+      };
+      branchEntry.offers += 1;
+      branchEntry.totalPackage += packageAmount;
+      branchEntry.highestPackage = Math.max(branchEntry.highestPackage, packageAmount);
+      branchMap.set(branch, branchEntry);
+
+      const companyEntry = companyHiringMap.get(placement.companyId) ?? {
+        name: placement.company.name,
+        offers: 0,
+      };
+      companyEntry.offers += 1;
+      companyHiringMap.set(placement.companyId, companyEntry);
+
+      const packageBand = packageBands.find(
+        (band) => packageAmount >= band.min && packageAmount < band.max,
+      );
+      if (packageBand) {
+        packageBand.count += 1;
+      }
+    });
+
+    const branchStats = Array.from(branchMap.entries())
+      .map(([branch, value]) => ({
+        branch,
+        offers: value.offers,
+        averagePackage: value.offers > 0 ? value.totalPackage / value.offers : 0,
+        highestPackage: value.highestPackage,
+      }))
+      .sort((left, right) => right.offers - left.offers);
+
+    const topHiringCompanies = Array.from(companyHiringMap.entries())
+      .map(([companyId, value]) => ({
+        companyId,
+        companyName: value.name,
+        offers: value.offers,
+      }))
+      .sort((left, right) => right.offers - left.offers)
+      .slice(0, 5);
+
     const recentActivityTrend = Array.from(activityByDate.entries())
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
       .slice(-30)
@@ -100,6 +212,17 @@ export async function GET(
       conflictFlaggedDrives,
       recentActivityTrend,
       lastUpdatedAt,
+      placementSummary: {
+        offers,
+        studentsPlaced: offers,
+        avgPackage,
+        medianPackage,
+        minPackage,
+        maxPackage,
+      },
+      branchStats,
+      packageBands: packageBands.map(({ label, count }) => ({ label, count })),
+      topHiringCompanies,
     });
   } catch (error) {
     console.error("Error fetching season summary stats:", error);
