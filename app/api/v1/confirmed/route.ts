@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/api/auth";
-import { success, unauthorized, serverError, badRequest } from "@/lib/api/response";
+import { success, unauthorized, serverError } from "@/lib/api/response";
 import { db } from "@/lib/db";
 
 function isMissingStudentEntriesTable(error: unknown) {
@@ -23,52 +23,10 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const driveId = searchParams.get("driveId");
   const seasonIdParam = searchParams.get("seasonId");
 
   try {
-    const confirmedDrives = await db.drive.findMany({
-      where: { status: "confirmed" },
-      orderBy: [{ startAt: "desc" }, { createdAt: "desc" }],
-      include: {
-        company: {
-          select: {
-            id: true,
-            name: true,
-            notes: true,
-          },
-        },
-        companySeasonCycle: {
-          select: {
-            id: true,
-            seasonId: true,
-            season: {
-              select: {
-                id: true,
-                name: true,
-                seasonType: true,
-              },
-            },
-          },
-        },
-      },
-      take: 200,
-    });
-
-    const selectedDrive = driveId
-      ? confirmedDrives.find((drive) => drive.id === driveId)
-      : seasonIdParam
-        ? confirmedDrives.find(
-            (drive) => drive.companySeasonCycle.seasonId === seasonIdParam,
-          )
-        : confirmedDrives[0];
-
-    if (driveId && !selectedDrive) {
-      return badRequest("Selected drive was not found in confirmed drives");
-    }
-
-    const seasonId =
-      seasonIdParam ?? selectedDrive?.companySeasonCycle.seasonId ?? null;
+    const seasonId = seasonIdParam ?? null;
 
     const baseQuery = seasonId
       ? {
@@ -105,12 +63,21 @@ export async function GET(request: NextRequest) {
                   select: {
                     id: true,
                     title: true,
-                    stage: true,
-                    status: true,
-                    startAt: true,
+                    compensationAmount: true,
+                    jobDescriptionText: true,
+                    jobDescriptionDocUrl: true,
+                    notificationFormUrl: true,
+                    eligibilityRules: {
+                      select: {
+                        id: true,
+                        branches: true,
+                        includeMinorBranches: true,
+                        minCgpa: true,
+                        allowsBacklogs: true,
+                      },
+                    },
                   },
                   orderBy: [
-                    { startAt: "asc" as const },
                     { createdAt: "asc" as const },
                   ],
                 },
@@ -131,25 +98,39 @@ export async function GET(request: NextRequest) {
     let acceptedCycles: any[] = [];
 
     if (baseQuery) {
-      try {
-        acceptedCycles = await db.companySeasonCycle.findMany({
-          ...baseQuery,
-          include: {
-            ...baseQuery.include,
-            studentEntries: {
-              select: {
-                entryNumber: true,
-              },
-              orderBy: [{ entryNumber: "asc" }],
+      acceptedCycles = await db.companySeasonCycle.findMany(baseQuery);
+    }
+
+    const driveEntryNumberMap = new Map<string, string[]>();
+    try {
+      const driveIds = acceptedCycles
+        .flatMap((cycle) => cycle.company.drives)
+        .map((drive: { id: string }) => drive.id);
+
+      if (driveIds.length > 0) {
+        const driveEntries = await db.companySeasonStudentEntry.findMany({
+          where: {
+            driveId: {
+              in: driveIds,
             },
           },
+          select: {
+            driveId: true,
+            entryNumber: true,
+          },
+          orderBy: [{ entryNumber: "asc" }],
         });
-      } catch (error) {
-        if (!isMissingStudentEntriesTable(error)) {
-          throw error;
-        }
 
-        acceptedCycles = await db.companySeasonCycle.findMany(baseQuery);
+        for (const entry of driveEntries) {
+          if (!entry.driveId) continue;
+          const current = driveEntryNumberMap.get(entry.driveId) ?? [];
+          current.push(entry.entryNumber);
+          driveEntryNumberMap.set(entry.driveId, current);
+        }
+      }
+    } catch (error) {
+      if (!isMissingStudentEntriesTable(error)) {
+        throw error;
       }
     }
 
@@ -169,22 +150,49 @@ export async function GET(request: NextRequest) {
       take: 200,
     });
 
-    const drives = confirmedDrives.map((drive) => ({
-      id: drive.id,
-      title: drive.title,
-      stage: drive.stage,
-      status: drive.status,
-      companyId: drive.companyId,
-      companyName: drive.company.name,
-      companySeasonCycleId: drive.companySeasonCycleId,
-      seasonId: drive.companySeasonCycle.season.id,
-      seasonName: drive.companySeasonCycle.season.name,
-      seasonType: drive.companySeasonCycle.season.seasonType,
-      startAt: drive.startAt?.toISOString() ?? null,
-      endAt: drive.endAt?.toISOString() ?? null,
-    }));
+    const acceptedCompanies = acceptedCycles.map((cycle) => {
+      const drives = cycle.company.drives.map(
+        (drive: {
+          id: string;
+          title: string;
+          compensationAmount: unknown;
+          jobDescriptionText?: string | null;
+          jobDescriptionDocUrl?: string | null;
+          notificationFormUrl?: string | null;
+          eligibilityRules: Array<{
+            id: string;
+            branches: string[];
+            includeMinorBranches: boolean;
+            minCgpa: unknown;
+            allowsBacklogs: boolean;
+          }>;
+        }) => {
+          const compensationAmount =
+            drive.compensationAmount !== null &&
+            drive.compensationAmount !== undefined
+              ? Number(drive.compensationAmount)
+              : null;
 
-    const acceptedCompanies = acceptedCycles.map((cycle) => ({
+          return {
+            id: drive.id,
+            title: drive.title,
+            jobDescriptionText: drive.jobDescriptionText ?? null,
+            jobDescriptionDocUrl: drive.jobDescriptionDocUrl ?? null,
+            notificationFormUrl: drive.notificationFormUrl ?? null,
+            compensationAmount,
+            studentEntryNumbers: driveEntryNumberMap.get(drive.id) ?? [],
+            eligibilityRules: drive.eligibilityRules.map((rule) => ({
+              id: rule.id,
+              branches: rule.branches,
+              includeMinorBranches: rule.includeMinorBranches,
+              minCgpa: rule.minCgpa !== null ? Number(rule.minCgpa) : null,
+              allowsBacklogs: rule.allowsBacklogs,
+            })),
+          };
+        },
+      );
+
+      return {
       companySeasonCycleId: cycle.id,
       companyId: cycle.company.id,
       companyName: cycle.company.name,
@@ -195,9 +203,10 @@ export async function GET(request: NextRequest) {
         name: cycle.season.name,
         seasonType: cycle.season.seasonType,
       },
-      roles: cycle.company.drives
+      roles: drives
         .map((drive: { title: string }) => drive.title)
         .filter((title: string) => title && title.trim().length > 0),
+      drives,
       contacts: cycle.company.contacts.map((contact: { id: string; name: string; designation: string; phones: string[]; emails: string[] }) => ({
         id: contact.id,
         name: contact.name,
@@ -205,8 +214,15 @@ export async function GET(request: NextRequest) {
         phones: contact.phones,
         emails: contact.emails,
       })),
-      studentEntryNumbers: (cycle.studentEntries ?? []).map((entry: { entryNumber: string }) => entry.entryNumber),
-    }));
+      studentEntryNumbers: Array.from(
+        new Set(
+          drives.flatMap((drive: { studentEntryNumbers: string[] }) =>
+            drive.studentEntryNumbers,
+          ),
+        ),
+      ).sort((left, right) => left.localeCompare(right)),
+      };
+    });
 
     const telegramTemplates = telegramTemplatesRaw.map((template) => ({
       id: template.id,
@@ -218,8 +234,6 @@ export async function GET(request: NextRequest) {
     }));
 
     return success({
-      drives,
-      selectedDriveId: selectedDrive?.id ?? null,
       acceptedCompanies,
       telegramTemplates,
     });

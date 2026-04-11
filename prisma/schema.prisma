@@ -214,14 +214,17 @@ model CompanySeasonCycle {
 model CompanySeasonStudentEntry {
   id                   String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   companySeasonCycleId String             @map("company_season_cycle_id") @db.Uuid
+  driveId              String?            @map("drive_id") @db.Uuid
   entryNumber          String             @map("entry_number") @db.VarChar(20)
   uploadedBy           String?            @map("uploaded_by") @db.Uuid
   createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   companySeasonCycle   CompanySeasonCycle @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade, map: "company_season_student_entries_cycle_fkey")
+  drive                Drive?             @relation(fields: [driveId], references: [id], onDelete: Cascade, map: "company_season_student_entries_drive_fkey")
   uploader             User?              @relation(fields: [uploadedBy], references: [id])
 
-  @@unique([companySeasonCycleId, entryNumber], map: "company_season_student_entries_cycle_entry_key")
+  @@unique([companySeasonCycleId, driveId, entryNumber], map: "company_season_student_entries_cycle_drive_entry_key")
   @@index([companySeasonCycleId], map: "company_season_student_entries_cycle_idx")
+  @@index([driveId], map: "company_season_student_entries_drive_idx")
   @@index([entryNumber], map: "company_season_student_entries_entry_idx")
   @@map("company_season_student_entries")
 }
@@ -266,12 +269,10 @@ model Drive {
   companyId            String             @map("company_id") @db.Uuid
   companySeasonCycleId String             @map("company_season_cycle_id") @db.Uuid
   title                String             @db.VarChar(255)
-  stage                String             @db.VarChar(50)
-  status               DriveStatus
-  venue                String?            @db.VarChar(255)
-  startAt              DateTime?          @map("start_at") @db.Timestamptz(6)
-  endAt                DateTime?          @map("end_at") @db.Timestamptz(6)
-  isConflictFlagged    Boolean?           @default(false) @map("is_conflict_flagged")
+  jobDescriptionText   String?            @map("job_description_text")
+  jobDescriptionDocUrl String?            @map("job_description_doc_url") @db.VarChar(500)
+  notificationFormUrl  String?            @map("notification_form_url") @db.VarChar(500)
+  compensationAmount   Decimal?           @map("compensation_amount") @db.Decimal(12, 2)
   notes                String?
   createdBy            String?            @map("created_by") @db.Uuid
   createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -280,13 +281,30 @@ model Drive {
   companySeasonCycle   CompanySeasonCycle @relation(fields: [companySeasonCycleId], references: [id], onDelete: Cascade)
   creator              User?              @relation(fields: [createdBy], references: [id])
   emails               Email[]
+  eligibilityRules     RoleEligibility[]
   placements           Placement[]
+  studentEntries       CompanySeasonStudentEntry[]
 
-  @@index([companyId, startAt], map: "drives_company_start_idx")
-  @@index([startAt, endAt], map: "drives_start_end_idx")
-  @@index([companySeasonCycleId, startAt], map: "drives_cycle_start_idx")
-  @@index([venue, startAt, endAt], map: "drives_venue_window_idx")
+  @@index([companyId, createdAt], map: "drives_company_created_idx")
+  @@index([companySeasonCycleId, createdAt], map: "drives_cycle_created_idx")
+  @@index([title], map: "drives_title_idx")
   @@map("drives")
+}
+
+model RoleEligibility {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  driveId              String   @map("drive_id") @db.Uuid
+  branches             String[] @default([])
+  includeMinorBranches Boolean  @default(false) @map("include_minor_branches")
+  minCgpa              Decimal? @map("min_cgpa") @db.Decimal(4, 2)
+  allowsBacklogs       Boolean  @default(false) @map("allows_backlogs")
+  notes                String?
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  drive                Drive    @relation(fields: [driveId], references: [id], onDelete: Cascade)
+
+  @@index([driveId], map: "role_eligibility_drive_idx")
+  @@map("role_eligibility")
 }
 
 model StudentCompanyFollow {
@@ -677,15 +695,6 @@ enum AssignmentItemType {
   contact
 
   @@map("assignment_item_type")
-}
-
-enum DriveStatus {
-  tentative
-  confirmed
-  completed
-  cancelled
-
-  @@map("drive_status")
 }
 
 enum MailRequestType {

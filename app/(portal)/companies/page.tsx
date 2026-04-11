@@ -22,7 +22,6 @@ import {
   Eye,
   PhoneCall,
 } from "lucide-react";
-import StatusBadge from "@/components/ui/StatusBadge";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import SearchBar from "@/components/ui/SearchBar";
@@ -237,7 +236,7 @@ function CompaniesTableSkeleton() {
       {Array.from({ length: 7 }, (_, index) => (
         <div
           key={index}
-          className="grid grid-cols-[minmax(0,2.2fr)_1fr_0.8fr_0.9fr_1fr_1.1fr_0.9fr] items-center gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3"
+          className="grid grid-cols-[minmax(0,2.2fr)_1fr_0.8fr_1fr_1.1fr_0.9fr] items-center gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3"
         >
           <div className="flex items-center gap-3 min-w-0">
             <div className="shimmer h-8 w-8 rounded-lg shrink-0" />
@@ -248,7 +247,6 @@ function CompaniesTableSkeleton() {
           </div>
           <div className="shimmer h-4 w-20 rounded-full" />
           <div className="shimmer h-6 w-16 rounded-full" />
-          <div className="shimmer h-6 w-24 rounded-full" />
           <div className="shimmer h-4 w-24 rounded-full" />
           <div className="flex justify-center">
             <div className="shimmer h-4 w-24 rounded-full" />
@@ -485,8 +483,7 @@ export default function CompaniesPage() {
   const [toolbarMessage, setToolbarMessage] = useState<string | null>(null);
   const [toolbarError, setToolbarError] = useState<string | null>(null);
   const [exportingCompanies, setExportingCompanies] = useState(false);
-  const [downloadingImportFormat, setDownloadingImportFormat] =
-    useState(false);
+  const [downloadingImportFormat, setDownloadingImportFormat] = useState(false);
   const [importingCompanies, setImportingCompanies] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [updateDetails, setUpdateDetails] = useState<{
@@ -797,7 +794,11 @@ export default function CompaniesPage() {
       });
 
       const bodyText = await response.text();
-      let body: ApiResponse<{ total: number; created: number; updated: number }> = {};
+      let body: ApiResponse<{
+        total: number;
+        created: number;
+        updated: number;
+      }> = {};
 
       if (bodyText) {
         try {
@@ -1222,63 +1223,63 @@ export default function CompaniesPage() {
                 className="flex-1 min-w-0"
               />
               <div className="ml-auto flex items-center gap-2 shrink-0">
-              <button
-                className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
-                  showFilters
-                    ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]"
-                    : ""
-                }`}
-                onClick={() => {
-                  setToolbarMessage(null);
-                  setToolbarError(null);
-                  setShowFilters((v) => !v);
-                }}
-              >
-                <Filter size={14} />
-                Filters
-                {activeFilterCount > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-[#2563EB] text-white text-[10px] flex items-center justify-center">
-                    {activeFilterCount}
-                  </span>
-                )}
-              </button>
-              <div className="w-px h-5 bg-(--card-border) shrink-0" />
-              <button
-                className="btn btn-secondary btn-sm gap-1.5 shrink-0"
-                onClick={() => void handleExportCompanies()}
-                disabled={exportingCompanies || importingCompanies}
-              >
-                <Download size={14} />
-                {exportingCompanies ? "Exporting..." : "Export"}
-              </button>
-              <button
-                className="btn btn-secondary btn-sm gap-1.5 shrink-0"
-                onClick={handleImportCompaniesClick}
-                disabled={importingCompanies || exportingCompanies}
-              >
-                <Upload size={14} />
-                {importingCompanies ? "Importing..." : "Import"}
-              </button>
-              <input
-                ref={importFileInputRef}
-                type="file"
-                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                className="hidden"
-                onChange={(event) => {
-                  void handleImportFileChange(event);
-                }}
-              />
-              <button
-                className="btn btn-primary btn-sm gap-1.5 shrink-0"
-                onClick={() => {
-                  setModalError(null);
-                  setSelectedCompany(null);
-                  setAddEditOpen(true);
-                }}
-              >
-                <Plus size={14} />
-                Add
-              </button>
+                <button
+                  className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
+                    showFilters
+                      ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]"
+                      : ""
+                  }`}
+                  onClick={() => {
+                    setToolbarMessage(null);
+                    setToolbarError(null);
+                    setShowFilters((v) => !v);
+                  }}
+                >
+                  <Filter size={14} />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="w-4 h-4 rounded-full bg-[#2563EB] text-white text-[10px] flex items-center justify-center">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                <div className="w-px h-5 bg-(--card-border) shrink-0" />
+                <button
+                  className="btn btn-secondary btn-sm gap-1.5 shrink-0"
+                  onClick={() => void handleExportCompanies()}
+                  disabled={exportingCompanies || importingCompanies}
+                >
+                  <Download size={14} />
+                  {exportingCompanies ? "Exporting..." : "Export"}
+                </button>
+                <button
+                  className="btn btn-secondary btn-sm gap-1.5 shrink-0"
+                  onClick={handleImportCompaniesClick}
+                  disabled={importingCompanies || exportingCompanies}
+                >
+                  <Upload size={14} />
+                  {importingCompanies ? "Importing..." : "Import"}
+                </button>
+                <input
+                  ref={importFileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                  className="hidden"
+                  onChange={(event) => {
+                    void handleImportFileChange(event);
+                  }}
+                />
+                <button
+                  className="btn btn-primary btn-sm gap-1.5 shrink-0"
+                  onClick={() => {
+                    setModalError(null);
+                    setSelectedCompany(null);
+                    setAddEditOpen(true);
+                  }}
+                >
+                  <Plus size={14} />
+                  Add
+                </button>
               </div>
             </div>
 
@@ -1372,7 +1373,6 @@ export default function CompaniesPage() {
                         "name",
                         "industry",
                         "priority",
-                        "status",
                         "assignedTo",
                         "lastUpdated",
                       ] as (keyof Company)[]
@@ -1430,9 +1430,6 @@ export default function CompaniesPage() {
                       </td>
                       <td className="px-4 py-3">
                         {PRIORITY_BADGE[company.priority]}
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={company.status} />
                       </td>
                       <td className="px-4 py-3">
                         {company.assignedTo === "Unassigned" ? (
@@ -1711,7 +1708,9 @@ export default function CompaniesPage() {
       >
         <div className="space-y-5">
           <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3">
-            <p className="text-sm font-semibold text-[#1D4ED8]">2-step import flow</p>
+            <p className="text-sm font-semibold text-[#1D4ED8]">
+              2-step import flow
+            </p>
             <p className="mt-1 text-sm text-slate-700">
               Download the template, fill the rows, then upload the same Excel
               file.
@@ -1739,7 +1738,9 @@ export default function CompaniesPage() {
               onClick={() => void handleDownloadImportFormat()}
               disabled={downloadingImportFormat || importingCompanies}
             >
-              {downloadingImportFormat ? "Downloading template..." : "Download .xlsx template"}
+              {downloadingImportFormat
+                ? "Downloading template..."
+                : "Download .xlsx template"}
             </button>
           </div>
 
@@ -1775,10 +1776,18 @@ export default function CompaniesPage() {
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-700 space-y-2">
             <p className="font-semibold text-slate-800">Required columns</p>
             <div className="flex flex-wrap gap-1.5">
-              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">company name</span>
-              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">industry</span>
-              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">priority</span>
-              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">domain</span>
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                company name
+              </span>
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                industry
+              </span>
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                priority
+              </span>
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                domain
+              </span>
             </div>
             <p className="flex items-center gap-1.5">
               <Globe size={13} className="text-slate-500" />

@@ -57,17 +57,11 @@ export async function GET(_request: NextRequest) {
         totalCompensation: 0,
       };
 
-      let totalDrives = 0;
-      let confirmedDrives = 0;
-      let completedDrives = 0;
-      let conflictFlaggedDrives = 0;
+      let totalRoles = 0;
 
       cycles.forEach((cycle) => {
         cycle.drives.forEach((drive) => {
-          totalDrives += 1;
-          if (drive.status === "confirmed") confirmedDrives += 1;
-          if (drive.status === "completed") completedDrives += 1;
-          if (drive.isConflictFlagged) conflictFlaggedDrives += 1;
+          totalRoles += 1;
         });
       });
 
@@ -82,10 +76,7 @@ export async function GET(_request: NextRequest) {
           placementSummary.studentsPlaced > 0
             ? placementSummary.totalCompensation / placementSummary.studentsPlaced
             : 0,
-        totalDrives,
-        confirmedDrives,
-        completedDrives,
-        conflictFlaggedDrives,
+        totalRoles,
       };
     });
 

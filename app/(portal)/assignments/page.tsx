@@ -10,22 +10,8 @@ import {
   UserCheck,
   UserPlus,
   RefreshCw,
-  BarChart3,
-  PieChart as PieChartIcon,
 } from "lucide-react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
@@ -100,8 +86,7 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected" },
 ];
 
-const PIE_COLORS = ["#2563EB", "#E2E8F0"];
-const BAR_COLORS = ["#2563EB", "#3B82F6", "#BFDBFE", "#DBEAFE"];
+const PIE_COLORS = ["#2563EB", "#DBEAFE"];
 
 function getInitials(name: string): string {
   return name
@@ -572,24 +557,57 @@ export default function AssignmentsPage() {
     };
   }, [coordinators, assignments, unassignedCycles, selectedSeasonId]);
 
-  const topCoordinatorLoads = useMemo(
-    () =>
-      [...stats.byCoord]
-        .sort((left, right) => right.companies - left.companies)
-        .slice(0, 5)
-        .map((coordinator) => ({
-          ...coordinator,
-          percent:
-            stats.assigned > 0
-              ? Math.round((coordinator.companies / stats.assigned) * 100)
-              : 0,
-        })),
-    [stats.assigned, stats.byCoord],
-  );
-
   const pieData = [
     { name: "Assigned", value: stats.assigned },
     { name: "Unassigned", value: stats.unassigned },
+  ];
+
+  const totalCycles = stats.assigned + stats.unassigned;
+  const assignedRatio =
+    totalCycles > 0 ? Math.round((stats.assigned / totalCycles) * 100) : 0;
+  const seasonAssignments = assignments.filter(
+    (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
+  );
+  const seasonUnassigned = unassignedCycles.filter(
+    (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
+  );
+  const statusCycles = [...seasonAssignments, ...seasonUnassigned];
+  const acceptedCount = statusCycles.filter(
+    (item) => item.status === "accepted",
+  ).length;
+  const positiveCount = statusCycles.filter(
+    (item) => item.status === "positive" || item.status === "accepted",
+  ).length;
+  const notContactedCount = statusCycles.filter(
+    (item) => item.status === "not_contacted",
+  ).length;
+  const acceptedRatio =
+    totalCycles > 0 ? Math.round((acceptedCount / totalCycles) * 100) : 0;
+  const acceptedPieData = [
+    { name: "Accepted", value: acceptedCount },
+    { name: "Other", value: Math.max(totalCycles - acceptedCount, 0) },
+  ];
+  const statsCardItems = [
+    {
+      label: "Total",
+      value: totalCycles,
+      sub: "Season cycles",
+    },
+    {
+      label: "Accepted",
+      value: acceptedCount,
+      sub: "Confirmed JD",
+    },
+    {
+      label: "Positive",
+      value: positiveCount,
+      sub: "Responded well",
+    },
+    {
+      label: "Pending",
+      value: notContactedCount,
+      sub: "Not contacted",
+    },
   ];
 
   const filteredAssigned = useMemo(() => {
@@ -763,7 +781,7 @@ export default function AssignmentsPage() {
   const activeFilterCount = statusFilter.length + coordinatorFilter.length;
 
   return (
-    <div className="-mt-6 xl:mt-0 space-y-5 pl-4 pr-4 pb-6 animate-fade-in xl:h-full xl:overflow-y-auto hide-scrollbar">
+    <div className="-mt-6 xl:mt-0 space-y-5 pl-4 pr-4 pb-6 animate-fade-in">
       {loadError && (
         <div className="card px-4 py-3 border border-red-200 bg-red-50/60">
           <div className="flex items-center justify-between gap-3">
@@ -778,7 +796,7 @@ export default function AssignmentsPage() {
         </div>
       )}
 
-      <div className="flex flex-col gap-5 pt-6 xl:flex-row xl:items-stretch">
+      <div className="flex flex-col gap-5 pt-6 xl:flex-row xl:items-start">
         <div className="min-w-0 flex-1 space-y-5 xl:flex xl:flex-col">
           <div className="card overflow-visible flex flex-col">
             <div className="px-4 py-3 border-b border-(--card-border)">
@@ -789,9 +807,7 @@ export default function AssignmentsPage() {
               >
                 <select
                   className={`input-base min-w-0 ${
-                    tab === "assigned"
-                      ? "xl:min-w-[260px] xl:max-w-[320px]"
-                      : "flex-1"
+                    tab === "assigned" ? "xl:min-w-65 xl:max-w-80" : "flex-1"
                   }`}
                   value={selectedSeasonId}
                   onChange={(event) => setSelectedSeasonId(event.target.value)}
@@ -919,11 +935,11 @@ export default function AssignmentsPage() {
                         className="border border-[#DBEAFE] rounded-xl overflow-hidden"
                       >
                         <button
-                          className="w-full flex items-center justify-between px-4 py-3 bg-slate-300 transition-colors"
+                          className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 transition-colors"
                           onClick={() => toggleGroup(coordinatorName)}
                         >
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[#1D4ED8] text-xs font-semibold">
+                            <div className="w-8 h-8 rounded-full bg-[#2563EB] flex items-center justify-center text-white text-xs font-semibold">
                               {coordinatorName
                                 .split(" ")
                                 .map((name) => name[0])
@@ -958,7 +974,7 @@ export default function AssignmentsPage() {
                             {entries.map((assignment) => (
                               <div
                                 key={assignment.companySeasonCycleId}
-                                className="flex items-center gap-4 px-4 py-3 hover:bg-[#F5F9FF] transition-colors"
+                                className="flex items-center gap-5 px-4 py-3 hover:bg-[#F5F9FF] transition-colors"
                               >
                                 <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
                                   {assignment.companyName.charAt(0)}
@@ -975,17 +991,21 @@ export default function AssignmentsPage() {
                                     {assignment.season}
                                   </p>
                                 </div>
-                                {/* <StatusBadge
-                                  status={assignment.status}
-                                  size="sm"
-                                /> */}
-                                <button
-                                  className="btn btn-ghost btn-sm gap-1 text-slate-500 hover:text-[#2563EB] hidden sm:flex"
-                                  onClick={() => setReassignModal(assignment)}
-                                >
-                                  <RefreshCw size={13} />
-                                  Reassign
-                                </button>
+                                <div className="hidden w-30 shrink-0 items-center justify-center sm:flex">
+                                  <StatusBadge
+                                    status={assignment.status}
+                                    size="sm"
+                                  />
+                                </div>
+                                <div className="hidden w-32 shrink-0 items-center justify-center sm:flex">
+                                  <button
+                                    className="btn btn-ghost btn-sm gap-1 text-slate-500 hover:text-[#2563EB] justify-center"
+                                    onClick={() => setReassignModal(assignment)}
+                                  >
+                                    <RefreshCw size={13} />
+                                    Reassign
+                                  </button>
+                                </div>
                                 {/* <button
                                   className="sm:hidden btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#2563EB]"
                                   onClick={() => setReassignModal(assignment)}
@@ -1067,177 +1087,150 @@ export default function AssignmentsPage() {
           </div>
         </div>
 
-        <div className="w-full space-y-5 xl:sticky xl:top-4 xl:w-90">
-          <div className="card overflow-hidden border border-[#DBEAFE]">
-            <div className="flex items-center gap-2 border-b border-[#DBEAFE] px-4 py-3">
-              <PieChartIcon size={14} className="text-[#2563EB]" />
-              <h3 className="text-sm font-semibold text-slate-800">
-                Assigned Ratio
-              </h3>
+        <div className="w-full xl:w-80 xl:self-start">
+          <div className="card overflow-hidden border border-(--card-border) xl:sticky xl:top-4">
+            <div
+              className="px-4 py-3 border-b"
+              style={{
+                borderColor: "var(--card-border)",
+                background: "#2563EB",
+              }}
+            >
+              <p className="text-xs text-center font-semibold uppercase tracking-widest text-white">
+                Statistics
+              </p>
             </div>
-            {isLoading ? (
-              <div className="space-y-3 p-4">
-                <div className="shimmer mx-auto h-52 w-52 rounded-full" />
-                <div className="shimmer mx-auto h-3 w-44 rounded-full" />
-              </div>
-            ) : stats.assigned === 0 ? (
-              <div className="px-4 py-8 text-center text-sm font-medium text-slate-500">
-                No Assignments
-              </div>
-            ) : (
-              <div className="p-4">
-                <div className="h-52">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={52}
-                        outerRadius={74}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {pieData.map((_, index) => (
-                          <Cell key={index} fill={PIE_COLORS[index]} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "8px",
-                          border: "1px solid #DBEAFE",
-                          fontSize: "12px",
-                        }}
-                      />
-                      <Legend
-                        wrapperStyle={{ fontSize: "12px" }}
-                        iconType="circle"
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <p className="mt-2 text-center text-xs text-slate-500">
-                  {stats.assigned} assigned | {stats.unassigned} unassigned
-                </p>
-              </div>
-            )}
-          </div>
 
-          <div className="card overflow-hidden border border-[#DBEAFE]">
-            <div className="flex items-center gap-2 border-b border-[#DBEAFE] px-4 py-3">
-              <BarChart3 size={14} className="text-[#2563EB]" />
-              <h3 className="text-sm font-semibold text-slate-800">
-                Coordinator Load
-              </h3>
-            </div>
-            {isLoading ? (
-              <div className="space-y-3 p-4">
-                <div className="shimmer h-56 w-full rounded-xl" />
-              </div>
-            ) : stats.assigned === 0 ? (
-              <div className="px-4 py-8 text-center text-sm font-medium text-slate-500">
-                No Assignments
-              </div>
-            ) : (
-              <div className="p-4">
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={stats.byCoord}
-                      margin={{ top: 0, right: 10, left: -20, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#EFF6FF" />
-                      <XAxis
-                        dataKey="shortName"
-                        tick={{ fontSize: 12, fill: "#64748B" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11, fill: "#94A3B8" }}
-                        axisLine={false}
-                        tickLine={false}
-                        allowDecimals={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "8px",
-                          border: "1px solid #DBEAFE",
-                          fontSize: "12px",
-                        }}
-                        cursor={{ fill: "#F5F9FF" }}
-                      />
-                      <Bar
-                        dataKey="companies"
-                        name="Companies"
-                        radius={[6, 6, 0, 0]}
-                      >
-                        {stats.byCoord.map((_, index) => (
-                          <Cell
-                            key={index}
-                            fill={BAR_COLORS[index % BAR_COLORS.length]}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="card overflow-hidden border border-[#DBEAFE]">
-            <div className="flex items-center gap-2 border-b border-[#DBEAFE] px-4 py-3">
-              <Users size={14} className="text-[#2563EB]" />
-              <h3 className="text-sm font-semibold text-slate-800">
-                Top 5 Loads
-              </h3>
-            </div>
-            <div className="divide-y divide-[#EFF6FF]">
+            <div className="p-3 border-b border-(--card-border)">
               {isLoading ? (
-                Array.from({ length: 5 }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center gap-3 px-4 py-3"
-                  >
-                    <div className="shimmer h-8 w-8 rounded-full" />
-                    <div className="min-w-0 flex-1 space-y-1.5">
-                      <div className="shimmer h-3.5 w-32 rounded-full" />
-                      <div className="shimmer h-1.5 w-full rounded-full" />
-                    </div>
-                    <div className="shimmer h-4 w-6 rounded-full" />
-                  </div>
-                ))
-              ) : topCoordinatorLoads.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm text-slate-500">
-                  No Assignments
+                <div className="space-y-3">
+                  <div className="shimmer mx-auto h-44 w-44 rounded-full" />
+                  <div className="shimmer mx-auto h-3 w-44 rounded-full" />
+                </div>
+              ) : totalCycles === 0 ? (
+                <div className="px-2 py-2 text-center text-sm font-medium text-slate-500">
+                  No assignments yet
                 </div>
               ) : (
-                topCoordinatorLoads.map((coordinator) => (
-                  <div
-                    key={coordinator.id}
-                    className="flex items-center gap-3 px-4 py-3 hover:bg-[#F5F9FF] transition-colors"
-                  >
-                    <div className="h-8 w-8 shrink-0 rounded-full bg-[#DBEAFE] flex items-center justify-center text-xs font-semibold text-[#1D4ED8]">
-                      {coordinator.avatar}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-800">
-                        {coordinator.name}
-                      </p>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[#EFF6FF]">
-                        <div
-                          className="h-full rounded-full bg-[#2563EB] transition-all"
-                          style={{ width: `${coordinator.percent}%` }}
+                <>
+                  <div className="relative mx-auto h-44 w-full max-w-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={58}
+                          paddingAngle={4}
+                          dataKey="value"
+                        >
+                          {pieData.map((_, index) => (
+                            <Cell key={index} fill={PIE_COLORS[index]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: "8px",
+                            border: "1px solid #DBEAFE",
+                            fontSize: "12px",
+                          }}
                         />
-                      </div>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-extrabold leading-none text-[#2563EB]">
+                        {assignedRatio}%
+                      </span>
+                      <span className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-[#2563EB]">
+                        assigned
+                      </span>
                     </div>
-                    <span className="text-sm font-bold tabular-nums text-slate-700">
-                      {coordinator.companies}
-                    </span>
                   </div>
-                ))
+                  <p className="mt-1 text-center text-xs text-slate-500">
+                    {stats.assigned} assigned | {stats.unassigned} unassigned
+                  </p>
+                </>
               )}
+            </div>
+
+            <div className="p-3 border-b border-(--card-border)">
+              {isLoading ? (
+                <div className="space-y-3">
+                  <div className="shimmer mx-auto h-44 w-44 rounded-full" />
+                  <div className="shimmer mx-auto h-3 w-44 rounded-full" />
+                </div>
+              ) : totalCycles === 0 ? (
+                <div className="px-2 py-6 text-center text-sm font-medium text-slate-500">
+                  No companies yet
+                </div>
+              ) : (
+                <>
+                  <div className="relative mx-auto h-44 w-full max-w-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={acceptedPieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={58}
+                          paddingAngle={4}
+                          dataKey="value"
+                        >
+                          <Cell fill="#2563EB" />
+                          <Cell fill="#DBEAFE" />
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            borderRadius: "8px",
+                            border: "1px solid #DBEAFE",
+                            fontSize: "12px",
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-2xl font-extrabold leading-none text-[#2563EB]">
+                        {acceptedRatio}%
+                      </span>
+                      <span className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-[#2563EB]">
+                        accepted
+                      </span>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-center text-xs text-slate-500">
+                    {acceptedCount} accepted |{" "}
+                    {Math.max(totalCycles - acceptedCount, 0)} others
+                  </p>
+                </>
+              )}
+            </div>
+
+            <div className="space-y-3 p-3">
+              {statsCardItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center gap-3 rounded-lg px-3"
+                  style={{ background: "#3B82F6" }}
+                >
+                  <div
+                    className="w-1 self-stretch rounded-full shrink-0 my-3"
+                    style={{ background: "#FFFFFF" }}
+                  />
+                  <div className="flex-1 min-w-0 py-3">
+                    <p className="text-[14px] font-bold uppercase tracking-wider leading-none text-white">
+                      {item.label}
+                    </p>
+                    <p className="mt-0.5 text-[12px] font-semibold text-black">
+                      {item.sub}
+                    </p>
+                  </div>
+                  <span className="text-2xl font-extrabold shrink-0 text-white">
+                    {item.value}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

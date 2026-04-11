@@ -362,6 +362,82 @@ body::before {
   border-radius: 8px;
 }
 
+/* ── Flushbar ─────────────────────────────────────────────── */
+.flushbar-stack {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 50;
+  width: min(92vw, 380px);
+  pointer-events: none;
+}
+
+.flushbar {
+  --flushbar-bg: var(--primary-light);
+  --flushbar-border: var(--ring);
+  --flushbar-icon: var(--primary-hover);
+  --flushbar-track: #DBEAFE;
+  --flushbar-progress: var(--primary);
+
+  overflow: hidden;
+  border: 1px solid var(--flushbar-border);
+  border-radius: 12px;
+  background: var(--flushbar-bg);
+  box-shadow:
+    0 6px 20px rgba(15, 23, 42, 0.12),
+    0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.flushbar-warning {
+  --flushbar-bg: var(--primary-light);
+  --flushbar-border: var(--ring);
+  --flushbar-icon: var(--primary-hover);
+  --flushbar-track: #DBEAFE;
+  --flushbar-progress: var(--primary);
+}
+
+.flushbar-error {
+  --flushbar-bg: var(--primary-light);
+  --flushbar-border: var(--ring);
+  --flushbar-icon: var(--primary-hover);
+  --flushbar-track: #DBEAFE;
+  --flushbar-progress: var(--primary);
+}
+
+.flushbar-progress-track {
+  height: 4px;
+  width: 100%;
+  background: var(--flushbar-track);
+}
+
+.flushbar-progress {
+  height: 100%;
+  width: 100%;
+  background: var(--flushbar-progress);
+  transition-property: width;
+  transition-timing-function: linear;
+}
+
+.flushbar-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.flushbar-icon {
+  flex-shrink: 0;
+  color: var(--flushbar-icon);
+}
+
+.flushbar-message {
+  margin: 0;
+  color: #0F172A;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
 /* ── Nav active glow ───────────────────────────────────────── */
 .nav-item-active {
   background: var(--nav-active-bg);

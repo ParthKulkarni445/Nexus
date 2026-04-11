@@ -55,7 +55,7 @@ export async function GET(
             },
           },
           drives: {
-            orderBy: { startAt: "desc" },
+            orderBy: { createdAt: "desc" },
           },
           interactions: {
             orderBy: { createdAt: "desc" },
@@ -69,12 +69,9 @@ export async function GET(
       const { company } = cycle;
       const drives = cycle.drives;
 
-      const totalDrives = drives.length;
-      const confirmedDrives = drives.filter((d) => d.status === "confirmed").length;
-      const completedDrives = drives.filter((d) => d.status === "completed").length;
-      const conflictFlagged = drives.some((d) => d.isConflictFlagged);
+      const totalRoles = drives.length;
 
-      const lastDriveAt = drives[0]?.startAt ?? null;
+      const lastDriveAt = drives[0]?.createdAt ?? null;
       const lastInteractionAt = cycle.interactions[0]?.createdAt ?? null;
       const lastActivityAt = [lastDriveAt, lastInteractionAt, cycle.updatedAt]
         .filter(Boolean)
@@ -89,14 +86,11 @@ export async function GET(
         companyName: company.name,
         industry: company.industry,
         seasonStatus: cycle.status,
-        drives: {
-          total: totalDrives,
-          confirmed: confirmedDrives,
-          completed: completedDrives,
+        roles: {
+          total: totalRoles,
         },
         lastActivityAt: lastActivityAt?.toISOString() ?? null,
         contactsCount: company.contacts.length,
-        conflictFlagged,
       };
     });
 

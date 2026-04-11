@@ -10,7 +10,7 @@ async function computeSeasonStats(
 ): Promise<{
   seasonId: string;
   companiesInSeason: number;
-  driveStatusCounts: Record<string, number>;
+  rolesCount: number;
 }> {
   const where: Prisma.CompanySeasonCycleWhereInput = {
     seasonId,
@@ -24,23 +24,21 @@ async function computeSeasonStats(
     },
   });
 
-  const driveStatusCounts: Record<string, number> = {};
-
   const companies = new Set<string>();
+  let rolesCount = 0;
 
   cycles.forEach((cycle) => {
     companies.add(cycle.companyId);
 
     cycle.drives.forEach((drive) => {
-      driveStatusCounts[drive.status] =
-        (driveStatusCounts[drive.status] || 0) + 1;
+      rolesCount += 1;
     });
   });
 
   return {
     seasonId,
     companiesInSeason: companies.size,
-    driveStatusCounts,
+    rolesCount,
   };
 }
 
@@ -66,28 +64,16 @@ export async function GET(request: NextRequest) {
       computeSeasonStats(seasonBId, companyId),
     ]);
 
-    const deltaDriveStatus: Record<string, number> = {};
-
-    const allStatuses = new Set([
-      ...Object.keys(statsA.driveStatusCounts),
-      ...Object.keys(statsB.driveStatusCounts),
-    ]);
-
-    allStatuses.forEach((status) => {
-      const a = statsA.driveStatusCounts[status] || 0;
-      const b = statsB.driveStatusCounts[status] || 0;
-      deltaDriveStatus[status] = b - a;
-    });
-
     const deltaCompanies =
       (statsB.companiesInSeason || 0) - (statsA.companiesInSeason || 0);
+    const deltaRoles = (statsB.rolesCount || 0) - (statsA.rolesCount || 0);
 
     return success({
       seasonA: statsA,
       seasonB: statsB,
       delta: {
         companiesInSeason: deltaCompanies,
-        driveStatusCounts: deltaDriveStatus,
+        rolesCount: deltaRoles,
       },
     });
   } catch (error) {

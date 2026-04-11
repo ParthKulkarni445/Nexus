@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { config } from "dotenv";
-import { PrismaClient, type Prisma } from "@prisma/client";
+import { PrismaClient, Prisma } from "@prisma/client";
 
 config({ path: ".env.local" });
 config();
@@ -75,20 +75,6 @@ function seasonStatusFromPlacement(
     return "accepted";
   }
   return "positive";
-}
-
-function buildDriveWindow(selectionDate: string): {
-  startAt: Date;
-  endAt: Date;
-} {
-  const selection = new Date(`${selectionDate}T10:00:00.000Z`);
-  const startAt = new Date(selection);
-  startAt.setDate(startAt.getDate() - 8);
-
-  const endAt = new Date(startAt);
-  endAt.setHours(endAt.getHours() + 3);
-
-  return { startAt, endAt };
 }
 
 const students: StudentSeed[] = [
@@ -516,26 +502,27 @@ async function seedPlacement2425() {
         },
       });
 
-      const { startAt, endAt } = buildDriveWindow(placement.selectionDate);
-      const driveStatus =
-        placement.placementStatus === "accepted" ? "completed" : "confirmed";
-      const driveStage =
-        placement.placementStatus === "accepted" ? "final" : "interview";
-
       await db.drive.upsert({
         where: { id: deterministicUuid(`drive-2425:${placement.key}`) },
         update: {
           companyId: company.id,
           companySeasonCycleId: cycleId,
           title: `${placement.role} Hiring Drive`,
-          stage: driveStage,
-          status: driveStatus,
-          venue: "Placement Cell - Seminar Hall",
-          startAt,
-          endAt,
-          isConflictFlagged: false,
+          jobDescriptionText: `${placement.role} role for placement cycle 2024-25. Follow placement policy and complete all rounds as scheduled by the company.`,
+          jobDescriptionDocUrl: `https://${company.slug.replaceAll("-", "")}.example.com/docs/${placement.key}`,
+          notificationFormUrl: `https://forms.nexus.local/drives/${placement.key}`,
           notes: `Auto-seeded from placement record ${placement.key}`,
           createdBy: admin?.id ?? null,
+          eligibilityRules: {
+            deleteMany: {},
+            create: {
+              branches: ["CSE", "IT", "ECE"],
+              includeMinorBranches: true,
+              minCgpa: new Prisma.Decimal("6.50"),
+              allowsBacklogs: placement.placementStatus !== "accepted",
+              notes: "Seed default eligibility",
+            },
+          },
           updatedAt: new Date(),
         },
         create: {
@@ -543,14 +530,20 @@ async function seedPlacement2425() {
           companyId: company.id,
           companySeasonCycleId: cycleId,
           title: `${placement.role} Hiring Drive`,
-          stage: driveStage,
-          status: driveStatus,
-          venue: "Placement Cell - Seminar Hall",
-          startAt,
-          endAt,
-          isConflictFlagged: false,
+          jobDescriptionText: `${placement.role} role for placement cycle 2024-25. Follow placement policy and complete all rounds as scheduled by the company.`,
+          jobDescriptionDocUrl: `https://${company.slug.replaceAll("-", "")}.example.com/docs/${placement.key}`,
+          notificationFormUrl: `https://forms.nexus.local/drives/${placement.key}`,
           notes: `Auto-seeded from placement record ${placement.key}`,
           createdBy: admin?.id ?? null,
+          eligibilityRules: {
+            create: {
+              branches: ["CSE", "IT", "ECE"],
+              includeMinorBranches: true,
+              minCgpa: new Prisma.Decimal("6.50"),
+              allowsBacklogs: placement.placementStatus !== "accepted",
+              notes: "Seed default eligibility",
+            },
+          },
         },
       });
 

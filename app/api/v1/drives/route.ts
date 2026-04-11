@@ -17,11 +17,21 @@ const createDriveSchema = z.object({
   companyId: z.string().uuid(),
   companySeasonCycleId: z.string().uuid(),
   title: z.string().min(1).max(255),
-  stage: z.enum(["oa", "interview", "hr", "final", "other"]),
-  status: z.enum(["tentative", "confirmed", "completed", "cancelled"]),
-  venue: z.string().max(255).optional(),
-  startAt: z.string().datetime().optional(),
-  endAt: z.string().datetime().optional(),
+  compensationAmount: z.number().min(0).max(9999).optional(),
+  jobDescriptionText: z.string().optional(),
+  jobDescriptionDocUrl: z.string().url().max(500).optional(),
+  notificationFormUrl: z.string().url().max(500).optional(),
+  eligibilityRules: z
+    .array(
+      z.object({
+        branches: z.array(z.string().min(1).max(100)).default([]),
+        includeMinorBranches: z.boolean().optional(),
+        minCgpa: z.number().min(0).max(10).optional(),
+        allowsBacklogs: z.boolean().optional(),
+        notes: z.string().optional(),
+      }),
+    )
+    .optional(),
   notes: z.string().optional(),
 });
 
@@ -33,27 +43,13 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const from = searchParams.get("from");
-  const to = searchParams.get("to");
-  const status = searchParams.get("status");
   const search = searchParams.get("search");
-  const stage = searchParams.get("stage");
   const seasonId = searchParams.get("seasonId");
   const companyId = searchParams.get("companyId");
   const ownerUserId = searchParams.get("ownerUserId");
 
   try {
     const where: Prisma.DriveWhereInput = {
-      ...(from || to
-        ? {
-            startAt: {
-              ...(from ? { gte: new Date(from) } : {}),
-              ...(to ? { lte: new Date(to) } : {}),
-            },
-          }
-        : {}),
-      ...(status ? { status: status as never } : {}),
-      ...(stage ? { stage } : {}),
       ...(companyId ? { companyId } : {}),
       ...((seasonId || ownerUserId)
         ? {
@@ -67,12 +63,12 @@ export async function GET(request: NextRequest) {
         ? {
             OR: [
               { title: { contains: search, mode: "insensitive" } },
+              { jobDescriptionText: { contains: search, mode: "insensitive" } },
               {
                 company: {
                   name: { contains: search, mode: "insensitive" },
                 },
               },
-              { venue: { contains: search, mode: "insensitive" } },
             ],
           }
         : {}),
@@ -80,10 +76,11 @@ export async function GET(request: NextRequest) {
 
     const drivesList = await db.drive.findMany({
       where,
-      orderBy: { startAt: "desc" },
+      orderBy: { createdAt: "desc" },
       take: 100,
       include: {
         company: { select: { id: true, name: true, industry: true } },
+        eligibilityRules: true,
         companySeasonCycle: {
           select: {
             season: { select: { name: true, seasonType: true } },
@@ -121,28 +118,31 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
-    let isConflictFlagged = false;
-
-    if (validation.venue && validation.startAt && validation.endAt) {
-      const conflicts = await db.drive.findMany({
-        where: {
-          venue: validation.venue,
-          startAt: { gte: new Date(validation.startAt) },
-          endAt: { lte: new Date(validation.endAt) },
-        },
-        select: { id: true },
-      });
-
-      isConflictFlagged = conflicts.length > 0;
-    }
-
     const drive = await db.drive.create({
       data: {
-        ...validation,
-        startAt: validation.startAt ? new Date(validation.startAt) : null,
-        endAt: validation.endAt ? new Date(validation.endAt) : null,
-        isConflictFlagged,
+        companyId: validation.companyId,
+        companySeasonCycleId: validation.companySeasonCycleId,
+        title: validation.title,
+        compensationAmount: validation.compensationAmount,
+        jobDescriptionText: validation.jobDescriptionText,
+        jobDescriptionDocUrl: validation.jobDescriptionDocUrl,
+        notificationFormUrl: validation.notificationFormUrl,
+        notes: validation.notes,
         createdBy: user.id,
+        eligibilityRules: validation.eligibilityRules?.length
+          ? {
+              create: validation.eligibilityRules.map((rule) => ({
+                branches: rule.branches ?? [],
+                includeMinorBranches: rule.includeMinorBranches ?? false,
+                minCgpa: rule.minCgpa,
+                allowsBacklogs: rule.allowsBacklogs ?? false,
+                notes: rule.notes,
+              })),
+            }
+          : undefined,
+      },
+      include: {
+        eligibilityRules: true,
       },
     });
 
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
       action: "create_drive",
       targetType: "drive",
       targetId: drive.id,
-      meta: { title: drive.title, isConflictFlagged },
+      meta: { title: drive.title, eligibilityRuleCount: drive.eligibilityRules.length },
       ...clientInfo,
     });
 

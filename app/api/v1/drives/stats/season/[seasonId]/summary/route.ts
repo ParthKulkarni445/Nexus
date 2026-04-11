@@ -56,8 +56,7 @@ export async function GET(
     });
 
     const cycleStatusDistribution: Record<string, number> = {};
-    const driveStatusCounts: Record<string, number> = {};
-    let conflictFlaggedDrives = 0;
+    let rolesCount = 0;
     let lastUpdatedAt: Date | null = null;
 
     const activityByDate = new Map<
@@ -74,22 +73,14 @@ export async function GET(
       }
 
       cycle.drives.forEach((drive) => {
-        driveStatusCounts[drive.status] =
-          (driveStatusCounts[drive.status] || 0) + 1;
-
-        if (drive.isConflictFlagged) {
-          conflictFlaggedDrives += 1;
-        }
-
-        if (drive.startAt) {
-          const key = drive.startAt.toISOString().slice(0, 10);
-          const existing = activityByDate.get(key) ?? {
-            drives: 0,
-            interactions: 0,
-          };
-          existing.drives += 1;
-          activityByDate.set(key, existing);
-        }
+        rolesCount += 1;
+        const key = drive.createdAt.toISOString().slice(0, 10);
+        const existing = activityByDate.get(key) ?? {
+          drives: 0,
+          interactions: 0,
+        };
+        existing.drives += 1;
+        activityByDate.set(key, existing);
       });
 
       cycle.interactions.forEach((interaction) => {
@@ -208,8 +199,7 @@ export async function GET(
       },
       companiesInSeason: cycles.length,
       cycleStatusDistribution,
-      driveStatusCounts,
-      conflictFlaggedDrives,
+      rolesCount,
       recentActivityTrend,
       lastUpdatedAt,
       placementSummary: {

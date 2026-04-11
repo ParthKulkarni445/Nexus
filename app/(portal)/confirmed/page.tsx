@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   AlertCircle,
   Building2,
   CalendarPlus,
+  ChevronDown,
   Eye,
   FileSpreadsheet,
   Loader2,
+  Pencil,
   PhoneCall,
   Search,
   Send,
   Upload,
   Users,
+  X,
 } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
@@ -25,21 +28,6 @@ type ApiResponse<T> = {
   error?: {
     message?: string;
   };
-};
-
-type ConfirmedDrive = {
-  id: string;
-  title: string;
-  stage: string;
-  status: "tentative" | "confirmed" | "completed" | "cancelled";
-  companyId: string;
-  companyName: string;
-  companySeasonCycleId: string;
-  seasonId: string;
-  seasonName: string;
-  seasonType: "intern" | "placement";
-  startAt: string | null;
-  endAt: string | null;
 };
 
 type TelegramTemplate = {
@@ -63,6 +51,12 @@ type ConfirmedCompany = {
     seasonType: "intern" | "placement";
   };
   roles: string[];
+  drives: Array<{
+    id: string;
+    title: string;
+    compensationAmount: number | null;
+    studentEntryNumbers: string[];
+  }>;
   contacts: Array<{
     id: string;
     name: string;
@@ -75,6 +69,7 @@ type ConfirmedCompany = {
 
 type UploadStudentInfoResponse = {
   companySeasonCycleId: string;
+  driveId: string;
   uploadedCount: number;
   invalidRows: number[];
   sampleEntryNumbers: string[];
@@ -88,6 +83,7 @@ type AttendanceCompareRow = {
 
 type CompareAttendanceResponse = {
   companySeasonCycleId: string;
+  driveId: string;
   detectedAttendanceColumn: string;
   matchedCount: number;
   missingCount: number;
@@ -97,8 +93,6 @@ type CompareAttendanceResponse = {
 };
 
 type ConfirmedPayload = {
-  drives: ConfirmedDrive[];
-  selectedDriveId: string | null;
   acceptedCompanies: ConfirmedCompany[];
   telegramTemplates: TelegramTemplate[];
 };
@@ -122,6 +116,8 @@ type InstructionTask = "upload" | "compare";
 type StudentUploadPreview = {
   companyId: string;
   companySeasonCycleId: string;
+  driveId: string;
+  driveTitle: string;
   companyName: string;
   file: File;
   rollHeader: string;
@@ -129,6 +125,15 @@ type StudentUploadPreview = {
   invalidRows: number[];
   totalDataRows: number;
 };
+
+type ActionFlushbar = {
+  id: number;
+  tone: "warning" | "error";
+  message: string;
+  progress: number;
+};
+
+const WARNING_FLUSHBAR_DURATION_MS = 3500;
 
 function htmlToText(value: string | null | undefined) {
   if (!value) return "";
@@ -138,13 +143,6 @@ function htmlToText(value: string | null | undefined) {
     .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
     .trim();
-}
-
-function toGoogleDateTime(value: string) {
-  return new Date(value)
-    .toISOString()
-    .replace(/[-:]/g, "")
-    .replace(/\.\d{3}Z$/, "Z");
 }
 
 function normalizeHeader(value: string) {
@@ -184,52 +182,198 @@ async function requestJson<T>(url: string, init?: RequestInit) {
   return body.data;
 }
 
+function ConfirmedToolbarSkeleton() {
+  return (
+    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_1.1fr_0.8fr]">
+        <div className="space-y-2">
+          <div className="shimmer h-3 w-24 rounded-full" />
+          <div className="shimmer h-11 rounded-2xl" />
+        </div>
+        <div className="space-y-2">
+          <div className="shimmer h-3 w-36 rounded-full" />
+          <div className="shimmer h-11 rounded-2xl" />
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="shimmer h-3 w-28 rounded-full" />
+          <div className="mt-3 shimmer h-8 w-16 rounded-full" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ConfirmedCompanyCardSkeleton() {
+  return (
+    <article className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-2">
+            <div className="shimmer h-6 w-48 rounded-full" />
+            <div className="shimmer h-4 w-64 rounded-full" />
+          </div>
+          <div className="shimmer h-7 w-20 rounded-full" />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="shimmer h-16 rounded-2xl" />
+          <div className="shimmer h-16 rounded-2xl" />
+          <div className="shimmer h-16 rounded-2xl" />
+          <div className="shimmer h-16 rounded-2xl" />
+        </div>
+        <div className="space-y-2">
+          <div className="shimmer h-3 w-24 rounded-full" />
+          <div className="shimmer h-10 rounded-xl" />
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="shimmer h-10 rounded-xl" />
+          <div className="shimmer h-10 rounded-xl" />
+          <div className="shimmer h-10 rounded-xl" />
+          <div className="shimmer h-10 rounded-xl" />
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="shimmer h-3 w-32 rounded-full" />
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="shimmer h-8 rounded-xl" />
+            <div className="shimmer h-8 rounded-xl" />
+            <div className="shimmer h-8 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export default function ConfirmedPage() {
   const [loading, setLoading] = useState(true);
   const [loadingError, setLoadingError] = useState<string | null>(null);
 
-  const [drives, setDrives] = useState<ConfirmedDrive[]>([]);
   const [seasons, setSeasons] = useState<SeasonRecord[]>([]);
-  const [acceptedCompanies, setAcceptedCompanies] = useState<ConfirmedCompany[]>([]);
-  const [telegramTemplates, setTelegramTemplates] = useState<TelegramTemplate[]>([]);
+  const [acceptedCompanies, setAcceptedCompanies] = useState<
+    ConfirmedCompany[]
+  >([]);
+  const [telegramTemplates, setTelegramTemplates] = useState<
+    TelegramTemplate[]
+  >([]);
 
-  const [selectedDrive, setSelectedDrive] = useState("");
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
   const [query, setQuery] = useState("");
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
-  const [selectedContactByCompany, setSelectedContactByCompany] = useState<Record<string, string>>({});
-  const [manualTelegramByCompany, setManualTelegramByCompany] = useState<Record<string, string>>({});
+  const [stipendDraftByDrive, setStipendDraftByDrive] = useState<
+    Record<string, string>
+  >({});
+  const [editingStipendByDrive, setEditingStipendByDrive] = useState<
+    Record<string, boolean>
+  >({});
+  const [savingStipendByDrive, setSavingStipendByDrive] = useState<
+    Record<string, boolean>
+  >({});
+  const [manualTelegramByCompany, setManualTelegramByCompany] = useState<
+    Record<string, string>
+  >({});
   const [telegramModalOpen, setTelegramModalOpen] = useState(false);
   const [telegramCompanyId, setTelegramCompanyId] = useState("");
   const [telegramTemplateId, setTelegramTemplateId] = useState("");
-  const [studentPreviewCompanyId, setStudentPreviewCompanyId] = useState("");
-  const [instructionModalTask, setInstructionModalTask] = useState<InstructionTask | null>(null);
-  const [instructionModalCompanyId, setInstructionModalCompanyId] = useState("");
+  const [studentPreviewDrive, setStudentPreviewDrive] = useState<{
+    companyId: string;
+    driveId: string;
+  } | null>(null);
+  const [instructionModalTask, setInstructionModalTask] =
+    useState<InstructionTask | null>(null);
+  const [instructionModalCompanyId, setInstructionModalCompanyId] =
+    useState("");
+  const [instructionModalDriveId, setInstructionModalDriveId] = useState("");
   const [compareResultModalOpen, setCompareResultModalOpen] = useState(false);
   const [compareResultCompanyId, setCompareResultCompanyId] = useState("");
   const [compareResultCompanyName, setCompareResultCompanyName] = useState("");
-  const [compareResultPayload, setCompareResultPayload] = useState<CompareAttendanceResponse | null>(null);
-  const [studentUploadPreview, setStudentUploadPreview] = useState<StudentUploadPreview | null>(null);
+  const [compareResultDriveTitle, setCompareResultDriveTitle] = useState("");
+  const [compareResultPayload, setCompareResultPayload] =
+    useState<CompareAttendanceResponse | null>(null);
+  const [studentUploadPreview, setStudentUploadPreview] =
+    useState<StudentUploadPreview | null>(null);
 
-  const [uploadingStudentByCompany, setUploadingStudentByCompany] = useState<Record<string, boolean>>({});
-  const [comparingAttendanceByCompany, setComparingAttendanceByCompany] = useState<
+  const [uploadingStudentByDrive, setUploadingStudentByDrive] = useState<
+    Record<string, boolean>
+  >({});
+  const [comparingAttendanceByDrive, setComparingAttendanceByDrive] = useState<
     Record<string, boolean>
   >({});
 
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
-  const [submittingAction, setSubmittingAction] = useState<Record<string, boolean>>({});
+  const [actionFlushbar, setActionFlushbar] = useState<ActionFlushbar | null>(
+    null,
+  );
+  const [submittingAction, setSubmittingAction] = useState<
+    Record<string, boolean>
+  >({});
   const [loggedInUserEmail, setLoggedInUserEmail] = useState("");
+  const actionFlushbarProgressTimerRef = useRef<number | null>(null);
+  const actionFlushbarHideTimerRef = useRef<number | null>(null);
 
-  async function fetchConfirmedData(nextDriveId?: string, nextSeasonId?: string) {
+  function clearActionFlushbarTimers() {
+    if (actionFlushbarProgressTimerRef.current !== null) {
+      window.clearTimeout(actionFlushbarProgressTimerRef.current);
+      actionFlushbarProgressTimerRef.current = null;
+    }
+
+    if (actionFlushbarHideTimerRef.current !== null) {
+      window.clearTimeout(actionFlushbarHideTimerRef.current);
+      actionFlushbarHideTimerRef.current = null;
+    }
+  }
+
+  function dismissActionFlushbar() {
+    clearActionFlushbarTimers();
+    setActionFlushbar(null);
+  }
+
+  function showActionFlushbar(tone: "warning" | "error", message: string) {
+    dismissActionFlushbar();
+    setActionMessage("");
+
+    const id = Date.now();
+    setActionFlushbar({ id, tone, message, progress: 100 });
+
+    actionFlushbarProgressTimerRef.current = window.setTimeout(() => {
+      setActionFlushbar((current) =>
+        current?.id === id ? { ...current, progress: 0 } : current,
+      );
+    }, 30);
+
+    actionFlushbarHideTimerRef.current = window.setTimeout(() => {
+      setActionFlushbar((current) => (current?.id === id ? null : current));
+    }, WARNING_FLUSHBAR_DURATION_MS + 30);
+  }
+
+  function showActionWarning(message: string) {
+    showActionFlushbar("warning", message);
+  }
+
+  function showActionError(message: string) {
+    showActionFlushbar("error", message);
+  }
+
+  useEffect(() => {
+    if (!actionError.trim()) {
+      return;
+    }
+
+    showActionError(actionError);
+    setActionError("");
+  }, [actionError]);
+
+  useEffect(() => {
+    return () => {
+      clearActionFlushbarTimers();
+    };
+  }, []);
+
+  async function fetchConfirmedData(nextSeasonId?: string) {
     setLoading(true);
     setLoadingError(null);
 
     try {
       const params = new URLSearchParams();
-      if (nextDriveId) {
-        params.set("driveId", nextDriveId);
-      }
       if (nextSeasonId) {
         params.set("seasonId", nextSeasonId);
       }
@@ -239,22 +383,25 @@ export default function ConfirmedPage() {
         `/api/v1/confirmed${search ? `?${search}` : ""}`,
       );
 
-      setDrives(payload.drives);
       setAcceptedCompanies(payload.acceptedCompanies);
       setTelegramTemplates(payload.telegramTemplates);
-      setSelectedDrive(payload.selectedDriveId ?? "");
+      setStipendDraftByDrive((current) => {
+        const next = { ...current };
+        for (const company of payload.acceptedCompanies) {
+          for (const drive of company.drives) {
+            if (!next[drive.id]) {
+              next[drive.id] =
+                drive.compensationAmount !== null
+                  ? String(drive.compensationAmount)
+                  : "";
+            }
+          }
+        }
+        return next;
+      });
       setSelectedSeasonId((current) => {
         if (nextSeasonId) {
           return nextSeasonId;
-        }
-
-        if (payload.selectedDriveId) {
-          const matchedDrive = payload.drives.find(
-            (drive) => drive.id === payload.selectedDriveId,
-          );
-          if (matchedDrive) {
-            return matchedDrive.seasonId;
-          }
         }
 
         return current;
@@ -263,23 +410,32 @@ export default function ConfirmedPage() {
       setTelegramCompanyId("");
       setTelegramTemplateId("");
     } catch (error) {
-      setLoadingError(error instanceof Error ? error.message : "Unable to load confirmed data");
+      setLoadingError(
+        error instanceof Error
+          ? error.message
+          : "Unable to load confirmed data",
+      );
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    void fetchConfirmedData();
-  }, []);
-
-  useEffect(() => {
     void (async () => {
       try {
         const seasonList = await requestJson<SeasonRecord[]>("/api/v1/seasons");
         setSeasons(seasonList);
+        const defaultSeasonId =
+          seasonList.find((season) => season.isActive)?.id ?? seasonList[0]?.id;
+
+        if (defaultSeasonId) {
+          void fetchConfirmedData(defaultSeasonId);
+        } else {
+          setLoading(false);
+        }
       } catch {
         setSeasons([]);
+        setLoading(false);
       }
     })();
   }, []);
@@ -310,25 +466,49 @@ export default function ConfirmedPage() {
   }, [acceptedCompanies, query]);
 
   const telegramCompany = useMemo(
-    () => filteredCompanies.find((company) => company.companyId === telegramCompanyId) ?? null,
+    () =>
+      filteredCompanies.find(
+        (company) => company.companyId === telegramCompanyId,
+      ) ?? null,
     [filteredCompanies, telegramCompanyId],
   );
 
   const telegramContact = useMemo(() => {
     if (!telegramCompany) return null;
-    const selectedContactId = selectedContactByCompany[telegramCompany.companyId];
-    if (!selectedContactId) return null;
-    return telegramCompany.contacts.find((contact) => contact.id === selectedContactId) ?? null;
-  }, [telegramCompany, selectedContactByCompany]);
+    return telegramCompany.contacts[0] ?? null;
+  }, [telegramCompany]);
 
   const studentPreviewCompany = useMemo(
-    () => acceptedCompanies.find((company) => company.companyId === studentPreviewCompanyId) ?? null,
-    [acceptedCompanies, studentPreviewCompanyId],
+    () =>
+      acceptedCompanies.find(
+        (company) =>
+          company.companyId === (studentPreviewDrive?.companyId ?? ""),
+      ) ?? null,
+    [acceptedCompanies, studentPreviewDrive],
+  );
+
+  const studentPreviewDriveItem = useMemo(
+    () =>
+      studentPreviewCompany?.drives.find(
+        (drive) => drive.id === (studentPreviewDrive?.driveId ?? ""),
+      ) ?? null,
+    [studentPreviewCompany, studentPreviewDrive],
   );
 
   const instructionModalCompany = useMemo(
-    () => acceptedCompanies.find((company) => company.companyId === instructionModalCompanyId) ?? null,
+    () =>
+      acceptedCompanies.find(
+        (company) => company.companyId === instructionModalCompanyId,
+      ) ?? null,
     [acceptedCompanies, instructionModalCompanyId],
+  );
+
+  const instructionModalDrive = useMemo(
+    () =>
+      instructionModalCompany?.drives.find(
+        (drive) => drive.id === instructionModalDriveId,
+      ) ?? null,
+    [instructionModalCompany, instructionModalDriveId],
   );
 
   const seasonOptions = useMemo(
@@ -345,27 +525,20 @@ export default function ConfirmedPage() {
     label: template.name,
   }));
 
-  async function handleDriveChange(nextDriveId: string) {
-    setActionError("");
-    setActionMessage("");
-    await fetchConfirmedData(nextDriveId);
-  }
-
   async function handleSeasonChange(nextSeasonId: string) {
     setSelectedSeasonId(nextSeasonId);
-
-    const representativeDrive = drives.find(
-      (drive) => drive.seasonId === nextSeasonId,
-    );
-
-    await fetchConfirmedData(representativeDrive?.id ?? undefined, nextSeasonId);
+    await fetchConfirmedData(nextSeasonId);
   }
 
-  function downloadAttendanceComparison(company: ConfirmedCompany, payload: CompareAttendanceResponse) {
+  function downloadAttendanceComparison(
+    company: ConfirmedCompany,
+    payload: CompareAttendanceResponse,
+  ) {
     const rows = [
       "entry_number,attendance_status,matched",
       ...payload.rows.map(
-        (row) => `${row.entryNumber},${JSON.stringify(row.attendanceStatus)},${row.matched ? "yes" : "no"}`,
+        (row) =>
+          `${row.entryNumber},${JSON.stringify(row.attendanceStatus)},${row.matched ? "yes" : "no"}`,
       ),
     ];
 
@@ -386,7 +559,11 @@ export default function ConfirmedPage() {
     URL.revokeObjectURL(url);
   }
 
-  async function onUploadStudentInfo(company: ConfirmedCompany, event: ChangeEvent<HTMLInputElement>) {
+  async function onUploadStudentInfo(
+    company: ConfirmedCompany,
+    drive: ConfirmedCompany["drives"][number],
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
     const file = event.target.files?.[0] ?? null;
     if (!file) return;
 
@@ -420,7 +597,9 @@ export default function ConfirmedPage() {
         return index === 0 ? trimmed.replace(/^\ufeff/, "") : trimmed;
       });
 
-      const rollHeader = headers.find((header) => normalizeHeader(header) === "roll no");
+      const rollHeader = headers.find(
+        (header) => normalizeHeader(header) === "roll no",
+      );
 
       if (!rollHeader) {
         throw new Error("Missing required column 'Roll No'.");
@@ -441,7 +620,9 @@ export default function ConfirmedPage() {
         validEntrySet.add(normalized);
       }
 
-      const validEntries = Array.from(validEntrySet).sort((a, b) => a.localeCompare(b));
+      const validEntries = Array.from(validEntrySet).sort((a, b) =>
+        a.localeCompare(b),
+      );
       if (validEntries.length === 0) {
         throw new Error("No valid Roll No values found.");
       }
@@ -449,6 +630,8 @@ export default function ConfirmedPage() {
       setStudentUploadPreview({
         companyId: company.companyId,
         companySeasonCycleId: company.companySeasonCycleId,
+        driveId: drive.id,
+        driveTitle: drive.title,
         companyName: company.companyName,
         file,
         rollHeader,
@@ -457,20 +640,29 @@ export default function ConfirmedPage() {
         totalDataRows: Math.max(rows.length - 1, 0),
       });
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to preview student file");
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to preview student file",
+      );
     }
   }
 
   async function submitStudentUploadPreview() {
     if (!studentUploadPreview) return;
 
-    const company = acceptedCompanies.find((item) => item.companyId === studentUploadPreview.companyId);
+    const company = acceptedCompanies.find(
+      (item) => item.companyId === studentUploadPreview.companyId,
+    );
     if (!company) {
       setActionError("Selected company was not found for upload.");
       return;
     }
 
-    setUploadingStudentByCompany((prev) => ({ ...prev, [company.companyId]: true }));
+    setUploadingStudentByDrive((prev) => ({
+      ...prev,
+      [studentUploadPreview.driveId]: true,
+    }));
     setActionError("");
     setActionMessage("");
 
@@ -478,32 +670,48 @@ export default function ConfirmedPage() {
       const formData = new FormData();
       formData.append("file", studentUploadPreview.file);
       formData.append("companySeasonCycleId", company.companySeasonCycleId);
+      formData.append("driveId", studentUploadPreview.driveId);
 
-      const payload = await requestJson<UploadStudentInfoResponse>("/api/v1/confirmed/student-info", {
-        method: "POST",
-        body: formData,
-      });
+      const payload = await requestJson<UploadStudentInfoResponse>(
+        "/api/v1/confirmed/student-info",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
 
-      await fetchConfirmedData(selectedDrive || undefined);
+      await fetchConfirmedData(selectedSeasonId || undefined);
       setActionMessage(
-        `Uploaded ${payload.uploadedCount} entry numbers for ${company.companyName}` +
+        `Uploaded ${payload.uploadedCount} entry numbers for ${company.companyName} - ${studentUploadPreview.driveTitle}` +
           (payload.invalidRows.length > 0
             ? ` (ignored invalid rows: ${payload.invalidRows.slice(0, 5).join(", ")}${payload.invalidRows.length > 5 ? ", ..." : ""})`
             : ""),
       );
       setStudentUploadPreview(null);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Student info upload failed");
+      setActionError(
+        error instanceof Error ? error.message : "Student info upload failed",
+      );
     } finally {
-      setUploadingStudentByCompany((prev) => ({ ...prev, [company.companyId]: false }));
+      setUploadingStudentByDrive((prev) => ({
+        ...prev,
+        [studentUploadPreview.driveId]: false,
+      }));
     }
   }
 
-  async function onCompareAttendance(company: ConfirmedCompany, event: ChangeEvent<HTMLInputElement>) {
+  async function onCompareAttendance(
+    company: ConfirmedCompany,
+    drive: ConfirmedCompany["drives"][number],
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
     const file = event.target.files?.[0] ?? null;
     if (!file) return;
 
-    setComparingAttendanceByCompany((prev) => ({ ...prev, [company.companyId]: true }));
+    setComparingAttendanceByDrive((prev) => ({
+      ...prev,
+      [drive.id]: true,
+    }));
     setActionError("");
     setActionMessage("");
 
@@ -511,6 +719,7 @@ export default function ConfirmedPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("companySeasonCycleId", company.companySeasonCycleId);
+      formData.append("driveId", drive.id);
 
       const payload = await requestJson<CompareAttendanceResponse>(
         "/api/v1/confirmed/compare-attendance",
@@ -522,25 +731,31 @@ export default function ConfirmedPage() {
 
       setCompareResultCompanyId(company.companyId);
       setCompareResultCompanyName(company.companyName);
+      setCompareResultDriveTitle(drive.title);
       setCompareResultPayload(payload);
       setCompareResultModalOpen(true);
       setActionMessage(
-        `Attendance compared for ${company.companyName}: ${payload.matchedCount} matched, ${payload.missingCount} missing.`,
+        `Attendance compared for ${company.companyName} - ${drive.title}: ${payload.matchedCount} matched, ${payload.missingCount} missing.`,
       );
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Attendance comparison failed");
+      setActionError(
+        error instanceof Error ? error.message : "Attendance comparison failed",
+      );
     } finally {
-      setComparingAttendanceByCompany((prev) => ({ ...prev, [company.companyId]: false }));
+      setComparingAttendanceByDrive((prev) => ({
+        ...prev,
+        [drive.id]: false,
+      }));
       event.target.value = "";
     }
   }
 
   async function logCall(company: ConfirmedCompany) {
     const actionKey = `call:${company.companyId}`;
-    const contactId = selectedContactByCompany[company.companyId];
+    const contactId = company.contacts[0]?.id;
 
     if (!contactId) {
-      setActionError("Choose an HR/contact before calling.");
+      setActionError("No contact available for this company.");
       return;
     }
 
@@ -560,16 +775,58 @@ export default function ConfirmedPage() {
       });
       setActionMessage("Call interaction logged successfully.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to log call interaction");
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to log call interaction",
+      );
     } finally {
       setSubmittingAction((prev) => ({ ...prev, [actionKey]: false }));
     }
   }
 
+  async function saveDriveCompensation(
+    company: ConfirmedCompany,
+    drive: ConfirmedCompany["drives"][number],
+  ) {
+    const draft = stipendDraftByDrive[drive.id] ?? "";
+    const nextValue = draft.trim() ? Number(draft) : null;
+
+    if (nextValue !== null && (!Number.isFinite(nextValue) || nextValue < 0)) {
+      setActionError("Compensation value must be a valid non-negative number.");
+      return false;
+    }
+
+    setSavingStipendByDrive((prev) => ({ ...prev, [drive.id]: true }));
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      await requestJson(`/api/v1/drives/${drive.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ compensationAmount: nextValue ?? undefined }),
+      });
+
+      await fetchConfirmedData(selectedSeasonId || undefined);
+      setActionMessage(
+        `Updated compensation for ${company.companyName} - ${drive.title}.`,
+      );
+      return true;
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to update compensation",
+      );
+      return false;
+    } finally {
+      setSavingStipendByDrive((prev) => ({ ...prev, [drive.id]: false }));
+    }
+  }
+
   function openScheduleModal(company: ConfirmedCompany) {
-    const selectedContactId = selectedContactByCompany[company.companyId];
-    const selectedContact =
-      company.contacts.find((contact) => contact.id === selectedContactId) ?? null;
+    const selectedContact = company.contacts[0] ?? null;
 
     const title = `${company.companyName} - OA`;
     const details = [
@@ -603,19 +860,6 @@ export default function ConfirmedPage() {
       params.set("add", invitees.join(","));
     }
 
-    const driveForCompany = drives.find(
-      (drive) => drive.id === selectedDrive && drive.companyId === company.companyId,
-    );
-
-    if (driveForCompany?.startAt && driveForCompany?.endAt) {
-      params.set(
-        "dates",
-        `${toGoogleDateTime(driveForCompany.startAt)}/${toGoogleDateTime(
-          driveForCompany.endAt,
-        )}`,
-      );
-    }
-
     const url = `https://calendar.google.com/calendar/render?${params.toString()}`;
     window.open(url, "_blank", "noopener,noreferrer");
     setActionError("");
@@ -640,7 +884,10 @@ export default function ConfirmedPage() {
           requestType: "custom",
           customSubject: `${company.companyName} update for students`,
           customBody: body || undefined,
-          recipientFilter: { audience: "all_students", source: "confirmed_tab" },
+          recipientFilter: {
+            audience: "all_students",
+            source: "confirmed_tab",
+          },
           previewPayload: {
             source: "confirmed_tab",
             mode: "students",
@@ -654,19 +901,21 @@ export default function ConfirmedPage() {
 
       setActionMessage("Mailing request queued for students.");
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : "Unable to create mail request");
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to create mail request",
+      );
     } finally {
       setSubmittingAction((prev) => ({ ...prev, [actionKey]: false }));
     }
   }
 
   function buildTelegramCompanyContext(company: ConfirmedCompany) {
-    const roles = company.roles.length ? company.roles.join(", ") : "Not mapped";
-    const contact = (() => {
-      const selectedContactId = selectedContactByCompany[company.companyId];
-      if (!selectedContactId) return null;
-      return company.contacts.find((item) => item.id === selectedContactId) ?? null;
-    })();
+    const roles = company.roles.length
+      ? company.roles.join(", ")
+      : "Not mapped";
+    const contact = company.contacts[0] ?? null;
 
     const contactLine = contact
       ? `Contact: ${contact.name}${contact.designation ? ` (${contact.designation})` : ""}`
@@ -704,7 +953,8 @@ export default function ConfirmedPage() {
     const template = telegramTemplates.find((item) => item.id === templateId);
     if (!template) return;
 
-    const candidate = template.bodyText?.trim() || htmlToText(template.bodyHtml);
+    const candidate =
+      template.bodyText?.trim() || htmlToText(template.bodyHtml);
     const companyContext = buildTelegramCompanyContext(telegramCompany);
 
     setManualTelegramByCompany((prev) => ({
@@ -718,14 +968,20 @@ export default function ConfirmedPage() {
     input?.click();
   }
 
-  function openInstructionModal(company: ConfirmedCompany, task: InstructionTask) {
+  function openInstructionModal(
+    company: ConfirmedCompany,
+    drive: ConfirmedCompany["drives"][number],
+    task: InstructionTask,
+  ) {
     setInstructionModalCompanyId(company.companyId);
+    setInstructionModalDriveId(drive.id);
     setInstructionModalTask(task);
   }
 
   function closeInstructionModal() {
     setInstructionModalTask(null);
     setInstructionModalCompanyId("");
+    setInstructionModalDriveId("");
   }
 
   function downloadTemplateCsv(task: InstructionTask) {
@@ -757,66 +1013,103 @@ export default function ConfirmedPage() {
   }
 
   function continueFromInstruction() {
-    if (!instructionModalCompanyId || !instructionModalTask) return;
+    if (
+      !instructionModalCompanyId ||
+      !instructionModalDriveId ||
+      !instructionModalTask
+    )
+      return;
 
     const inputId =
       instructionModalTask === "upload"
-        ? `upload-students-${instructionModalCompanyId}`
-        : `compare-attendance-${instructionModalCompanyId}`;
+        ? `upload-students-${instructionModalDriveId}`
+        : `compare-attendance-${instructionModalDriveId}`;
 
     closeInstructionModal();
     triggerFilePicker(inputId);
   }
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 md:p-5 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div>
-            <p className="text-xs font-semibold text-slate-600 mb-1">Select season</p>
-            <select
-              className="input-base w-full"
-              value={selectedSeasonId}
-              onChange={(event) => {
-                void handleSeasonChange(event.target.value);
-              }}
-            >
-              <option value="">Select season</option>
-              {seasonOptions.map((season) => (
-                <option key={season.value} value={season.value}>
-                  {season.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold text-slate-600 mb-1">Search Accepted Companies</p>
-            <SearchBar
-              value={query}
-              onChange={setQuery}
-              placeholder="Search company, role, notes"
-              className="w-full"
-            />
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 flex items-center justify-between">
-            <div>
-              <p className="text-xs text-slate-500">Accepted In Selected Season</p>
-              <p className="text-lg font-bold text-slate-900">{filteredCompanies.length}</p>
+    <div className="space-y-5 p-4 md:p-6">
+      {actionFlushbar ? (
+        <div className="flushbar-stack fixed left-4 bottom-4 z-50 w-[min(92vw,380px)] pointer-events-none">
+          <div
+            className={`flushbar flushbar-${actionFlushbar.tone} overflow-hidden rounded-xl border shadow-lg`}
+          >
+            <div className="flushbar-progress-track h-1 w-full">
+              <div
+                className="flushbar-progress h-full transition-[width] ease-linear"
+                style={{
+                  width: `${actionFlushbar.progress}%`,
+                  transitionDuration: `${WARNING_FLUSHBAR_DURATION_MS}ms`,
+                }}
+              />
             </div>
-            <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-              <Building2 size={16} className="text-[#2563EB]" />
+            <div className="flushbar-body flex items-center gap-2.5 px-3.5 py-3">
+              <AlertCircle size={36} className="flushbar-icon shrink-0" />
+              <div className="min-w-0 space-y-0.5">
+                <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                  {actionFlushbar.tone === "error" ? "ERROR" : "WARNING"}
+                </p>
+                <p className="flushbar-message m-0 text-[14px] font-medium leading-[1.45]">
+                  {actionFlushbar.message}
+                </p>
+              </div>
             </div>
           </div>
         </div>
+      ) : null}
 
-        {actionError ? (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 inline-flex items-center gap-2">
-            <AlertCircle size={14} />
-            {actionError}
+      <section className="rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,#ffffff_0%,#f8fbff_48%,#eef5ff_100%)] p-5 shadow-sm space-y-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Confirmed Companies
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold text-slate-950">
+            Company-ready actions for confirmed opportunities
+          </h1>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+          <div className="w-full md:w-[52%]">
+            <p className="text-xs font-semibold text-slate-600 mb-1">
+              Select season
+            </p>
+            <div className="relative">
+              <select
+                className="input-base w-full appearance-none pr-10"
+                value={selectedSeasonId}
+                onChange={(event) => {
+                  void handleSeasonChange(event.target.value);
+                }}
+              >
+                <option value="">Select season</option>
+                {seasonOptions.map((season) => (
+                  <option key={season.value} value={season.value}>
+                    {season.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={16}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+              />
+            </div>
           </div>
-        ) : null}
+
+          <div className="rounded-2xl border border-[#4A86E8] bg-[#4A86E8] px-4 py-3 flex items-center justify-between shadow-[0_8px_18px_rgba(74,134,232,0.28)] md:min-w-64">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-black">
+                Companies
+              </p>
+              <p className="mt-1 text-3xl leading-none font-bold text-white">
+                {filteredCompanies.length}
+              </p>
+            </div>
+            <div className="w-11 h-11 rounded-xl bg-[#F8FAFF] flex items-center justify-center shadow-[0_2px_6px_rgba(15,23,42,0.1)]">
+              <Building2 size={18} className="text-[#2563EB]" />
+            </div>
+          </div>
+        </div>
 
         {actionMessage ? (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
@@ -825,219 +1118,444 @@ export default function ConfirmedPage() {
         ) : null}
       </section>
 
-      {loading ? (
-        <section className="rounded-2xl border border-slate-200 bg-white p-6">
-          <p className="text-sm text-slate-600 inline-flex items-center gap-2">
-            <Loader2 size={16} className="animate-spin" />
-            Loading confirmed data...
+      <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_42%)] p-4 shadow-sm md:p-5">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+          <p className="mb-1 text-xs font-semibold text-slate-600">
+            Search companies
           </p>
-        </section>
-      ) : loadingError ? (
-        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-          <p className="text-sm text-rose-700">{loadingError}</p>
-        </section>
-      ) : filteredCompanies.length === 0 ? (
-        <section className="rounded-2xl border border-slate-200 bg-white">
-          <EmptyState
-            icon={Search}
-            title="No accepted companies found"
-            description="Pick another confirmed drive or adjust your search."
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            placeholder="Search company or drive title"
+            className="w-full"
           />
-        </section>
-      ) : (
-        <section className="space-y-4">
-          {filteredCompanies.map((company) => {
-              const isActive = selectedCompanyId === company.companyId;
-              const contactValue = selectedContactByCompany[company.companyId] ?? "";
-              const hasContacts = company.contacts.length > 0;
-              const hasSelectedContact = Boolean(contactValue);
-              const hasUploadedStudents = company.studentEntryNumbers.length > 0;
+        </div>
 
-              return (
-                <article
-                  key={company.companySeasonCycleId}
-                  onClick={() => setSelectedCompanyId(company.companyId)}
-                  className={`rounded-2xl border bg-white p-4 md:p-5 transition-all ${
-                    isActive
-                      ? "border-[#2563EB] ring-2 ring-[#93C5FD] shadow-[0_8px_20px_rgba(37,99,235,0.12)]"
-                      : "border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-900">{company.companyName}</h2>
-                      <p className="text-sm text-slate-600 mt-1">
-                        Roles: {company.roles.length > 0 ? company.roles.join(", ") : "No role titles mapped"}
-                      </p>
+        <div className="mt-4">
+          {loading ? (
+            <section className="space-y-4">
+              <ConfirmedCompanyCardSkeleton />
+              <ConfirmedCompanyCardSkeleton />
+            </section>
+          ) : loadingError ? (
+            <section className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+              <p className="text-sm text-rose-700">{loadingError}</p>
+            </section>
+          ) : filteredCompanies.length === 0 ? (
+            <section className="rounded-2xl border border-slate-200 bg-white">
+              <EmptyState
+                icon={Search}
+                title="No companies found"
+                description="Pick another confirmed drive or adjust your search."
+              />
+            </section>
+          ) : (
+            <section className="space-y-4">
+              {filteredCompanies.map((company) => {
+                const isActive = selectedCompanyId === company.companyId;
+                const hasContacts = company.contacts.length > 0;
+                const hasUploadedStudents =
+                  company.studentEntryNumbers.length > 0;
+
+                return (
+                  <article
+                    key={company.companySeasonCycleId}
+                    onClick={() => setSelectedCompanyId(company.companyId)}
+                    className={`rounded-[26px] border bg-[linear-gradient(135deg,#ffffff,#fbfdff)] p-4 shadow-sm transition md:p-5 ${
+                      isActive
+                        ? "border-slate-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                        : "border-slate-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                    }`}
+                  >
+                    <div className="space-y-3">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-900">
+                          {company.companyName}
+                        </h2>
+                      </div>
+
+                      {/* <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-2xl bg-slate-50 p-3">
+                          <p className="text-xs text-slate-500">Contacts</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">
+                            {company.contacts.length}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl bg-slate-50 p-3">
+                          <p className="text-xs text-slate-500">Students</p>
+                          <p className="mt-1 text-sm font-semibold text-slate-900">
+                            {company.studentEntryNumbers.length}
+                          </p>
+                        </div>
+                      </div> */}
+
+                      {company.drives.length > 0 ? (
+                        <div className="rounded-xl border border-slate-200 bg-white">
+                          <div className="grid grid-cols-1 gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide md:grid-cols-[1.9fr_0.8fr_0.8fr_1.3fr]">
+                            <p>Role</p>
+                            <p className="text-center">
+                              {company.season.seasonType === "intern"
+                                ? "Stipend"
+                                : "Package (LPA)"}
+                            </p>
+                            <p className="justify-self-center text-center">
+                              Students
+                            </p>
+                            <p className="text-center">Actions</p>
+                          </div>
+                          <div className="space-y-2 p-2">
+                            {company.drives.map((drive) => {
+                              const hasDriveStudents =
+                                drive.studentEntryNumbers.length > 0;
+                              const currentCompensationText =
+                                drive.compensationAmount !== null
+                                  ? String(drive.compensationAmount)
+                                  : "";
+                              const draftCompensationText =
+                                stipendDraftByDrive[drive.id] ??
+                                currentCompensationText;
+                              const isEditingCompensation = Boolean(
+                                editingStipendByDrive[drive.id],
+                              );
+                              const draftNumber = draftCompensationText.trim()
+                                ? Number(draftCompensationText)
+                                : null;
+                              const currentNumber =
+                                drive.compensationAmount !== null
+                                  ? Number(drive.compensationAmount)
+                                  : null;
+                              const compensationChanged =
+                                (draftNumber === null &&
+                                  currentNumber !== null) ||
+                                (draftNumber !== null &&
+                                  currentNumber === null) ||
+                                (draftNumber !== null &&
+                                  currentNumber !== null &&
+                                  Number(draftNumber.toFixed(2)) !==
+                                    Number(currentNumber.toFixed(2)));
+                              return (
+                                <div
+                                  key={drive.id}
+                                  className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 px-3 py-2 md:grid-cols-[1.9fr_0.8fr_0.8fr_1.3fr] md:items-center"
+                                >
+                                  <p className="text-sm font-semibold text-slate-900">
+                                    {drive.title}
+                                  </p>
+
+                                  <div className="flex items-center justify-center gap-2">
+                                    {isEditingCompensation ? (
+                                      <>
+                                        <input
+                                          className="input-base w-20 sm:w-24 border-2 border-[#93C5FD] bg-white text-center font-semibold text-slate-900 focus:border-[#2563EB]"
+                                          value={draftCompensationText}
+                                          onChange={(event) =>
+                                            setStipendDraftByDrive((prev) => ({
+                                              ...prev,
+                                              [drive.id]: event.target.value,
+                                            }))
+                                          }
+                                          placeholder="0"
+                                        />
+                                        {compensationChanged ? (
+                                          <button
+                                            type="button"
+                                            className="btn btn-secondary btn-sm"
+                                            onClick={async () => {
+                                              const saved =
+                                                await saveDriveCompensation(
+                                                  company,
+                                                  drive,
+                                                );
+                                              if (saved) {
+                                                setEditingStipendByDrive(
+                                                  (prev) => ({
+                                                    ...prev,
+                                                    [drive.id]: false,
+                                                  }),
+                                                );
+                                              }
+                                            }}
+                                            disabled={Boolean(
+                                              savingStipendByDrive[drive.id],
+                                            )}
+                                          >
+                                            {savingStipendByDrive[drive.id]
+                                              ? "..."
+                                              : "Save"}
+                                          </button>
+                                        ) : null}
+                                        <button
+                                          type="button"
+                                          className="btn btn-secondary btn-sm px-2"
+                                          onClick={() => {
+                                            setStipendDraftByDrive((prev) => ({
+                                              ...prev,
+                                              [drive.id]:
+                                                currentCompensationText,
+                                            }));
+                                            setEditingStipendByDrive(
+                                              (prev) => ({
+                                                ...prev,
+                                                [drive.id]: false,
+                                              }),
+                                            );
+                                          }}
+                                          aria-label="Cancel editing stipend or package"
+                                          title="Cancel"
+                                        >
+                                          <X size={13} />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <p className="w-20 sm:w-24 rounded-md border-2 border-[#8f8f8f] bg-white px-2 py-1 text-center text-sm font-semibold text-slate-900">
+                                          {currentCompensationText || "-"}
+                                        </p>
+                                        <button
+                                          type="button"
+                                          className="btn btn-secondary btn-sm px-2"
+                                          onClick={() => {
+                                            setStipendDraftByDrive((prev) => ({
+                                              ...prev,
+                                              [drive.id]:
+                                                currentCompensationText,
+                                            }));
+                                            setEditingStipendByDrive(
+                                              (prev) => ({
+                                                ...prev,
+                                                [drive.id]: true,
+                                              }),
+                                            );
+                                          }}
+                                          aria-label="Edit stipend or package"
+                                          title="Edit"
+                                        >
+                                          <Pencil size={13} />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center justify-center gap-4">
+                                    <p className="text-sm font-semibold text-slate-900">
+                                      {drive.studentEntryNumbers.length}
+                                    </p>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!hasDriveStudents) {
+                                          showActionWarning(
+                                            "No uploaded students for this drive yet.",
+                                          );
+                                          return;
+                                        }
+
+                                        dismissActionFlushbar();
+                                        setStudentPreviewDrive({
+                                          companyId: company.companyId,
+                                          driveId: drive.id,
+                                        });
+                                      }}
+                                      title={
+                                        hasDriveStudents
+                                          ? "View uploaded list"
+                                          : "No uploaded students"
+                                      }
+                                      aria-label="View uploaded list"
+                                      className="btn btn-secondary btn-sm px-2"
+                                    >
+                                      <Eye size={13} />
+                                    </button>
+                                  </div>
+
+                                  <div className="flex flex-wrap justify-center gap-2">
+                                    <input
+                                      id={`upload-students-${drive.id}`}
+                                      type="file"
+                                      accept=".csv,.xls,.xlsx"
+                                      className="hidden"
+                                      onChange={(event) =>
+                                        void onUploadStudentInfo(
+                                          company,
+                                          drive,
+                                          event,
+                                        )
+                                      }
+                                      disabled={Boolean(
+                                        uploadingStudentByDrive[drive.id],
+                                      )}
+                                    />
+                                    <input
+                                      id={`compare-attendance-${drive.id}`}
+                                      type="file"
+                                      accept=".csv,.xls,.xlsx"
+                                      className="hidden"
+                                      onChange={(event) =>
+                                        void onCompareAttendance(
+                                          company,
+                                          drive,
+                                          event,
+                                        )
+                                      }
+                                      disabled={Boolean(
+                                        comparingAttendanceByDrive[drive.id],
+                                      )}
+                                    />
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        openInstructionModal(
+                                          company,
+                                          drive,
+                                          "upload",
+                                        )
+                                      }
+                                      disabled={Boolean(
+                                        uploadingStudentByDrive[drive.id],
+                                      )}
+                                      className="btn btn-secondary btn-sm"
+                                    >
+                                      <Upload size={12} />
+                                      {uploadingStudentByDrive[drive.id]
+                                        ? "Uploading..."
+                                        : "Upload List"}
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!hasDriveStudents) {
+                                          showActionWarning(
+                                            "Upload students before checking attendance.",
+                                          );
+                                          return;
+                                        }
+
+                                        dismissActionFlushbar();
+                                        openInstructionModal(
+                                          company,
+                                          drive,
+                                          "compare",
+                                        );
+                                      }}
+                                      disabled={Boolean(
+                                        comparingAttendanceByDrive[drive.id],
+                                      )}
+                                      className="btn btn-secondary btn-sm"
+                                    >
+                                      <FileSpreadsheet size={12} />
+                                      {comparingAttendanceByDrive[drive.id]
+                                        ? "Processing..."
+                                        : "Attendance"}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                          No drives available for this company-season cycle.
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap justify-start gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!hasContacts) {
+                              showActionWarning(
+                                "No contact is available for this company.",
+                              );
+                              return;
+                            }
+
+                            dismissActionFlushbar();
+                            void logCall(company);
+                          }}
+                          disabled={
+                            submittingAction[`call:${company.companyId}`]
+                          }
+                          className="btn btn-primary btn-sm w-auto justify-center text-center"
+                        >
+                          {submittingAction[`call:${company.companyId}`] ? (
+                            <Loader2 size={15} className="animate-spin" />
+                          ) : (
+                            <PhoneCall size={15} />
+                          )}
+                          {submittingAction[`call:${company.companyId}`]
+                            ? "Logging..."
+                            : "Call"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!hasUploadedStudents) {
+                              showActionWarning(
+                                "Upload students before scheduling an event.",
+                              );
+                              return;
+                            }
+
+                            dismissActionFlushbar();
+                            openScheduleModal(company);
+                          }}
+                          className="btn btn-primary btn-sm w-auto justify-center text-center"
+                        >
+                          <CalendarPlus size={15} />
+                          Schedule
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void sendMailRequest(company)}
+                          disabled={
+                            submittingAction[
+                              `mail:students:${company.companyId}`
+                            ]
+                          }
+                          className="btn btn-primary btn-sm w-auto justify-center text-center"
+                        >
+                          {submittingAction[
+                            `mail:students:${company.companyId}`
+                          ] ? (
+                            <Loader2 size={15} className="animate-spin" />
+                          ) : (
+                            <Users size={15} />
+                          )}
+                          {submittingAction[
+                            `mail:students:${company.companyId}`
+                          ]
+                            ? "Requesting..."
+                            : "Mail"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openTelegramModal(company)}
+                          className="btn btn-primary btn-sm w-auto justify-center text-center"
+                        >
+                          <Send size={15} />
+                          Telegram
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="success" size="sm" dot>
-                        {company.status}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3 text-sm text-slate-700">
-                    <p>
-                      <span className="font-semibold text-slate-900">Season:</span> {company.season.name}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-slate-900">Type:</span> {company.season.seasonType}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-slate-900">Contacts:</span> {company.contacts.length}
-                    </p>
-                    <p>
-                      <span className="font-semibold text-slate-900">Notes:</span> {company.notes ?? "None"}
-                    </p>
-                  </div>
-
-                  <div className="mt-3">
-                    <label className="text-xs font-semibold text-slate-600 mb-1 block">
-                      Choose HR / Contact
-                    </label>
-                    <FilterSelect
-                      value={contactValue}
-                      onChange={(value) =>
-                        setSelectedContactByCompany((prev) => ({
-                          ...prev,
-                          [company.companyId]: value,
-                        }))
-                      }
-                      options={company.contacts.map((contact) => ({
-                        value: contact.id,
-                        label: contact.designation
-                          ? `${contact.name} (${contact.designation})`
-                          : contact.name,
-                      }))}
-                      placeholder="Select HR contact"
-                    />
-                    {!hasContacts ? (
-                      <p className="mt-1 text-xs text-slate-500">
-                        No contacts available. Contact-dependent actions are disabled.
-                      </p>
-                    ) : null}
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void logCall(company)}
-                      disabled={submittingAction[`call:${company.companyId}`] || !hasSelectedContact}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 px-3 py-2 text-sm font-medium hover:bg-emerald-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <PhoneCall size={15} />
-                      Call HR
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openScheduleModal(company)}
-                      disabled={!hasUploadedStudents}
-                      title={
-                        hasUploadedStudents
-                          ? "Schedule event with participants"
-                          : "Upload students first to enable scheduling"
-                      }
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8] px-3 py-2 text-sm font-medium hover:bg-[#DBEAFE] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <CalendarPlus size={15} />
-                      Schedule Event
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void sendMailRequest(company)}
-                      disabled={submittingAction[`mail:students:${company.companyId}`]}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 px-3 py-2 text-sm font-medium hover:bg-amber-100 transition-colors disabled:opacity-60"
-                    >
-                      <Users size={15} />
-                      Request Mailing Team
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => openTelegramModal(company)}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 px-3 py-2 text-sm font-medium hover:bg-indigo-100 transition-colors"
-                    >
-                      <Send size={15} />
-                      Telegram
-                    </button>
-                  </div>
-
-                  <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-slate-700">
-                        Students Uploaded: <span className="text-slate-900">{company.studentEntryNumbers.length}</span>
-                      </p>
-                    </div>
-
-                    <input
-                      id={`upload-students-${company.companyId}`}
-                      type="file"
-                      accept=".csv,.xls,.xlsx"
-                      className="hidden"
-                      onChange={(event) => void onUploadStudentInfo(company, event)}
-                      disabled={Boolean(uploadingStudentByCompany[company.companyId])}
-                    />
-                    <input
-                      id={`compare-attendance-${company.companyId}`}
-                      type="file"
-                      accept=".csv,.xls,.xlsx"
-                      className="hidden"
-                      onChange={(event) => void onCompareAttendance(company, event)}
-                      disabled={Boolean(comparingAttendanceByCompany[company.companyId])}
-                    />
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openInstructionModal(company, "upload")}
-                        disabled={Boolean(uploadingStudentByCompany[company.companyId])}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <Upload size={12} />
-                        {uploadingStudentByCompany[company.companyId] ? "Uploading..." : "Upload Students"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setStudentPreviewCompanyId(company.companyId)}
-                        disabled={!hasUploadedStudents}
-                        title={
-                          hasUploadedStudents
-                            ? "Preview uploaded students"
-                            : "Upload students first to preview the list"
-                        }
-                        className="inline-flex items-center gap-1.5 rounded-md border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1.5 text-xs font-semibold text-[#1D4ED8] hover:bg-[#DBEAFE] disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <Eye size={12} />
-                        Preview List
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => openInstructionModal(company, "compare")}
-                        disabled={Boolean(comparingAttendanceByCompany[company.companyId]) || !hasUploadedStudents}
-                        title={
-                          hasUploadedStudents
-                            ? "Compare attendance"
-                            : "Upload students first to enable compare attendance"
-                        }
-                        className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <FileSpreadsheet size={12} />
-                        {comparingAttendanceByCompany[company.companyId] ? "Comparing..." : "Compare Attendance"}
-                      </button>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-        </section>
-      )}
+                  </article>
+                );
+              })}
+            </section>
+          )}
+        </div>
+      </section>
 
       <Modal
         isOpen={telegramModalOpen}
         onClose={() => setTelegramModalOpen(false)}
-        title={telegramCompany ? `Telegram - ${telegramCompany.companyName}` : "Telegram"}
+        title={
+          telegramCompany
+            ? `Telegram - ${telegramCompany.companyName}`
+            : "Telegram"
+        }
         size="lg"
         footer={
           <>
@@ -1064,7 +1582,9 @@ export default function ConfirmedPage() {
       >
         <div className="space-y-3">
           <div>
-            <p className="text-xs font-semibold text-slate-600 mb-1">Template</p>
+            <p className="text-xs font-semibold text-slate-600 mb-1">
+              Template
+            </p>
             <FilterSelect
               value={telegramTemplateId}
               onChange={applyTelegramTemplate}
@@ -1080,7 +1600,10 @@ export default function ConfirmedPage() {
                 <p>Company: {telegramCompany.companyName}</p>
                 <p>Season: {telegramCompany.season.name}</p>
                 <p>
-                  Roles: {telegramCompany.roles.length > 0 ? telegramCompany.roles.join(", ") : "Not mapped"}
+                  Roles:{" "}
+                  {telegramCompany.roles.length > 0
+                    ? telegramCompany.roles.join(", ")
+                    : "Not mapped"}
                 </p>
                 <p>Notes: {telegramCompany.notes ?? "None"}</p>
               </div>
@@ -1090,11 +1613,15 @@ export default function ConfirmedPage() {
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-            <p className="font-semibold text-slate-800 mb-1">Selected Contact</p>
+            <p className="font-semibold text-slate-800 mb-1">
+              Selected Contact
+            </p>
             {telegramContact ? (
               <div className="space-y-0.5">
                 <p>Name: {telegramContact.name}</p>
-                <p>Designation: {telegramContact.designation ?? "Not available"}</p>
+                <p>
+                  Designation: {telegramContact.designation ?? "Not available"}
+                </p>
                 <p>Phone: {telegramContact.phones[0] ?? "Not available"}</p>
                 <p>Email: {telegramContact.emails[0] ?? "Not available"}</p>
               </div>
@@ -1104,11 +1631,17 @@ export default function ConfirmedPage() {
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-slate-600 mb-1">Telegram Message</p>
+            <p className="text-xs font-semibold text-slate-600 mb-1">
+              Telegram Message
+            </p>
             <textarea
               className="input-base min-h-52 resize-y"
               disabled={!telegramCompany}
-              value={telegramCompany ? (manualTelegramByCompany[telegramCompany.companyId] ?? "") : ""}
+              value={
+                telegramCompany
+                  ? (manualTelegramByCompany[telegramCompany.companyId] ?? "")
+                  : ""
+              }
               onChange={(event) => {
                 if (!telegramCompany) return;
                 const next = event.target.value;
@@ -1124,15 +1657,19 @@ export default function ConfirmedPage() {
       </Modal>
 
       <Modal
-        isOpen={Boolean(studentPreviewCompany)}
-        onClose={() => setStudentPreviewCompanyId("")}
-        title={studentPreviewCompany ? `Students - ${studentPreviewCompany.companyName}` : "Students"}
+        isOpen={Boolean(studentPreviewDriveItem)}
+        onClose={() => setStudentPreviewDrive(null)}
+        title={
+          studentPreviewCompany && studentPreviewDriveItem
+            ? `Students - ${studentPreviewCompany.companyName} - ${studentPreviewDriveItem.title}`
+            : "Students"
+        }
         size="lg"
         footer={
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            onClick={() => setStudentPreviewCompanyId("")}
+            onClick={() => setStudentPreviewDrive(null)}
           >
             Close
           </button>
@@ -1140,54 +1677,85 @@ export default function ConfirmedPage() {
       >
         <div className="space-y-3">
           <p className="text-xs text-slate-600">
-            Uploaded students: <span className="font-semibold text-slate-800">{studentPreviewCompany?.studentEntryNumbers.length ?? 0}</span>
+            Uploaded students:{" "}
+            <span className="font-semibold text-slate-800">
+              {studentPreviewDriveItem?.studentEntryNumbers.length ?? 0}
+            </span>
           </p>
 
-          {studentPreviewCompany && studentPreviewCompany.studentEntryNumbers.length > 0 ? (
+          {studentPreviewDriveItem &&
+          studentPreviewDriveItem.studentEntryNumbers.length > 0 ? (
             <div className="max-h-80 overflow-auto rounded-lg border border-slate-200">
               <table className="w-full text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-700">#</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Entry Number</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Email</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                      #
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                      Entry Number
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                      Email
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {studentPreviewCompany.studentEntryNumbers.map((entry, index) => (
-                    <tr key={entry} className="border-b border-slate-100 last:border-b-0">
-                      <td className="px-3 py-2 text-slate-600">{index + 1}</td>
-                      <td className="px-3 py-2 font-medium text-slate-900">{entry}</td>
-                      <td className="px-3 py-2 text-slate-700">{entry}@iitrpr.ac.in</td>
-                    </tr>
-                  ))}
+                  {studentPreviewDriveItem.studentEntryNumbers.map(
+                    (entry, index) => (
+                      <tr
+                        key={entry}
+                        className="border-b border-slate-100 last:border-b-0"
+                      >
+                        <td className="px-3 py-2 text-slate-600">
+                          {index + 1}
+                        </td>
+                        <td className="px-3 py-2 font-medium text-slate-900">
+                          {entry}
+                        </td>
+                        <td className="px-3 py-2 text-slate-700">
+                          {entry}@iitrpr.ac.in
+                        </td>
+                      </tr>
+                    ),
+                  )}
                 </tbody>
               </table>
             </div>
           ) : (
-            <p className="text-sm text-slate-500">No students uploaded yet for this company.</p>
+            <p className="text-sm text-slate-500">
+              No students uploaded yet for this role.
+            </p>
           )}
         </div>
       </Modal>
 
       <Modal
-        isOpen={Boolean(instructionModalTask && instructionModalCompany)}
+        isOpen={Boolean(
+          instructionModalTask &&
+          instructionModalCompany &&
+          instructionModalDrive,
+        )}
         onClose={closeInstructionModal}
         title={
           instructionModalTask === "upload"
-            ? `Upload Students Instructions - ${instructionModalCompany?.companyName ?? ""}`
-            : `Compare Attendance Instructions - ${instructionModalCompany?.companyName ?? ""}`
+            ? `Upload Students Instructions - ${instructionModalCompany?.companyName ?? ""} - ${instructionModalDrive?.title ?? ""}`
+            : `Compare Attendance Instructions - ${instructionModalCompany?.companyName ?? ""} - ${instructionModalDrive?.title ?? ""}`
         }
         size="md"
         footer={
           <>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={closeInstructionModal}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={closeInstructionModal}
+            >
               Cancel
             </button>
             {instructionModalTask === "upload" ? (
               <button
                 type="button"
-                className="btn btn-ghost btn-sm"
+                className="btn btn-sm border border-[#1D4ED8] bg-[#2563EB] text-white hover:bg-[#1D4ED8]"
                 onClick={() => {
                   downloadTemplateCsv("upload");
                 }}
@@ -1199,7 +1767,11 @@ export default function ConfirmedPage() {
               type="button"
               className="btn btn-primary btn-sm"
               onClick={continueFromInstruction}
-              disabled={!instructionModalTask || !instructionModalCompany}
+              disabled={
+                !instructionModalTask ||
+                !instructionModalCompany ||
+                !instructionModalDrive
+              }
             >
               Continue
             </button>
@@ -1209,16 +1781,19 @@ export default function ConfirmedPage() {
         {instructionModalTask === "upload" ? (
           <div className="space-y-2 text-sm text-slate-700">
             <p>
-              File can have <span className="font-semibold">any number of columns</span>.
+              File can have{" "}
+              <span className="font-semibold">any number of columns</span>.
             </p>
             <p>
-              One required column must be exactly: <span className="font-semibold">Roll No</span>.
+              One required column must be exactly:{" "}
+              <span className="font-semibold">Roll No</span>.
             </p>
           </div>
         ) : instructionModalTask === "compare" ? (
           <div className="space-y-2 text-sm text-slate-700">
             <p>
-              Upload <span className="font-semibold">CSV exported from Acadly</span>.
+              Upload{" "}
+              <span className="font-semibold">CSV exported from Acadly</span>.
             </p>
           </div>
         ) : null}
@@ -1227,7 +1802,11 @@ export default function ConfirmedPage() {
       <Modal
         isOpen={compareResultModalOpen}
         onClose={() => setCompareResultModalOpen(false)}
-        title={compareResultCompanyName ? `Attendance Records - ${compareResultCompanyName}` : "Attendance Records"}
+        title={
+          compareResultCompanyName
+            ? `Attendance Records - ${compareResultCompanyName}${compareResultDriveTitle ? ` - ${compareResultDriveTitle}` : ""}`
+            : "Attendance Records"
+        }
         size="lg"
         footer={
           <>
@@ -1242,7 +1821,9 @@ export default function ConfirmedPage() {
               type="button"
               className="btn btn-primary btn-sm"
               onClick={() => {
-                const company = acceptedCompanies.find((item) => item.companyId === compareResultCompanyId);
+                const company = acceptedCompanies.find(
+                  (item) => item.companyId === compareResultCompanyId,
+                );
                 if (!company || !compareResultPayload) return;
                 downloadAttendanceComparison(company, compareResultPayload);
               }}
@@ -1257,26 +1838,49 @@ export default function ConfirmedPage() {
           {compareResultPayload ? (
             <>
               <p className="text-xs text-slate-600">
-                Matched: <span className="font-semibold text-emerald-700">{compareResultPayload.matchedCount}</span>
-                {" "}| Missing: <span className="font-semibold text-rose-700">{compareResultPayload.missingCount}</span>
+                Matched:{" "}
+                <span className="font-semibold text-emerald-700">
+                  {compareResultPayload.matchedCount}
+                </span>{" "}
+                | Missing:{" "}
+                <span className="font-semibold text-rose-700">
+                  {compareResultPayload.missingCount}
+                </span>
               </p>
 
               <div className="max-h-80 overflow-auto rounded-lg border border-slate-200">
                 <table className="w-full text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-700">#</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-700">Entry Number</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-700">Status</th>
-                      <th className="px-3 py-2 text-left font-semibold text-slate-700">Matched</th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                        #
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                        Entry Number
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                        Matched
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {compareResultPayload.rows.map((row, index) => (
-                      <tr key={`${row.entryNumber}-${index}`} className="border-b border-slate-100 last:border-b-0">
-                        <td className="px-3 py-2 text-slate-600">{index + 1}</td>
-                        <td className="px-3 py-2 font-medium text-slate-900">{row.entryNumber}</td>
-                        <td className="px-3 py-2 text-slate-700">{row.attendanceStatus}</td>
+                      <tr
+                        key={`${row.entryNumber}-${index}`}
+                        className="border-b border-slate-100 last:border-b-0"
+                      >
+                        <td className="px-3 py-2 text-slate-600">
+                          {index + 1}
+                        </td>
+                        <td className="px-3 py-2 font-medium text-slate-900">
+                          {row.entryNumber}
+                        </td>
+                        <td className="px-3 py-2 text-slate-700">
+                          {row.attendanceStatus}
+                        </td>
                         <td className="px-3 py-2">
                           <span
                             className={`inline-flex items-center rounded-full px-2 py-0.5 font-semibold ${
@@ -1303,15 +1907,15 @@ export default function ConfirmedPage() {
       <Modal
         isOpen={Boolean(studentUploadPreview)}
         onClose={() => {
-          const companyId = studentUploadPreview?.companyId ?? "";
-          if (companyId && uploadingStudentByCompany[companyId]) {
+          const driveId = studentUploadPreview?.driveId ?? "";
+          if (driveId && uploadingStudentByDrive[driveId]) {
             return;
           }
           setStudentUploadPreview(null);
         }}
         title={
           studentUploadPreview
-            ? `Preview Student Upload - ${studentUploadPreview.companyName}`
+            ? `Preview Student Upload - ${studentUploadPreview.companyName} - ${studentUploadPreview.driveTitle}`
             : "Preview Student Upload"
         }
         size="lg"
@@ -1322,7 +1926,8 @@ export default function ConfirmedPage() {
               className="btn btn-secondary btn-sm"
               onClick={() => setStudentUploadPreview(null)}
               disabled={Boolean(
-                studentUploadPreview && uploadingStudentByCompany[studentUploadPreview.companyId],
+                studentUploadPreview &&
+                uploadingStudentByDrive[studentUploadPreview.driveId],
               )}
             >
               Cancel
@@ -1333,10 +1938,12 @@ export default function ConfirmedPage() {
               onClick={() => void submitStudentUploadPreview()}
               disabled={Boolean(
                 !studentUploadPreview ||
-                  (studentUploadPreview && uploadingStudentByCompany[studentUploadPreview.companyId]),
+                (studentUploadPreview &&
+                  uploadingStudentByDrive[studentUploadPreview.driveId]),
               )}
             >
-              {studentUploadPreview && uploadingStudentByCompany[studentUploadPreview.companyId]
+              {studentUploadPreview &&
+              uploadingStudentByDrive[studentUploadPreview.driveId]
                 ? "Uploading..."
                 : "Confirm Upload"}
             </button>
@@ -1347,15 +1954,30 @@ export default function ConfirmedPage() {
           <div className="space-y-3">
             <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
               <p>
-                File: <span className="font-semibold">{studentUploadPreview.file.name}</span>
+                File:{" "}
+                <span className="font-semibold">
+                  {studentUploadPreview.file.name}
+                </span>
               </p>
               <p>
-                Detected column: <span className="font-semibold">{studentUploadPreview.rollHeader}</span>
+                Detected column:{" "}
+                <span className="font-semibold">
+                  {studentUploadPreview.rollHeader}
+                </span>
               </p>
               <p>
-                Valid entries: <span className="font-semibold text-emerald-700">{studentUploadPreview.validEntries.length}</span>
-                {" "}| Invalid rows: <span className="font-semibold text-rose-700">{studentUploadPreview.invalidRows.length}</span>
-                {" "}| Data rows: <span className="font-semibold">{studentUploadPreview.totalDataRows}</span>
+                Valid entries:{" "}
+                <span className="font-semibold text-emerald-700">
+                  {studentUploadPreview.validEntries.length}
+                </span>{" "}
+                | Invalid rows:{" "}
+                <span className="font-semibold text-rose-700">
+                  {studentUploadPreview.invalidRows.length}
+                </span>{" "}
+                | Data rows:{" "}
+                <span className="font-semibold">
+                  {studentUploadPreview.totalDataRows}
+                </span>
               </p>
             </div>
 
@@ -1363,32 +1985,49 @@ export default function ConfirmedPage() {
               <table className="w-full text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-700">#</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Entry Number</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-700">Email</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                      #
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                      Entry Number
+                    </th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                      Email
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {studentUploadPreview.validEntries.slice(0, 200).map((entry, index) => (
-                    <tr key={entry} className="border-b border-slate-100 last:border-b-0">
-                      <td className="px-3 py-2 text-slate-600">{index + 1}</td>
-                      <td className="px-3 py-2 font-medium text-slate-900">{entry}</td>
-                      <td className="px-3 py-2 text-slate-700">{entry}@iitrpr.ac.in</td>
-                    </tr>
-                  ))}
+                  {studentUploadPreview.validEntries
+                    .slice(0, 200)
+                    .map((entry, index) => (
+                      <tr
+                        key={entry}
+                        className="border-b border-slate-100 last:border-b-0"
+                      >
+                        <td className="px-3 py-2 text-slate-600">
+                          {index + 1}
+                        </td>
+                        <td className="px-3 py-2 font-medium text-slate-900">
+                          {entry}
+                        </td>
+                        <td className="px-3 py-2 text-slate-700">
+                          {entry}@iitrpr.ac.in
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
 
             {studentUploadPreview.validEntries.length > 200 ? (
               <p className="text-xs text-slate-500">
-                Showing first 200 entries in preview. All valid entries will be uploaded.
+                Showing first 200 entries in preview. All valid entries will be
+                uploaded.
               </p>
             ) : null}
           </div>
         ) : null}
       </Modal>
-
     </div>
   );
 }

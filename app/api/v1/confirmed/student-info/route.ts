@@ -38,8 +38,12 @@ export async function POST(request: Request) {
   }
 
   const companySeasonCycleId = String(formData.get("companySeasonCycleId") ?? "").trim();
+  const driveId = String(formData.get("driveId") ?? "").trim();
   if (!companySeasonCycleId) {
     return badRequest("companySeasonCycleId is required");
+  }
+  if (!driveId) {
+    return badRequest("driveId is required");
   }
 
   const fileValue = formData.get("file");
@@ -55,13 +59,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const cycle = await prisma.companySeasonCycle.findUnique({
-      where: { id: companySeasonCycleId },
-      select: { id: true, companyId: true },
+    const drive = await prisma.drive.findUnique({
+      where: { id: driveId },
+      select: { id: true, companySeasonCycleId: true },
     });
 
-    if (!cycle) {
-      return badRequest("Invalid companySeasonCycleId");
+    if (!drive || drive.companySeasonCycleId !== companySeasonCycleId) {
+      return badRequest("Invalid driveId for selected companySeasonCycleId");
     }
 
     const { headers, records } = parseWorkbookBuffer(buffer);
@@ -88,12 +92,13 @@ export async function POST(request: Request) {
 
     await prisma.$transaction(async (tx: any) => {
       await tx.companySeasonStudentEntry.deleteMany({
-        where: { companySeasonCycleId },
+        where: { companySeasonCycleId, driveId },
       });
 
       await tx.companySeasonStudentEntry.createMany({
         data: entryNumbers.map((entryNumber) => ({
           companySeasonCycleId,
+          driveId,
           entryNumber,
           uploadedBy: user.id,
         })),
@@ -103,6 +108,7 @@ export async function POST(request: Request) {
 
     return success({
       companySeasonCycleId,
+      driveId,
       uploadedCount: entryNumbers.length,
       invalidRows,
       sampleEntryNumbers: entryNumbers.slice(0, 10),

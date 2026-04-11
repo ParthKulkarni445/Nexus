@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import { Prisma } from "@prisma/client";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
   success,
@@ -31,34 +30,27 @@ export async function POST(
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const confirmedDrive = await db.drive.update({
+    const drive = await db.drive.findUnique({
       where: { id: driveId },
-      data: {
-        status: "confirmed",
-        updatedAt: new Date(),
-      },
     });
+
+    if (!drive) {
+      return notFound("Drive not found");
+    }
 
     await createAuditLog({
       actorId: user.id,
-      action: "confirm_drive",
+      action: "confirm_drive_deprecated",
       targetType: "drive",
       targetId: driveId,
       ...clientInfo,
     });
 
     return success({
-      message: "Drive confirmed successfully",
-      drive: confirmedDrive,
+      message: "Drive roles no longer use confirmation state.",
+      drive,
     });
   } catch (error: unknown) {
-    if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2025"
-    ) {
-      return notFound("Drive not found");
-    }
-
     console.error("Error confirming drive:", error);
     return serverError();
   }

@@ -47,29 +47,23 @@ export async function GET(request: NextRequest) {
       "Company Name",
       "Industry",
       "Season Status",
-      "Total Drives",
-      "Confirmed Drives",
-      "Completed Drives",
-      "Conflict Flagged",
+      "Total Roles",
+      "Roles Offered",
       "Contacts Count",
     ];
 
     const lines = cycles.map((cycle) => {
       const { company } = cycle;
       const drives = cycle.drives;
-      const totalDrives = drives.length;
-      const confirmedDrives = drives.filter((d) => d.status === "confirmed").length;
-      const completedDrives = drives.filter((d) => d.status === "completed").length;
-      const conflictFlagged = drives.some((d) => d.isConflictFlagged);
+      const totalRoles = drives.length;
+      const roleTitles = drives.map((d) => d.title).filter(Boolean).join(" | ");
 
       const row = [
         company.name,
         company.industry || "",
         cycle.status,
-        totalDrives.toString(),
-        confirmedDrives.toString(),
-        completedDrives.toString(),
-        conflictFlagged ? "yes" : "no",
+        totalRoles.toString(),
+        roleTitles,
         company.contacts.length.toString(),
       ];
 

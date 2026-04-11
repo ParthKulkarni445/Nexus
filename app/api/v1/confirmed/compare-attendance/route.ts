@@ -107,8 +107,12 @@ export async function POST(request: Request) {
   }
 
   const companySeasonCycleId = String(formData.get("companySeasonCycleId") ?? "").trim();
+  const driveId = String(formData.get("driveId") ?? "").trim();
   if (!companySeasonCycleId) {
     return badRequest("companySeasonCycleId is required");
+  }
+  if (!driveId) {
+    return badRequest("driveId is required");
   }
 
   const fileValue = formData.get("file");
@@ -124,14 +128,23 @@ export async function POST(request: Request) {
   }
 
   try {
+    const drive = await prisma.drive.findUnique({
+      where: { id: driveId },
+      select: { id: true, companySeasonCycleId: true },
+    });
+
+    if (!drive || drive.companySeasonCycleId !== companySeasonCycleId) {
+      return badRequest("Invalid driveId for selected companySeasonCycleId");
+    }
+
     const storedEntries: Array<{ entryNumber: string }> = await prisma.companySeasonStudentEntry.findMany({
-      where: { companySeasonCycleId },
+      where: { companySeasonCycleId, driveId },
       select: { entryNumber: true },
       orderBy: { entryNumber: "asc" },
     });
 
     if (storedEntries.length === 0) {
-      return badRequest("No uploaded student info found for this company. Upload Roll No sheet first.");
+      return badRequest("No uploaded student info found for this drive. Upload Roll No sheet first.");
     }
 
     const { headers, records } = parseAttendanceWorkbook(buffer);
@@ -178,6 +191,7 @@ export async function POST(request: Request) {
 
     return success({
       companySeasonCycleId,
+      driveId,
       detectedAttendanceColumn: attendanceHeader,
       matchedCount: rows.filter((row) => row.matched).length,
       missingCount: rows.filter((row) => !row.matched).length,

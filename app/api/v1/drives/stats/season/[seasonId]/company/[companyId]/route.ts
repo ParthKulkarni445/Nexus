@@ -30,7 +30,10 @@ export async function GET(
           },
         },
         drives: {
-          orderBy: { startAt: "desc" },
+          orderBy: { createdAt: "desc" },
+          include: {
+            eligibilityRules: true,
+          },
         },
         interactions: {
           orderBy: { createdAt: "desc" },
@@ -82,14 +85,21 @@ export async function GET(
       changedBy: h.changer ? { id: h.changer.id, name: h.changer.name } : null,
     }));
 
-    const recentDrives = cycle.drives.map((d) => ({
+    const roles = cycle.drives.map((d) => ({
       id: d.id,
       title: d.title,
-      stage: d.stage,
-      status: d.status,
-      startAt: d.startAt,
-      endAt: d.endAt,
-      isConflictFlagged: d.isConflictFlagged,
+      createdAt: d.createdAt,
+      jobDescriptionText: d.jobDescriptionText,
+      jobDescriptionDocUrl: d.jobDescriptionDocUrl,
+      notificationFormUrl: d.notificationFormUrl,
+      eligibilityRules: d.eligibilityRules.map((rule) => ({
+        id: rule.id,
+        branches: rule.branches,
+        includeMinorBranches: rule.includeMinorBranches,
+        minCgpa: Number(rule.minCgpa ?? 0),
+        allowsBacklogs: rule.allowsBacklogs,
+        notes: rule.notes,
+      })),
     }));
 
     const contacts = cycle.company.contacts.map((contact) => ({
@@ -121,7 +131,7 @@ export async function GET(
         updatedAt: cycle.updatedAt,
       },
       statusTimeline,
-      recentDrives,
+      roles,
       contacts,
       linkedBlogs,
       placementSummary: {

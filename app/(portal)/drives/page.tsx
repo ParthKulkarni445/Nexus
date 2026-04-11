@@ -43,7 +43,7 @@ async function requestJson<T>(url: string) {
 
 function formatMoney(value: number, mode: SeasonType) {
   if (!Number.isFinite(value) || value <= 0) return "-";
-  return mode === "intern" ? `${value.toFixed(2)} stipend` : `${value.toFixed(2)} LPA`;
+  return mode === "intern" ? `${value.toFixed(2)} stipend` : `${value.toFixed(2)}`;
 }
 
 function getInsight(current: SeasonCard, previous?: SeasonCard | null) {
@@ -214,21 +214,28 @@ export default function DrivesPage() {
                   <CompareChart
                     title={seasonType === "intern" ? "Average Stipend" : "Average Package"}
                     data={compareComp}
-                    suffix={seasonType === "intern" ? "" : "LPA"}
+                    suffix={seasonType === "intern" ? "" : ""}
                   />
                 </div>
               </section>
             ) : null}
 
-            <section className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold text-slate-950">Seasons</h2>
+            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm space-y-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                    Seasons
+                  </p>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-950">
+                    Browse by season
+                  </h2>
+                </div>
                 <Badge variant="gray" size="sm">
                   {seasonsOfType.length} seasons
                 </Badge>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+              <div className="grid gap-4">
                 {seasonsOfType.map((season, index) => {
                   const previous = seasonsOfType[index + 1] ?? null;
                   const insight = getInsight(season, previous);
@@ -236,19 +243,19 @@ export default function DrivesPage() {
                     <Link
                       key={season.id}
                       href={`/drives/${season.id}`}
-                      className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                      className="rounded-[26px] border border-slate-200 bg-[linear-gradient(135deg,#ffffff,#fbfdff)] p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div>
                           <p className="text-xs uppercase tracking-[0.22em] text-slate-500">{season.academicYear}</p>
                           <h3 className="mt-2 text-xl font-semibold text-slate-950">{season.name}</h3>
                         </div>
-                        <Badge variant="blue" size="sm">
+                        <Badge variant="info" size="sm">
                           {seasonType}
                         </Badge>
                       </div>
 
-                      <div className="mt-5 grid grid-cols-3 gap-3">
+                      <div className="mt-5 grid gap-3 sm:grid-cols-3">
                         <div className="rounded-2xl bg-slate-50 p-3">
                           <p className="text-xs text-slate-500">Companies</p>
                           <p className="mt-1 text-lg font-semibold text-slate-950">{season.companiesInSeason}</p>

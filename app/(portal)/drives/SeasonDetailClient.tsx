@@ -32,15 +32,29 @@ type CompanyRow = {
   companyName: string;
   industry: string | null;
   seasonStatus: CycleStatus;
-  drives: { total: number; confirmed: number; completed: number };
+  roles: { total: number };
   lastActivityAt: string | null;
   contactsCount: number;
-  conflictFlagged: boolean;
 };
 type CompanyDetail = {
   company: { id: string; name: string; industry: string | null; website: string | null };
   cycle: { status: CycleStatus; lastContactedAt: string | null; nextFollowUpAt: string | null; updatedAt: string };
-  recentDrives: Array<{ id: string; title: string; status: string; startAt: string | null }>;
+  roles: Array<{
+    id: string;
+    title: string;
+    createdAt: string | null;
+    jobDescriptionText: string | null;
+    jobDescriptionDocUrl: string | null;
+    notificationFormUrl: string | null;
+    eligibilityRules: Array<{
+      id: string;
+      branches: string[];
+      includeMinorBranches: boolean;
+      minCgpa: number;
+      allowsBacklogs: boolean;
+      notes: string | null;
+    }>;
+  }>;
   contacts: Array<{ name: string; role: string; email: string; phone: string }>;
   placementSummary: { studentsPlaced: number; avgPackage: number; medianPackage: number; maxPackage: number };
 };
@@ -65,7 +79,7 @@ function formatDate(value?: string | null) {
 
 function formatMoney(value: number, label: "stipend" | "package") {
   if (!Number.isFinite(value) || value <= 0) return "-";
-  return label === "stipend" ? `${value.toFixed(2)} stipend` : `${value.toFixed(2)} LPA`;
+  return label === "stipend" ? `${value.toFixed(2)}` : `${value.toFixed(2)}`;
 }
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -304,8 +318,8 @@ export default function SeasonDetailClient({ seasonId }: { seasonId: string }) {
                         <p className="mt-1 text-lg font-semibold">{company.contactsCount}</p>
                       </div>
                       <div className={`rounded-2xl p-3 ${active ? "bg-white" : "bg-slate-50"}`}>
-                        <p className="text-[11px] text-slate-500">Drives</p>
-                        <p className="mt-1 text-lg font-semibold">{company.drives.total}</p>
+                        <p className="text-[11px] text-slate-500">Roles</p>
+                        <p className="mt-1 text-lg font-semibold">{company.roles.total}</p>
                       </div>
                     </div>
                   </button>
@@ -371,20 +385,53 @@ export default function SeasonDetailClient({ seasonId }: { seasonId: string }) {
 
                 <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Visit Dates</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Roles Offered</p>
                     <div className="mt-3 space-y-2">
-                      {companyDetail.recentDrives.length > 0 ? (
-                        companyDetail.recentDrives.map((drive) => (
-                          <div key={drive.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="font-medium text-slate-800">{drive.title}</p>
-                              <StatusBadge status={drive.status} size="sm" />
+                      {companyDetail.roles.length > 0 ? (
+                        companyDetail.roles.map((role) => (
+                          <div key={role.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-medium text-slate-800">{role.title}</p>
+                                <p className="mt-1 text-xs text-slate-500">
+                                  Added {formatDate(role.createdAt)}
+                                </p>
+                              </div>
+                              <Badge variant="info" size="sm">
+                                {role.eligibilityRules.length} eligibility
+                              </Badge>
                             </div>
-                            <p className="mt-1 text-xs text-slate-500">{formatDate(drive.startAt)}</p>
+                            <div className="mt-3 space-y-2 text-xs text-slate-600">
+                              <p>
+                                JD Text: {role.jobDescriptionText?.trim() ? "Available" : "Not available"}
+                              </p>
+                              <p>
+                                JD Doc: {role.jobDescriptionDocUrl ? "Attached" : "Not attached"}
+                              </p>
+                              <p>
+                                Notification Form: {role.notificationFormUrl ? "Attached" : "Not attached"}
+                              </p>
+                              {role.eligibilityRules[0] ? (
+                                <p>
+                                  Eligibility: Branches{" "}
+                                  {role.eligibilityRules[0].branches.length > 0
+                                    ? role.eligibilityRules[0].branches.join(", ")
+                                    : "Any"}
+                                  {" | "} Min CGPA{" "}
+                                  {role.eligibilityRules[0].minCgpa > 0
+                                    ? role.eligibilityRules[0].minCgpa.toFixed(2)
+                                    : "Not set"}
+                                  {" | "} Backlogs{" "}
+                                  {role.eligibilityRules[0].allowsBacklogs ? "Allowed" : "Not allowed"}
+                                </p>
+                              ) : (
+                                <p>Eligibility: Not configured</p>
+                              )}
+                            </div>
                           </div>
                         ))
                       ) : (
-                        <p className="text-sm text-slate-500">No visit dates recorded yet.</p>
+                        <p className="text-sm text-slate-500">No roles mapped yet.</p>
                       )}
                     </div>
                   </div>

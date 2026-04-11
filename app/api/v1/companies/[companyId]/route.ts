@@ -105,9 +105,7 @@ export async function GET(
           select: {
             id: true,
             title: true,
-            status: true,
-            stage: true,
-            startAt: true,
+            jobDescriptionDocUrl: true,
             createdAt: true,
           },
           orderBy: { createdAt: "desc" },

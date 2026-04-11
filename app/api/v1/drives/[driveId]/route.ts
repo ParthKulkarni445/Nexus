@@ -16,11 +16,21 @@ import { headers } from "next/headers";
 
 const updateDriveSchema = z.object({
   title: z.string().min(1).max(255).optional(),
-  stage: z.enum(["oa", "interview", "hr", "final", "other"]).optional(),
-  status: z.enum(["tentative", "confirmed", "completed", "cancelled"]).optional(),
-  venue: z.string().max(255).optional(),
-  startAt: z.string().datetime().optional(),
-  endAt: z.string().datetime().optional(),
+  compensationAmount: z.number().min(0).max(9999).optional(),
+  jobDescriptionText: z.string().optional(),
+  jobDescriptionDocUrl: z.string().url().max(500).optional(),
+  notificationFormUrl: z.string().url().max(500).optional(),
+  eligibilityRules: z
+    .array(
+      z.object({
+        branches: z.array(z.string().min(1).max(100)).default([]),
+        includeMinorBranches: z.boolean().optional(),
+        minCgpa: z.number().min(0).max(10).optional(),
+        allowsBacklogs: z.boolean().optional(),
+        notes: z.string().optional(),
+      }),
+    )
+    .optional(),
   notes: z.string().optional(),
 });
 
@@ -52,10 +62,29 @@ export async function PUT(
     const updatedDrive = await db.drive.update({
       where: { id: driveId },
       data: {
-        ...validation,
-        startAt: validation.startAt ? new Date(validation.startAt) : undefined,
-        endAt: validation.endAt ? new Date(validation.endAt) : undefined,
+        title: validation.title,
+        compensationAmount: validation.compensationAmount,
+        jobDescriptionText: validation.jobDescriptionText,
+        jobDescriptionDocUrl: validation.jobDescriptionDocUrl,
+        notificationFormUrl: validation.notificationFormUrl,
+        notes: validation.notes,
+        eligibilityRules:
+          validation.eligibilityRules !== undefined
+            ? {
+                deleteMany: {},
+                create: validation.eligibilityRules.map((rule) => ({
+                  branches: rule.branches ?? [],
+                  includeMinorBranches: rule.includeMinorBranches ?? false,
+                  minCgpa: rule.minCgpa,
+                  allowsBacklogs: rule.allowsBacklogs ?? false,
+                  notes: rule.notes,
+                })),
+              }
+            : undefined,
         updatedAt: new Date(),
+      },
+      include: {
+        eligibilityRules: true,
       },
     });
 
