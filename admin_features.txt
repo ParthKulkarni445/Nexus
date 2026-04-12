@@ -1,0 +1,8 @@
+create new season
+assign roles to co-ordinators
+manage user accounts(add, edit)
+view or edit schedule 
+access and export reports, stats, take backup
+set permissions and access levels for different roles (co-ordinators can do what)
+reset user passwords
+monitor system logs

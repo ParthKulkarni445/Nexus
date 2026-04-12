@@ -7,6 +7,7 @@ import {
   CalendarPlus,
   ChevronDown,
   Eye,
+  ExternalLink,
   FileSpreadsheet,
   Loader2,
   Pencil,
@@ -911,6 +912,39 @@ export default function ConfirmedPage() {
     }
   }
 
+  function openGoogleForm(company: ConfirmedCompany) {
+    const scriptUrl =
+      process.env.NEXT_PUBLIC_CONFIRMED_GOOGLE_SCRIPT_WEB_APP_URL?.trim() ??
+      "";
+
+    if (!scriptUrl) {
+      setActionError(
+        "Google Script URL is not configured. Set NEXT_PUBLIC_CONFIRMED_GOOGLE_SCRIPT_WEB_APP_URL.",
+      );
+      return;
+    }
+
+    const matchedSeason = seasons.find(
+      (season) => season.id === company.season.id,
+    );
+    const seasonYear = matchedSeason?.academicYear?.trim() || company.season.name;
+    let finalUrl: URL;
+    try {
+      finalUrl = new URL(scriptUrl);
+    } catch {
+      setActionError("Configured Google Script URL is invalid.");
+      return;
+    }
+
+    finalUrl.searchParams.set("companyName", company.companyName);
+    finalUrl.searchParams.set("seasonYear", seasonYear);
+
+    window.open(finalUrl.toString(), "_blank", "noopener,noreferrer");
+    setActionMessage(
+      `Opened Google Script form creator for ${company.companyName}.`,
+    );
+  }
+
   function buildTelegramCompanyContext(company: ConfirmedCompany) {
     const roles = company.roles.length
       ? company.roles.join(", ")
@@ -1537,6 +1571,15 @@ export default function ConfirmedPage() {
                         >
                           <Send size={15} />
                           Telegram
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openGoogleForm(company)}
+                          className="btn btn-primary btn-sm w-auto justify-center text-center"
+                          title="Open prefilled Google Form"
+                        >
+                          <ExternalLink size={15} />
+                          Form
                         </button>
                       </div>
                     </div>

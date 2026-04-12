@@ -5,6 +5,7 @@ import {
   success,
   unauthorized,
   forbidden,
+  badRequest,
   serverError,
 } from "@/lib/api/response";
 import { validateBody } from "@/lib/api/validation";
@@ -13,13 +14,22 @@ import { db } from "@/lib/db";
 import { headers } from "next/headers";
 
 const createSeasonSchema = z.object({
-  name: z.string().min(1).max(255),
   seasonType: z.enum(["intern", "placement"]),
-  academicYear: z.string().max(20),
+  academicYear: z
+    .string()
+    .regex(/^\d{4}-\d{2}$/i, "Academic year must be in format YYYY-YY"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   isActive: z.boolean().default(true),
 });
+
+function generateSeasonName(seasonType: "intern" | "placement", academicYear: string) {
+  if (seasonType === "intern") {
+    return `Intern ${academicYear.slice(0, 4)}`;
+  }
+
+  return `Placement ${academicYear}`;
+}
 
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
@@ -61,9 +71,29 @@ export async function POST(request: NextRequest) {
   const clientInfo = getClientInfo(headersList);
 
   try {
+    const generatedName = generateSeasonName(
+      validation.seasonType,
+      validation.academicYear,
+    );
+
+    const existingSeason = await db.recruitmentSeason.findFirst({
+      where: {
+        seasonType: validation.seasonType,
+        academicYear: validation.academicYear,
+      },
+      select: { id: true },
+    });
+
+    if (existingSeason) {
+      return badRequest("Season already exists for selected type and academic year");
+    }
+
     const season = await db.recruitmentSeason.create({
       data: {
-        ...validation,
+        name: generatedName,
+        seasonType: validation.seasonType,
+        academicYear: validation.academicYear,
+        isActive: validation.isActive,
         startDate: validation.startDate ? new Date(validation.startDate) : null,
         endDate: validation.endDate ? new Date(validation.endDate) : null,
         createdBy: user.id,
