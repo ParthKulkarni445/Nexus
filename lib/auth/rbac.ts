@@ -70,6 +70,13 @@ export const APP_ROUTE_POLICIES: RoutePolicy[] = [
 
 export const API_ROUTE_POLICIES: RoutePolicy[] = [
   {
+    route: "/api/v1/admin",
+    label: "Admin APIs",
+    rule: {
+      roles: ["tpo_admin"],
+    },
+  },
+  {
     route: "/api/v1/mail/requests",
     label: "Mail request API",
     rule: {

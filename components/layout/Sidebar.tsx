@@ -20,6 +20,7 @@ import {
   Settings,
   User,
   OrbitIcon,
+  Shield,
 } from "lucide-react";
 import { canAccessAppPath } from "@/lib/auth/rbac";
 
@@ -31,6 +32,7 @@ const navItems = [
   { label: "Mailing", href: "/mailing", icon: Mail },
   { label: "Assignments", href: "/assignments", icon: Users },
   { label: "Blogs", href: "/blogs", icon: BookOpen },
+  { label: "Admin", href: "/admin", icon: Shield },
 ];
 
 type NavUser = {
@@ -104,11 +106,6 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  // Close mobile menu on route change
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   // Focus search input when opened
   useEffect(() => {
