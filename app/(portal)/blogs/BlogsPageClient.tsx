@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Badge from "@/components/ui/Badge";
 import FilterSelect from "@/components/ui/FilterSelect";
 import Modal from "@/components/ui/Modal";
@@ -112,6 +112,8 @@ export default function BlogsPageClient({
   const [query, setQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string[]>([]);
   const [companyFilter, setCompanyFilter] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const BLOGS_PER_PAGE = 10;
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createCompanyId, setCreateCompanyId] = useState("");
   const [createTitle, setCreateTitle] = useState("");
@@ -164,6 +166,17 @@ export default function BlogsPageClient({
         return +new Date(right.date) - +new Date(left.date);
       });
   }, [blogs, query, sourceFilter, companyFilter]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query, sourceFilter, companyFilter]);
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredBlogs.length / BLOGS_PER_PAGE);
+  const startIndex = (currentPage - 1) * BLOGS_PER_PAGE;
+  const endIndex = startIndex + BLOGS_PER_PAGE;
+  const paginatedBlogs = filteredBlogs.slice(startIndex, endIndex);
 
   const activeFilterCount = sourceFilter.length + companyFilter.length;
 
@@ -551,7 +564,7 @@ export default function BlogsPageClient({
                 </div>
               )}
 
-              {filteredBlogs.map((blog) => (
+              {paginatedBlogs.map((blog) => (
                 <article
                   key={blog.id}
                   className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_6px_16px_rgba(15,23,42,0.08)]"
@@ -634,6 +647,48 @@ export default function BlogsPageClient({
                   </div>
                 </article>
               ))}
+
+              {/* Pagination Controls */}
+              {filteredBlogs.length > 0 && (
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-4">
+                  <div className="text-xs text-slate-600">
+                    Showing <span className="font-semibold">{startIndex + 1}</span> to{" "}
+                    <span className="font-semibold">{Math.min(endIndex, filteredBlogs.length)}</span> of{" "}
+                    <span className="font-semibold">{filteredBlogs.length}</span> blogs
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      ← Previous
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                            currentPage === page
+                              ? "bg-[#2563EB] text-white"
+                              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         </div>

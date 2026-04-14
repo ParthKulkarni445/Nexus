@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   ArrowRight,
@@ -1043,7 +1042,6 @@ function ActionModals({
 }
 
 export default function OutreachPage() {
-  const searchParams = useSearchParams();
   const [entries, setEntries] = useState<OutreachCompany[]>([]);
   const [templates, setTemplates] = useState<MailTemplate[]>([]);
   const [currentUserName, setCurrentUserName] = useState("Coordinator");
@@ -1117,6 +1115,7 @@ export default function OutreachPage() {
   }, [loadOutreach]);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
     const companyId = searchParams.get("companyId");
     const messageId = searchParams.get("replyMessageId");
     const recipientEmail = searchParams.get("replyRecipientEmail");
@@ -1140,7 +1139,7 @@ export default function OutreachPage() {
       subject: searchParams.get("replySubject") ?? "",
       recipientEmail,
     });
-  }, [searchParams]);
+  }, []);
 
   const seasonOptions = useMemo(
     () =>

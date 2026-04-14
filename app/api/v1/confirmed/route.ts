@@ -214,13 +214,13 @@ export async function GET(request: NextRequest) {
         phones: contact.phones,
         emails: contact.emails,
       })),
-      studentEntryNumbers: Array.from(
+      studentEntryNumbers: (Array.from(
         new Set(
           drives.flatMap((drive: { studentEntryNumbers: string[] }) =>
             drive.studentEntryNumbers,
           ),
         ),
-      ).sort((left, right) => left.localeCompare(right)),
+      ) as string[]).sort((left, right) => left.localeCompare(right)),
       };
     });
 

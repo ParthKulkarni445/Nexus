@@ -17,6 +17,9 @@ export async function GET(request: NextRequest) {
     const notificationsList = await db.notification.findMany({
       where: {
         userId: user.id,
+        NOT: {
+          type: "notification_view_marker",
+        },
         ...(unreadOnly ? { isRead: false } : {}),
       },
       orderBy: { createdAt: "desc" },

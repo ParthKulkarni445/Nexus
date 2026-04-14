@@ -44,6 +44,13 @@ export const APP_ROUTE_POLICIES: RoutePolicy[] = [
     },
   },
   {
+    route: "/notifications",
+    label: "Notifications",
+    rule: {
+      roles: ["tpo_admin", "coordinator"],
+    },
+  },
+  {
     route: "/admin",
     label: "Admin pages",
     rule: {
@@ -79,6 +86,13 @@ export const API_ROUTE_POLICIES: RoutePolicy[] = [
   {
     route: "/api/v1/blogs",
     label: "Blog moderation APIs",
+    rule: {
+      roles: ["tpo_admin", "coordinator"],
+    },
+  },
+  {
+    route: "/api/v1/notifications",
+    label: "Notifications API",
     rule: {
       roles: ["tpo_admin", "coordinator"],
     },

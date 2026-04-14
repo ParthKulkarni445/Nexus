@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import {
   AlertCircle,
   Building2,
@@ -491,31 +498,31 @@ export default function ConfirmedPage() {
     }
   }
 
-  function dismissActionFlushbar() {
+  const dismissActionFlushbar = useCallback(() => {
     clearActionFlushbarTimers();
     setActionFlushbar(null);
-  }
+  }, []);
 
-  function showActionFlushbar(
-    tone: "warning" | "error" | "success",
-    message: string,
-  ) {
-    dismissActionFlushbar();
-    setActionMessage("");
+  const showActionFlushbar = useCallback(
+    (tone: "warning" | "error" | "success", message: string) => {
+      dismissActionFlushbar();
+      setActionMessage("");
 
-    const id = Date.now();
-    setActionFlushbar({ id, tone, message, progress: 100 });
+      const id = Date.now();
+      setActionFlushbar({ id, tone, message, progress: 100 });
 
-    actionFlushbarProgressTimerRef.current = window.setTimeout(() => {
-      setActionFlushbar((current) =>
-        current?.id === id ? { ...current, progress: 0 } : current,
-      );
-    }, 30);
+      actionFlushbarProgressTimerRef.current = window.setTimeout(() => {
+        setActionFlushbar((current) =>
+          current?.id === id ? { ...current, progress: 0 } : current,
+        );
+      }, 30);
 
-    actionFlushbarHideTimerRef.current = window.setTimeout(() => {
-      setActionFlushbar((current) => (current?.id === id ? null : current));
-    }, WARNING_FLUSHBAR_DURATION_MS + 30);
-  }
+      actionFlushbarHideTimerRef.current = window.setTimeout(() => {
+        setActionFlushbar((current) => (current?.id === id ? null : current));
+      }, WARNING_FLUSHBAR_DURATION_MS + 30);
+    },
+    [dismissActionFlushbar],
+  );
 
   function showActionWarning(message: string) {
     showActionFlushbar("warning", message);
@@ -534,9 +541,13 @@ export default function ConfirmedPage() {
       return;
     }
 
+    function showActionError(message: string) {
+      showActionFlushbar("error", message);
+    }
+
     showActionError(actionError);
     setActionError("");
-  }, [actionError]);
+  }, [actionError, showActionFlushbar]);
 
   useEffect(() => {
     if (!actionMessage.trim()) {
