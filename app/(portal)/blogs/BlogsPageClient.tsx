@@ -96,8 +96,9 @@ export default function BlogsPageClient({
 }: BlogsPageClientProps) {
   const [blogs, setBlogs] = useState<BlogPost[]>(initialBlogs);
   const [companies] = useState<ApiCompany[]>(initialCompanies);
-  const [moderationQueue, setModerationQueue] =
-    useState<BlogPost[]>(initialModerationQueue);
+  const [moderationQueue, setModerationQueue] = useState<BlogPost[]>(
+    initialModerationQueue,
+  );
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [voteError, setVoteError] = useState<string | null>(null);
@@ -171,12 +172,20 @@ export default function BlogsPageClient({
     setActiveBlogId(blogId);
 
     try {
-      const response = await fetch(`/api/v1/admin/blogs/${blogId}/approve`, {
+      const response = await fetch(`/api/v1/blogs/${blogId}/approve`, {
         method: "POST",
       });
 
       if (!response.ok) {
-        throw new Error("Failed to approve blog");
+        let errorMessage = "Failed to approve blog";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error?.message || errorMessage;
+        } catch {
+          // If response body isn't JSON, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const approvedFromQueue = moderationQueue.find(
@@ -205,7 +214,9 @@ export default function BlogsPageClient({
     } catch (error) {
       console.error("Error approving blog:", error);
       setActionError(
-        "Unable to approve this blog right now. Please try again.",
+        error instanceof Error
+          ? error.message
+          : "Unable to approve this blog right now. Please try again.",
       );
     } finally {
       setActiveBlogId(null);
@@ -217,7 +228,7 @@ export default function BlogsPageClient({
     setActiveBlogId(blogId);
 
     try {
-      const response = await fetch(`/api/v1/admin/blogs/${blogId}/reject`, {
+      const response = await fetch(`/api/v1/blogs/${blogId}/reject`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -665,9 +676,7 @@ export default function BlogsPageClient({
                   <p className="text-sm font-medium text-slate-900">
                     {blog.title}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {blog.company}
-                  </p>
+                  <p className="mt-1 text-xs text-slate-500">{blog.company}</p>
                   <p className="mt-1 text-xs text-slate-500">
                     {blog.author} • {formatDate(blog.date)}
                   </p>

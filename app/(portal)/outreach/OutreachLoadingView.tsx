@@ -87,7 +87,7 @@ export default function OutreachLoadingView() {
               {Array.from({ length: 4 }, (_, index) => (
                 <div
                   key={index}
-                  className="rounded-xl border border-slate-50 bg-slate-200 px-3 py-2.5 shadow-sm"
+                  className="rounded-xl border border-slate-50 bg-slate-200 px-3 py-2.5"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-2">
@@ -179,7 +179,10 @@ export default function OutreachLoadingView() {
                         <div className="shimmer h-3 w-20 rounded-full" />
                         <div className="mt-3 space-y-2">
                           {Array.from({ length: 2 }, (_, index) => (
-                            <div key={index} className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,1fr)_36px] gap-2">
+                            <div
+                              key={index}
+                              className="grid grid-cols-[minmax(140px,1fr)_minmax(120px,1fr)_36px] gap-2"
+                            >
                               <div className="shimmer h-10 rounded-lg" />
                               <div className="shimmer h-10 rounded-lg" />
                               <div className="shimmer h-10 rounded-lg" />
@@ -189,21 +192,24 @@ export default function OutreachLoadingView() {
                       </div>
                       <div className="mt-4 flex justify-end gap-2">
                         {Array.from({ length: 3 }, (_, index) => (
-                          <div key={index} className="shimmer h-9 w-20 rounded-lg" />
+                          <div
+                            key={index}
+                            className="shimmer h-9 w-20 rounded-lg"
+                          />
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-                    <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="flex items-center justify-between gap-3 pb-4">
                       <div className="space-y-2">
                         <div className="shimmer h-4 w-28 rounded-full" />
                         <div className="shimmer h-3 w-56 rounded-full" />
                       </div>
                       <div className="shimmer h-6 w-12 rounded-full" />
                     </div>
-                    <div className="mt-4 space-y-0">
+                    <div className="mt-4 space-y-0 min-h-0 flex-1 overflow-y-auto border border-slate-200 rounded-lg p-3 -mx-1">
                       {Array.from({ length: 4 }, (_, index) => (
                         <TimelineItemSkeleton key={index} />
                       ))}

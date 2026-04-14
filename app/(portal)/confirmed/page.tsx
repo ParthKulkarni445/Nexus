@@ -5,23 +5,30 @@ import {
   AlertCircle,
   Building2,
   CalendarPlus,
+  CheckCircle2,
   ChevronDown,
+  Check,
+  Copy,
   Eye,
   ExternalLink,
   FileSpreadsheet,
   Loader2,
+  Mail,
   Pencil,
   PhoneCall,
+  Plus,
   Search,
-  Send,
   Upload,
   Users,
   X,
 } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
-import FilterSelect from "@/components/ui/FilterSelect";
+import MailAttachmentInput, {
+  type MailAttachmentMeta,
+} from "@/components/ui/MailAttachmentInput";
 import Modal from "@/components/ui/Modal";
+import RichTextEditor from "@/components/ui/RichTextEditor";
 import SearchBar from "@/components/ui/SearchBar";
 
 type ApiResponse<T> = {
@@ -29,15 +36,6 @@ type ApiResponse<T> = {
   error?: {
     message?: string;
   };
-};
-
-type TelegramTemplate = {
-  id: string;
-  name: string;
-  subject: string;
-  bodyText: string | null;
-  bodyHtml: string | null;
-  updatedAt: string;
 };
 
 type ConfirmedCompany = {
@@ -68,6 +66,8 @@ type ConfirmedCompany = {
   studentEntryNumbers: string[];
 };
 
+type ConfirmedContact = ConfirmedCompany["contacts"][number];
+
 type UploadStudentInfoResponse = {
   companySeasonCycleId: string;
   driveId: string;
@@ -95,7 +95,6 @@ type CompareAttendanceResponse = {
 
 type ConfirmedPayload = {
   acceptedCompanies: ConfirmedCompany[];
-  telegramTemplates: TelegramTemplate[];
 };
 
 type SeasonRecord = {
@@ -110,6 +109,13 @@ type MePayload = {
   user: {
     email?: string | null;
   };
+};
+
+type MailTemplate = {
+  id: string;
+  name: string;
+  subject: string;
+  bodyHtml: string;
 };
 
 type InstructionTask = "upload" | "compare";
@@ -129,21 +135,107 @@ type StudentUploadPreview = {
 
 type ActionFlushbar = {
   id: number;
-  tone: "warning" | "error";
+  tone: "warning" | "error" | "success";
   message: string;
   progress: number;
 };
 
+type CompensationInputUnit = "lpa" | "cr" | "lpm" | "kpm";
+type SeasonType = ConfirmedCompany["season"]["seasonType"];
+
 const WARNING_FLUSHBAR_DURATION_MS = 3500;
 
-function htmlToText(value: string | null | undefined) {
-  if (!value) return "";
-  return value
-    .replace(/<br\s*\/?\s*>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<[^>]+>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .trim();
+function getDefaultCompensationUnit(
+  seasonType: SeasonType,
+): CompensationInputUnit {
+  return seasonType === "placement" ? "lpa" : "lpm";
+}
+
+function getCompensationUnitFromCanonical(
+  seasonType: SeasonType,
+  value: number | null,
+): CompensationInputUnit {
+  if (value === null || !Number.isFinite(value) || value <= 0) {
+    return getDefaultCompensationUnit(seasonType);
+  }
+
+  if (seasonType === "placement") {
+    return value >= 100 ? "cr" : "lpa";
+  }
+
+  return value < 1 ? "kpm" : "lpm";
+}
+
+function normalizeCompensationUnit(
+  seasonType: SeasonType,
+  unit: CompensationInputUnit,
+): CompensationInputUnit {
+  if (seasonType === "placement") {
+    return unit === "cr" || unit === "lpa" ? unit : "lpa";
+  }
+
+  return unit === "kpm" || unit === "lpm" ? unit : "lpm";
+}
+
+function inputToCanonicalCompensation(
+  seasonType: SeasonType,
+  value: number,
+  unit: CompensationInputUnit,
+) {
+  if (seasonType === "placement") {
+    return unit === "cr" ? value * 100 : value;
+  }
+
+  return unit === "kpm" ? value / 100 : value;
+}
+
+function canonicalToInputCompensation(
+  seasonType: SeasonType,
+  value: number,
+  unit: CompensationInputUnit,
+) {
+  if (seasonType === "placement") {
+    return unit === "cr" ? value / 100 : value;
+  }
+
+  return unit === "kpm" ? value * 100 : value;
+}
+
+function toCompensationDraftValue(value: number) {
+  return String(Number(value.toFixed(2)));
+}
+
+function parseCanonicalCompensationFromDraft(
+  seasonType: SeasonType,
+  draft: string,
+  unit: CompensationInputUnit,
+): number | null | "invalid" {
+  const text = draft.trim();
+  if (!text) return null;
+
+  const parsed = Number(text);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return "invalid";
+  }
+
+  return inputToCanonicalCompensation(seasonType, parsed, unit);
+}
+
+function formatCompensationValue(
+  seasonType: SeasonType,
+  value: number | null,
+): string {
+  if (value === null || !Number.isFinite(value) || value <= 0) return "-";
+
+  if (seasonType === "placement") {
+    return value >= 100
+      ? `${(value / 100).toFixed(2)} Cr`
+      : `${value.toFixed(2)} LPA`;
+  }
+
+  return value < 1
+    ? `${(value * 100).toFixed(0)} KPM`
+    : `${value.toFixed(2)} LPM`;
 }
 
 function normalizeHeader(value: string) {
@@ -154,6 +246,56 @@ function normalizeEntryNumber(rawValue: string) {
   const compact = rawValue.trim().toUpperCase().replace(/\s+/g, "");
   if (!compact) return null;
   return /^\d{4}[A-Z]{3}\d{4}$/.test(compact) ? compact : null;
+}
+
+function parseRecipientInput(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,;]/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function htmlToPlainText(value: string) {
+  return value
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\r/g, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+async function copyToClipboard(text: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document !== "undefined") {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "true");
+    textarea.style.position = "absolute";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return;
+  }
+
+  throw new Error("Clipboard API is not available");
 }
 
 async function requestJson<T>(url: string, init?: RequestInit) {
@@ -252,9 +394,6 @@ export default function ConfirmedPage() {
   const [acceptedCompanies, setAcceptedCompanies] = useState<
     ConfirmedCompany[]
   >([]);
-  const [telegramTemplates, setTelegramTemplates] = useState<
-    TelegramTemplate[]
-  >([]);
 
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
   const [query, setQuery] = useState("");
@@ -262,18 +401,50 @@ export default function ConfirmedPage() {
   const [stipendDraftByDrive, setStipendDraftByDrive] = useState<
     Record<string, string>
   >({});
+  const [compensationUnitByDrive, setCompensationUnitByDrive] = useState<
+    Record<string, CompensationInputUnit>
+  >({});
   const [editingStipendByDrive, setEditingStipendByDrive] = useState<
     Record<string, boolean>
   >({});
   const [savingStipendByDrive, setSavingStipendByDrive] = useState<
     Record<string, boolean>
   >({});
-  const [manualTelegramByCompany, setManualTelegramByCompany] = useState<
-    Record<string, string>
-  >({});
-  const [telegramModalOpen, setTelegramModalOpen] = useState(false);
-  const [telegramCompanyId, setTelegramCompanyId] = useState("");
-  const [telegramTemplateId, setTelegramTemplateId] = useState("");
+  const [callCompanyId, setCallCompanyId] = useState("");
+  const [callContactId, setCallContactId] = useState("");
+  const [mailCompanyId, setMailCompanyId] = useState("");
+  const [mailContactId, setMailContactId] = useState("");
+  const [mailRequestType, setMailRequestType] = useState<"template" | "custom">(
+    "template",
+  );
+  const [mailTemplateId, setMailTemplateId] = useState("");
+  const [mailToRecipients, setMailToRecipients] = useState("");
+  const [mailCcRecipients, setMailCcRecipients] = useState("");
+  const [mailSubject, setMailSubject] = useState("");
+  const [mailBody, setMailBody] = useState("");
+  const [mailAttachments, setMailAttachments] = useState<MailAttachmentMeta[]>(
+    [],
+  );
+  const [mailTemplates, setMailTemplates] = useState<MailTemplate[]>([]);
+  const [studentMailCompanyId, setStudentMailCompanyId] = useState("");
+  const [studentMailDriveId, setStudentMailDriveId] = useState("");
+  const [studentMailToEmails, setStudentMailToEmails] = useState<string[]>([]);
+  const [studentMailSubject, setStudentMailSubject] = useState("");
+  const [studentMailBody, setStudentMailBody] = useState("");
+  const [studentMailAttachments, setStudentMailAttachments] = useState<
+    MailAttachmentMeta[]
+  >([]);
+  const [studentMailSubmitting, setStudentMailSubmitting] = useState(false);
+  const [addRoleCompanyId, setAddRoleCompanyId] = useState("");
+  const [addRoleTitle, setAddRoleTitle] = useState("");
+  const [addRoleCompensation, setAddRoleCompensation] = useState("");
+  const [addRoleCompensationUnit, setAddRoleCompensationUnit] =
+    useState<CompensationInputUnit>("lpa");
+  const [addRoleSubmitting, setAddRoleSubmitting] = useState(false);
+  const [companyMailSubmitting, setCompanyMailSubmitting] = useState(false);
+  const [copiedDriveActionKey, setCopiedDriveActionKey] = useState<
+    string | null
+  >(null);
   const [studentPreviewDrive, setStudentPreviewDrive] = useState<{
     companyId: string;
     driveId: string;
@@ -304,9 +475,6 @@ export default function ConfirmedPage() {
   const [actionFlushbar, setActionFlushbar] = useState<ActionFlushbar | null>(
     null,
   );
-  const [submittingAction, setSubmittingAction] = useState<
-    Record<string, boolean>
-  >({});
   const [loggedInUserEmail, setLoggedInUserEmail] = useState("");
   const actionFlushbarProgressTimerRef = useRef<number | null>(null);
   const actionFlushbarHideTimerRef = useRef<number | null>(null);
@@ -328,7 +496,10 @@ export default function ConfirmedPage() {
     setActionFlushbar(null);
   }
 
-  function showActionFlushbar(tone: "warning" | "error", message: string) {
+  function showActionFlushbar(
+    tone: "warning" | "error" | "success",
+    message: string,
+  ) {
     dismissActionFlushbar();
     setActionMessage("");
 
@@ -354,6 +525,10 @@ export default function ConfirmedPage() {
     showActionFlushbar("error", message);
   }
 
+  function showActionSuccess(message: string) {
+    showActionFlushbar("success", message);
+  }
+
   useEffect(() => {
     if (!actionError.trim()) {
       return;
@@ -362,6 +537,15 @@ export default function ConfirmedPage() {
     showActionError(actionError);
     setActionError("");
   }, [actionError]);
+
+  useEffect(() => {
+    if (!actionMessage.trim()) {
+      return;
+    }
+
+    showActionSuccess(actionMessage);
+    setActionMessage("");
+  }, [actionMessage]);
 
   useEffect(() => {
     return () => {
@@ -385,15 +569,38 @@ export default function ConfirmedPage() {
       );
 
       setAcceptedCompanies(payload.acceptedCompanies);
-      setTelegramTemplates(payload.telegramTemplates);
+      setCompensationUnitByDrive((current) => {
+        const next = { ...current };
+        for (const company of payload.acceptedCompanies) {
+          for (const drive of company.drives) {
+            if (!next[drive.id]) {
+              next[drive.id] = getCompensationUnitFromCanonical(
+                company.season.seasonType,
+                drive.compensationAmount,
+              );
+            }
+          }
+        }
+        return next;
+      });
       setStipendDraftByDrive((current) => {
         const next = { ...current };
         for (const company of payload.acceptedCompanies) {
           for (const drive of company.drives) {
             if (!next[drive.id]) {
+              const unit = getCompensationUnitFromCanonical(
+                company.season.seasonType,
+                drive.compensationAmount,
+              );
               next[drive.id] =
                 drive.compensationAmount !== null
-                  ? String(drive.compensationAmount)
+                  ? toCompensationDraftValue(
+                      canonicalToInputCompensation(
+                        company.season.seasonType,
+                        drive.compensationAmount,
+                        unit,
+                      ),
+                    )
                   : "";
             }
           }
@@ -408,8 +615,6 @@ export default function ConfirmedPage() {
         return current;
       });
       setSelectedCompanyId("");
-      setTelegramCompanyId("");
-      setTelegramTemplateId("");
     } catch (error) {
       setLoadingError(
         error instanceof Error
@@ -452,6 +657,19 @@ export default function ConfirmedPage() {
     })();
   }, []);
 
+  useEffect(() => {
+    void (async () => {
+      try {
+        const templates = await requestJson<MailTemplate[]>(
+          "/api/v1/mail/templates",
+        );
+        setMailTemplates(templates);
+      } catch {
+        setMailTemplates([]);
+      }
+    })();
+  }, []);
+
   const filteredCompanies = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return acceptedCompanies;
@@ -466,18 +684,65 @@ export default function ConfirmedPage() {
     });
   }, [acceptedCompanies, query]);
 
-  const telegramCompany = useMemo(
+  const callCompany = useMemo(
     () =>
-      filteredCompanies.find(
-        (company) => company.companyId === telegramCompanyId,
+      acceptedCompanies.find(
+        (company) => company.companyId === callCompanyId,
       ) ?? null,
-    [filteredCompanies, telegramCompanyId],
+    [acceptedCompanies, callCompanyId],
   );
 
-  const telegramContact = useMemo(() => {
-    if (!telegramCompany) return null;
-    return telegramCompany.contacts[0] ?? null;
-  }, [telegramCompany]);
+  const selectedCallContact = useMemo(
+    () =>
+      callCompany?.contacts.find((contact) => contact.id === callContactId) ??
+      null,
+    [callCompany, callContactId],
+  );
+
+  const mailCompany = useMemo(
+    () =>
+      acceptedCompanies.find(
+        (company) => company.companyId === mailCompanyId,
+      ) ?? null,
+    [acceptedCompanies, mailCompanyId],
+  );
+
+  const selectedMailContact = useMemo(
+    () =>
+      mailCompany?.contacts.find((contact) => contact.id === mailContactId) ??
+      null,
+    [mailCompany, mailContactId],
+  );
+
+  const selectedMailTemplate = useMemo(
+    () =>
+      mailTemplates.find((template) => template.id === mailTemplateId) ?? null,
+    [mailTemplates, mailTemplateId],
+  );
+
+  const addRoleCompany = useMemo(
+    () =>
+      acceptedCompanies.find(
+        (company) => company.companyId === addRoleCompanyId,
+      ) ?? null,
+    [acceptedCompanies, addRoleCompanyId],
+  );
+
+  const studentMailCompany = useMemo(
+    () =>
+      acceptedCompanies.find(
+        (company) => company.companyId === studentMailCompanyId,
+      ) ?? null,
+    [acceptedCompanies, studentMailCompanyId],
+  );
+
+  const studentMailDrive = useMemo(
+    () =>
+      studentMailCompany?.drives.find(
+        (drive) => drive.id === studentMailDriveId,
+      ) ?? null,
+    [studentMailCompany, studentMailDriveId],
+  );
 
   const studentPreviewCompany = useMemo(
     () =>
@@ -520,11 +785,6 @@ export default function ConfirmedPage() {
       })),
     [seasons],
   );
-
-  const templateOptions = telegramTemplates.map((template) => ({
-    value: template.id,
-    label: template.name,
-  }));
 
   async function handleSeasonChange(nextSeasonId: string) {
     setSelectedSeasonId(nextSeasonId);
@@ -751,50 +1011,234 @@ export default function ConfirmedPage() {
     }
   }
 
-  async function logCall(company: ConfirmedCompany) {
-    const actionKey = `call:${company.companyId}`;
-    const contactId = company.contacts[0]?.id;
+  function openCallModal(company: ConfirmedCompany) {
+    setCallCompanyId(company.companyId);
+    setCallContactId(company.contacts[0]?.id ?? "");
+    setActionError("");
+  }
 
-    if (!contactId) {
-      setActionError("No contact available for this company.");
+  function closeCallModal() {
+    setCallCompanyId("");
+    setCallContactId("");
+  }
+
+  function openCompanyMailModal(company: ConfirmedCompany) {
+    const primaryContact = company.contacts[0] ?? null;
+    setMailCompanyId(company.companyId);
+    setMailContactId(primaryContact?.id ?? "");
+    setMailRequestType("template");
+    setMailTemplateId("");
+    setMailToRecipients((primaryContact?.emails ?? []).join(", "));
+    setMailCcRecipients("");
+    setMailSubject(primaryContact ? `${company.companyName} - Follow-up` : "");
+    setMailBody("");
+    setMailAttachments([]);
+    setActionError("");
+  }
+
+  function closeCompanyMailModal(force = false) {
+    if (companyMailSubmitting && !force) return;
+    setMailCompanyId("");
+    setMailContactId("");
+    setMailRequestType("template");
+    setMailTemplateId("");
+    setMailToRecipients("");
+    setMailCcRecipients("");
+    setMailSubject("");
+    setMailBody("");
+    setMailAttachments([]);
+  }
+
+  function openAddRoleModal(company: ConfirmedCompany) {
+    setAddRoleCompanyId(company.companyId);
+    setAddRoleTitle("");
+    setAddRoleCompensation("");
+    setAddRoleCompensationUnit(
+      getDefaultCompensationUnit(company.season.seasonType),
+    );
+    setSelectedCompanyId(company.companyId);
+    setActionError("");
+  }
+
+  function closeAddRoleModal(force = false) {
+    if (addRoleSubmitting && !force) return;
+    setAddRoleCompanyId("");
+    setAddRoleTitle("");
+    setAddRoleCompensation("");
+    setAddRoleCompensationUnit("lpa");
+  }
+
+  async function submitAddRole() {
+    if (!addRoleCompany) {
+      setActionError("Select a company before creating a role.");
       return;
     }
 
-    setSubmittingAction((prev) => ({ ...prev, [actionKey]: true }));
+    const nextTitle = addRoleTitle.trim();
+    if (!nextTitle) {
+      setActionError("Role title is required.");
+      return;
+    }
+
+    const parsedCompensation = parseCanonicalCompensationFromDraft(
+      addRoleCompany.season.seasonType,
+      addRoleCompensation,
+      normalizeCompensationUnit(
+        addRoleCompany.season.seasonType,
+        addRoleCompensationUnit,
+      ),
+    );
+
+    let compensationAmount: number | undefined;
+    if (parsedCompensation === "invalid") {
+      setActionError("Compensation must be a valid non-negative number.");
+      return;
+    }
+
+    if (typeof parsedCompensation === "number") {
+      if (parsedCompensation > 9999) {
+        setActionError("Compensation value is too high.");
+        return;
+      }
+
+      compensationAmount = Number(parsedCompensation.toFixed(2));
+    }
+
+    setAddRoleSubmitting(true);
     setActionError("");
     setActionMessage("");
 
     try {
-      await requestJson(`/api/v1/contacts/${contactId}/quick-action`, {
+      await requestJson("/api/v1/drives", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "call",
-          summary: `Called HR for ${company.companyName} from Confirmed tab`,
-          companySeasonCycleId: company.companySeasonCycleId,
+          companyId: addRoleCompany.companyId,
+          companySeasonCycleId: addRoleCompany.companySeasonCycleId,
+          title: nextTitle,
+          compensationAmount,
         }),
       });
-      setActionMessage("Call interaction logged successfully.");
+
+      await fetchConfirmedData(selectedSeasonId || undefined);
+      setSelectedCompanyId(addRoleCompany.companyId);
+      setActionMessage(
+        `Added role ${nextTitle} for ${addRoleCompany.companyName}.`,
+      );
+      closeAddRoleModal(true);
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "Unable to create role",
+      );
+    } finally {
+      setAddRoleSubmitting(false);
+    }
+  }
+
+  async function submitCompanyMail() {
+    if (!mailCompany) {
+      setActionError("Select a company before sending mail.");
+      return;
+    }
+
+    const toEmails = parseRecipientInput(mailToRecipients);
+    const ccEmails = parseRecipientInput(mailCcRecipients);
+
+    if (toEmails.length === 0) {
+      setActionError("At least one recipient is required in To.");
+      return;
+    }
+
+    if (mailRequestType === "template" && !mailTemplateId) {
+      setActionError("Select a template before queueing mail.");
+      return;
+    }
+
+    if (
+      mailRequestType === "custom" &&
+      (!mailSubject.trim() || !htmlToPlainText(mailBody))
+    ) {
+      setActionError("Subject and body are required for custom mail.");
+      return;
+    }
+
+    setCompanyMailSubmitting(true);
+    setActionError("");
+    setActionMessage("");
+
+    try {
+      await requestJson("/api/v1/mail/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          companyId: mailCompany.companyId,
+          companySeasonCycleId: mailCompany.companySeasonCycleId,
+          requestType: mailRequestType,
+          templateId:
+            mailRequestType === "template" ? mailTemplateId : undefined,
+          customSubject:
+            mailRequestType === "custom" ? mailSubject.trim() : undefined,
+          customBody:
+            mailRequestType === "custom" ? mailBody.trim() : undefined,
+          recipientFilter: {
+            contactIds: selectedMailContact ? [selectedMailContact.id] : [],
+            emails: toEmails,
+            ccEmails,
+          },
+          previewPayload: {
+            source: "confirmed_tab",
+            mode: "company",
+            companyName: mailCompany.companyName,
+            contactName: selectedMailContact?.name ?? null,
+            templateName:
+              mailRequestType === "template"
+                ? selectedMailTemplate?.name
+                : null,
+          },
+          attachments: mailAttachments,
+          urgency: 3,
+        }),
+      });
+
+      setActionMessage(
+        `Company mail request queued for ${mailCompany.companyName}.`,
+      );
+      closeCompanyMailModal(true);
     } catch (error) {
       setActionError(
         error instanceof Error
           ? error.message
-          : "Unable to log call interaction",
+          : "Unable to create company mail request",
       );
     } finally {
-      setSubmittingAction((prev) => ({ ...prev, [actionKey]: false }));
+      setCompanyMailSubmitting(false);
     }
   }
 
   async function saveDriveCompensation(
     company: ConfirmedCompany,
     drive: ConfirmedCompany["drives"][number],
+    unit: CompensationInputUnit,
   ) {
     const draft = stipendDraftByDrive[drive.id] ?? "";
-    const nextValue = draft.trim() ? Number(draft) : null;
+    const canonicalValue = parseCanonicalCompensationFromDraft(
+      company.season.seasonType,
+      draft,
+      normalizeCompensationUnit(company.season.seasonType, unit),
+    );
 
-    if (nextValue !== null && (!Number.isFinite(nextValue) || nextValue < 0)) {
+    if (canonicalValue === "invalid") {
       setActionError("Compensation value must be a valid non-negative number.");
+      return false;
+    }
+
+    const nextValue =
+      typeof canonicalValue === "number"
+        ? Number(canonicalValue.toFixed(2))
+        : null;
+
+    if (nextValue !== null && nextValue > 9999) {
+      setActionError("Compensation value is too high.");
       return false;
     }
 
@@ -867,40 +1311,160 @@ export default function ConfirmedPage() {
     setActionMessage("Opened Google Calendar with prefilled event.");
   }
 
-  async function sendMailRequest(company: ConfirmedCompany) {
-    const actionKey = `mail:students:${company.companyId}`;
-    setSubmittingAction((prev) => ({ ...prev, [actionKey]: true }));
+  function getDriveStudentEmails(
+    drive: ConfirmedCompany["drives"][number],
+  ): string[] {
+    return Array.from(
+      new Set(
+        drive.studentEntryNumbers
+          .map((entry) => normalizeEntryNumber(entry))
+          .filter((entry): entry is string => Boolean(entry))
+          .map((entry) => `${entry.toLowerCase()}@iitrpr.ac.in`),
+      ),
+    );
+  }
+
+  function buildDriveDetails(
+    company: ConfirmedCompany,
+    drive: ConfirmedCompany["drives"][number],
+  ) {
+    const contact = company.contacts[0] ?? null;
+    const compensationLabel =
+      company.season.seasonType === "intern" ? "Stipend" : "Package";
+
+    return [
+      `Company: ${company.companyName}`,
+      `Role: ${drive.title}`,
+      `${compensationLabel}: ${
+        drive.compensationAmount !== null
+          ? formatCompensationValue(
+              company.season.seasonType,
+              drive.compensationAmount,
+            )
+          : "Not set"
+      }`,
+      "Duration: ",
+      "CGPA: ",
+      "Eligible Branches: ",
+      "Backlogs Allowed: ",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  async function handleCopyDriveDetails(
+    company: ConfirmedCompany,
+    drive: ConfirmedCompany["drives"][number],
+  ) {
+    const actionKey = `copy:${drive.id}`;
+
+    try {
+      await copyToClipboard(buildDriveDetails(company, drive));
+      setCopiedDriveActionKey(actionKey);
+      setActionError("");
+      setActionMessage(
+        `Copied details for ${company.companyName} - ${drive.title}.`,
+      );
+      window.setTimeout(() => {
+        setCopiedDriveActionKey((current) =>
+          current === actionKey ? null : current,
+        );
+      }, 1800);
+    } catch {
+      setCopiedDriveActionKey(null);
+      setActionError("Unable to copy details right now.");
+    }
+  }
+
+  function openStudentMailModal(
+    company: ConfirmedCompany,
+    drive: ConfirmedCompany["drives"][number],
+  ) {
+    const studentEmails = getDriveStudentEmails(drive);
+
+    if (drive.studentEntryNumbers.length === 0) {
+      showActionWarning("No uploaded students for this role yet.");
+      return;
+    }
+
+    if (studentEmails.length === 0) {
+      showActionWarning(
+        "Student emails are not available for this uploaded list.",
+      );
+      return;
+    }
+
+    setStudentMailCompanyId(company.companyId);
+    setStudentMailDriveId(drive.id);
+    setStudentMailToEmails(studentEmails);
+    setStudentMailSubject(
+      `${company.companyName} - ${drive.title} update for students`,
+    );
+    // setStudentMailBody(buildDriveDetails(company, drive));
+    setStudentMailAttachments([]);
+    setSelectedCompanyId(company.companyId);
+    setActionError("");
+  }
+
+  function closeStudentMailModal(force = false) {
+    if (studentMailSubmitting && !force) return;
+    setStudentMailCompanyId("");
+    setStudentMailDriveId("");
+    setStudentMailToEmails([]);
+    setStudentMailSubject("");
+    setStudentMailBody("");
+    setStudentMailAttachments([]);
+  }
+
+  async function submitStudentMailRequest() {
+    if (!studentMailCompany || !studentMailDrive) {
+      setActionError("Select a valid company and role before sending mail.");
+      return;
+    }
+
+    if (!studentMailSubject.trim() || !studentMailBody.trim()) {
+      setActionError("Subject and body are required for student mail.");
+      return;
+    }
+
+    if (studentMailToEmails.length === 0) {
+      setActionError("No student email recipients found.");
+      return;
+    }
+
+    setStudentMailSubmitting(true);
     setActionError("");
     setActionMessage("");
 
     try {
-      const body = (manualTelegramByCompany[company.companyId] ?? "").trim();
-
       await requestJson("/api/v1/mail/requests", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          companyId: company.companyId,
-          companySeasonCycleId: company.companySeasonCycleId,
+          companyId: studentMailCompany.companyId,
+          companySeasonCycleId: studentMailCompany.companySeasonCycleId,
           requestType: "custom",
-          customSubject: `${company.companyName} update for students`,
-          customBody: body || undefined,
+          customSubject: studentMailSubject.trim(),
+          customBody: studentMailBody.trim(),
           recipientFilter: {
-            audience: "all_students",
-            source: "confirmed_tab",
+            emails: studentMailToEmails,
           },
           previewPayload: {
             source: "confirmed_tab",
             mode: "students",
-            companyName: company.companyName,
+            companyName: studentMailCompany.companyName,
+            driveTitle: studentMailDrive.title,
             contactName: null,
           },
-          attachments: [],
+          attachments: studentMailAttachments,
           urgency: 3,
         }),
       });
 
-      setActionMessage("Mailing request queued for students.");
+      setActionMessage(
+        `Mailing request queued for ${studentMailToEmails.length} students in ${studentMailDrive.title}.`,
+      );
+      closeStudentMailModal(true);
     } catch (error) {
       setActionError(
         error instanceof Error
@@ -908,14 +1472,13 @@ export default function ConfirmedPage() {
           : "Unable to create mail request",
       );
     } finally {
-      setSubmittingAction((prev) => ({ ...prev, [actionKey]: false }));
+      setStudentMailSubmitting(false);
     }
   }
 
   function openGoogleForm(company: ConfirmedCompany) {
     const scriptUrl =
-      process.env.NEXT_PUBLIC_CONFIRMED_GOOGLE_SCRIPT_WEB_APP_URL?.trim() ??
-      "";
+      process.env.NEXT_PUBLIC_CONFIRMED_GOOGLE_SCRIPT_WEB_APP_URL?.trim() ?? "";
 
     if (!scriptUrl) {
       setActionError(
@@ -927,7 +1490,8 @@ export default function ConfirmedPage() {
     const matchedSeason = seasons.find(
       (season) => season.id === company.season.id,
     );
-    const seasonYear = matchedSeason?.academicYear?.trim() || company.season.name;
+    const seasonYear =
+      matchedSeason?.academicYear?.trim() || company.season.name;
     let finalUrl: URL;
     try {
       finalUrl = new URL(scriptUrl);
@@ -943,58 +1507,6 @@ export default function ConfirmedPage() {
     setActionMessage(
       `Opened Google Script form creator for ${company.companyName}.`,
     );
-  }
-
-  function buildTelegramCompanyContext(company: ConfirmedCompany) {
-    const roles = company.roles.length
-      ? company.roles.join(", ")
-      : "Not mapped";
-    const contact = company.contacts[0] ?? null;
-
-    const contactLine = contact
-      ? `Contact: ${contact.name}${contact.designation ? ` (${contact.designation})` : ""}`
-      : "Contact: Select HR/contact from company card";
-
-    return [
-      `Company: ${company.companyName}`,
-      `Season: ${company.season.name}`,
-      `Roles: ${roles}`,
-      contactLine,
-      company.notes ? `Notes: ${company.notes}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
-  }
-
-  function openTelegramModal(company: ConfirmedCompany) {
-    setTelegramCompanyId(company.companyId);
-    setTelegramTemplateId("");
-    setTelegramModalOpen(true);
-
-    setManualTelegramByCompany((prev) => {
-      if (prev[company.companyId]?.trim()) return prev;
-      return {
-        ...prev,
-        [company.companyId]: `${buildTelegramCompanyContext(company)}\n\n`,
-      };
-    });
-  }
-
-  function applyTelegramTemplate(templateId: string) {
-    setTelegramTemplateId(templateId);
-
-    if (!telegramCompany) return;
-    const template = telegramTemplates.find((item) => item.id === templateId);
-    if (!template) return;
-
-    const candidate =
-      template.bodyText?.trim() || htmlToText(template.bodyHtml);
-    const companyContext = buildTelegramCompanyContext(telegramCompany);
-
-    setManualTelegramByCompany((prev) => ({
-      ...prev,
-      [telegramCompany.companyId]: `${companyContext}\n\n${candidate}`,
-    }));
   }
 
   function triggerFilePicker(inputId: string) {
@@ -1066,26 +1578,40 @@ export default function ConfirmedPage() {
   return (
     <div className="space-y-5 p-4 md:p-6">
       {actionFlushbar ? (
-        <div className="flushbar-stack fixed left-4 bottom-4 z-50 w-[min(92vw,380px)] pointer-events-none">
+        <div className="flushbar-stack fixed right-4 bottom-4 z-50 w-[min(92vw,600px)] pointer-events-none">
           <div
-            className={`flushbar flushbar-${actionFlushbar.tone} overflow-hidden rounded-xl border shadow-lg`}
+            className={`flushbar flushbar-${actionFlushbar.tone} rounded-xl border shadow-lg`}
           >
             <div className="flushbar-progress-track h-1 w-full">
               <div
-                className="flushbar-progress h-full transition-[width] ease-linear"
+                className="flushbar-progress h-full"
                 style={{
                   width: `${actionFlushbar.progress}%`,
-                  transitionDuration: `${WARNING_FLUSHBAR_DURATION_MS}ms`,
+                  transition: `width ${WARNING_FLUSHBAR_DURATION_MS}ms linear`,
                 }}
               />
             </div>
-            <div className="flushbar-body flex items-center gap-2.5 px-3.5 py-3">
-              <AlertCircle size={36} className="flushbar-icon shrink-0" />
-              <div className="min-w-0 space-y-0.5">
+            <div className="flushbar-body flex items-start gap-2.5 px-3.5 py-3">
+              {actionFlushbar.tone === "success" ? (
+                <CheckCircle2
+                  size={36}
+                  className="flushbar-icon shrink-0 mt-0.5"
+                />
+              ) : (
+                <AlertCircle
+                  size={36}
+                  className="flushbar-icon shrink-0 mt-0.5"
+                />
+              )}
+              <div className="flex-1 space-y-0.5 min-w-0">
                 <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
-                  {actionFlushbar.tone === "error" ? "ERROR" : "WARNING"}
+                  {actionFlushbar.tone === "error"
+                    ? "ERROR"
+                    : actionFlushbar.tone === "warning"
+                      ? "WARNING"
+                      : "SUCCESS"}
                 </p>
-                <p className="flushbar-message m-0 text-[14px] font-medium leading-[1.45]">
+                <p className="flushbar-message m-0 text-[14px] font-medium leading-[1.45] whitespace-normal wrap-break-word">
                   {actionFlushbar.message}
                 </p>
               </div>
@@ -1130,7 +1656,7 @@ export default function ConfirmedPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#4A86E8] bg-[#4A86E8] px-4 py-3 flex items-center justify-between shadow-[0_8px_18px_rgba(74,134,232,0.28)] md:min-w-64">
+          <div className="rounded-2xl border border-[#4A86E8] bg-[#4A86E8] px-4 py-3 flex items-center justify-between shadow-[0_8px_18px_rgba(74,134,232,0.28)] md:min-w-64 transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-black">
                 Companies
@@ -1144,12 +1670,6 @@ export default function ConfirmedPage() {
             </div>
           </div>
         </div>
-
-        {actionMessage ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            {actionMessage}
-          </div>
-        ) : null}
       </section>
 
       <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_42%)] p-4 shadow-sm md:p-5">
@@ -1202,10 +1722,23 @@ export default function ConfirmedPage() {
                     }`}
                   >
                     <div className="space-y-3">
-                      <div>
+                      <div className="flex items-start justify-between gap-3">
                         <h2 className="text-lg font-bold text-slate-900">
                           {company.companyName}
                         </h2>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            dismissActionFlushbar();
+                            openAddRoleModal(company);
+                          }}
+                          className="btn btn-secondary btn-sm"
+                          aria-label="Add role"
+                        >
+                          <Plus size={15} />
+                          Add role
+                        </button>
                       </div>
 
                       {/* <div className="grid gap-3 sm:grid-cols-2">
@@ -1225,25 +1758,45 @@ export default function ConfirmedPage() {
 
                       {company.drives.length > 0 ? (
                         <div className="rounded-xl border border-slate-200 bg-white">
-                          <div className="grid grid-cols-1 gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide md:grid-cols-[1.9fr_0.8fr_0.8fr_1.3fr]">
+                          <div className="grid grid-cols-1 gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide md:grid-cols-[1.9fr_1fr_0.8fr_1.1fr] md:items-center">
                             <p>Role</p>
-                            <p className="text-center">
-                              {company.season.seasonType === "intern"
-                                ? "Stipend"
-                                : "Package (LPA)"}
-                            </p>
-                            <p className="justify-self-center text-center">
-                              Students
-                            </p>
-                            <p className="text-center">Actions</p>
+                            <div className="flex items-center justify-center">
+                              <p>
+                                {company.season.seasonType === "intern"
+                                  ? "Stipend"
+                                  : "Package"}
+                              </p>
+                            </div>
+                            <div className="flex items-center justify-center">
+                              <p>Students</p>
+                            </div>
+                            <div className="flex items-center justify-center">
+                              <p>Actions</p>
+                            </div>
                           </div>
                           <div className="space-y-2 p-2">
                             {company.drives.map((drive) => {
                               const hasDriveStudents =
                                 drive.studentEntryNumbers.length > 0;
+                              const defaultUnit =
+                                getCompensationUnitFromCanonical(
+                                  company.season.seasonType,
+                                  drive.compensationAmount,
+                                );
+                              const selectedUnit = normalizeCompensationUnit(
+                                company.season.seasonType,
+                                compensationUnitByDrive[drive.id] ??
+                                  defaultUnit,
+                              );
                               const currentCompensationText =
                                 drive.compensationAmount !== null
-                                  ? String(drive.compensationAmount)
+                                  ? toCompensationDraftValue(
+                                      canonicalToInputCompensation(
+                                        company.season.seasonType,
+                                        drive.compensationAmount,
+                                        selectedUnit,
+                                      ),
+                                    )
                                   : "";
                               const draftCompensationText =
                                 stipendDraftByDrive[drive.id] ??
@@ -1251,26 +1804,30 @@ export default function ConfirmedPage() {
                               const isEditingCompensation = Boolean(
                                 editingStipendByDrive[drive.id],
                               );
-                              const draftNumber = draftCompensationText.trim()
-                                ? Number(draftCompensationText)
-                                : null;
+                              const draftCanonicalValue =
+                                parseCanonicalCompensationFromDraft(
+                                  company.season.seasonType,
+                                  draftCompensationText,
+                                  selectedUnit,
+                                );
                               const currentNumber =
                                 drive.compensationAmount !== null
                                   ? Number(drive.compensationAmount)
                                   : null;
                               const compensationChanged =
-                                (draftNumber === null &&
+                                (draftCanonicalValue === null &&
                                   currentNumber !== null) ||
-                                (draftNumber !== null &&
+                                (typeof draftCanonicalValue === "number" &&
                                   currentNumber === null) ||
-                                (draftNumber !== null &&
+                                draftCanonicalValue === "invalid" ||
+                                (typeof draftCanonicalValue === "number" &&
                                   currentNumber !== null &&
-                                  Number(draftNumber.toFixed(2)) !==
+                                  Number(draftCanonicalValue.toFixed(2)) !==
                                     Number(currentNumber.toFixed(2)));
                               return (
                                 <div
                                   key={drive.id}
-                                  className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 px-3 py-2 md:grid-cols-[1.9fr_0.8fr_0.8fr_1.3fr] md:items-center"
+                                  className="grid grid-cols-1 gap-2 rounded-lg border border-slate-200 px-3 py-2 md:grid-cols-[1.9fr_1fr_0.8fr_1.1fr] md:items-center"
                                 >
                                   <p className="text-sm font-semibold text-slate-900">
                                     {drive.title}
@@ -1290,6 +1847,68 @@ export default function ConfirmedPage() {
                                           }
                                           placeholder="0"
                                         />
+                                        <select
+                                          className="input-base w-16 sm:w-20 border-2 border-[#93C5FD] bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 focus:border-[#2563EB]"
+                                          value={selectedUnit}
+                                          onChange={(event) => {
+                                            const nextUnit =
+                                              normalizeCompensationUnit(
+                                                company.season.seasonType,
+                                                event.target
+                                                  .value as CompensationInputUnit,
+                                              );
+
+                                            setCompensationUnitByDrive(
+                                              (prev) => ({
+                                                ...prev,
+                                                [drive.id]: nextUnit,
+                                              }),
+                                            );
+
+                                            const canonicalValue =
+                                              parseCanonicalCompensationFromDraft(
+                                                company.season.seasonType,
+                                                draftCompensationText,
+                                                selectedUnit,
+                                              );
+
+                                            if (
+                                              typeof canonicalValue === "number"
+                                            ) {
+                                              const nextInputValue =
+                                                canonicalToInputCompensation(
+                                                  company.season.seasonType,
+                                                  canonicalValue,
+                                                  nextUnit,
+                                                );
+                                              setStipendDraftByDrive(
+                                                (prev) => ({
+                                                  ...prev,
+                                                  [drive.id]:
+                                                    toCompensationDraftValue(
+                                                      nextInputValue,
+                                                    ),
+                                                }),
+                                              );
+                                            }
+                                          }}
+                                          disabled={Boolean(
+                                            savingStipendByDrive[drive.id],
+                                          )}
+                                        >
+                                          {company.season.seasonType ===
+                                          "placement" ? (
+                                            <>
+                                              <option value="lpa">LPA</option>
+                                              <option value="cr">Cr</option>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <option value="lpm">LPM</option>
+                                              <option value="kpm">KPM</option>
+                                            </>
+                                          )}
+                                        </select>
                                         {compensationChanged ? (
                                           <button
                                             type="button"
@@ -1299,6 +1918,7 @@ export default function ConfirmedPage() {
                                                 await saveDriveCompensation(
                                                   company,
                                                   drive,
+                                                  selectedUnit,
                                                 );
                                               if (saved) {
                                                 setEditingStipendByDrive(
@@ -1322,10 +1942,31 @@ export default function ConfirmedPage() {
                                           type="button"
                                           className="btn btn-secondary btn-sm px-2"
                                           onClick={() => {
+                                            const resetUnit =
+                                              getCompensationUnitFromCanonical(
+                                                company.season.seasonType,
+                                                drive.compensationAmount,
+                                              );
+                                            const resetValue =
+                                              drive.compensationAmount !== null
+                                                ? toCompensationDraftValue(
+                                                    canonicalToInputCompensation(
+                                                      company.season.seasonType,
+                                                      drive.compensationAmount,
+                                                      resetUnit,
+                                                    ),
+                                                  )
+                                                : "";
+
+                                            setCompensationUnitByDrive(
+                                              (prev) => ({
+                                                ...prev,
+                                                [drive.id]: resetUnit,
+                                              }),
+                                            );
                                             setStipendDraftByDrive((prev) => ({
                                               ...prev,
-                                              [drive.id]:
-                                                currentCompensationText,
+                                              [drive.id]: resetValue,
                                             }));
                                             setEditingStipendByDrive(
                                               (prev) => ({
@@ -1343,16 +1984,40 @@ export default function ConfirmedPage() {
                                     ) : (
                                       <>
                                         <p className="w-20 sm:w-24 rounded-md border-2 border-[#8f8f8f] bg-white px-2 py-1 text-center text-sm font-semibold text-slate-900">
-                                          {currentCompensationText || "-"}
+                                          {formatCompensationValue(
+                                            company.season.seasonType,
+                                            drive.compensationAmount,
+                                          )}
                                         </p>
                                         <button
                                           type="button"
                                           className="btn btn-secondary btn-sm px-2"
                                           onClick={() => {
+                                            const nextUnit =
+                                              getCompensationUnitFromCanonical(
+                                                company.season.seasonType,
+                                                drive.compensationAmount,
+                                              );
+                                            const nextDraft =
+                                              drive.compensationAmount !== null
+                                                ? toCompensationDraftValue(
+                                                    canonicalToInputCompensation(
+                                                      company.season.seasonType,
+                                                      drive.compensationAmount,
+                                                      nextUnit,
+                                                    ),
+                                                  )
+                                                : "";
+
+                                            setCompensationUnitByDrive(
+                                              (prev) => ({
+                                                ...prev,
+                                                [drive.id]: nextUnit,
+                                              }),
+                                            );
                                             setStipendDraftByDrive((prev) => ({
                                               ...prev,
-                                              [drive.id]:
-                                                currentCompensationText,
+                                              [drive.id]: nextDraft,
                                             }));
                                             setEditingStipendByDrive(
                                               (prev) => ({
@@ -1402,7 +2067,7 @@ export default function ConfirmedPage() {
                                     </button>
                                   </div>
 
-                                  <div className="flex flex-wrap justify-center gap-2">
+                                  <div className="flex flex-wrap justify-center gap-1">
                                     <input
                                       id={`upload-students-${drive.id}`}
                                       type="file"
@@ -1449,11 +2114,18 @@ export default function ConfirmedPage() {
                                         uploadingStudentByDrive[drive.id],
                                       )}
                                       className="btn btn-secondary btn-sm"
+                                      title={
+                                        uploadingStudentByDrive[drive.id]
+                                          ? "Uploading..."
+                                          : "Upload List"
+                                      }
+                                      aria-label={
+                                        uploadingStudentByDrive[drive.id]
+                                          ? "Uploading student list"
+                                          : "Upload student list"
+                                      }
                                     >
-                                      <Upload size={12} />
-                                      {uploadingStudentByDrive[drive.id]
-                                        ? "Uploading..."
-                                        : "Upload List"}
+                                      <Upload size={15} />
                                     </button>
 
                                     <button
@@ -1477,11 +2149,60 @@ export default function ConfirmedPage() {
                                         comparingAttendanceByDrive[drive.id],
                                       )}
                                       className="btn btn-secondary btn-sm"
+                                      title={
+                                        comparingAttendanceByDrive[drive.id]
+                                          ? "Processing attendance..."
+                                          : "Attendance"
+                                      }
+                                      aria-label={
+                                        comparingAttendanceByDrive[drive.id]
+                                          ? "Processing attendance"
+                                          : "Compare attendance"
+                                      }
                                     >
-                                      <FileSpreadsheet size={12} />
-                                      {comparingAttendanceByDrive[drive.id]
-                                        ? "Processing..."
-                                        : "Attendance"}
+                                      <FileSpreadsheet size={15} />
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        openStudentMailModal(company, drive)
+                                      }
+                                      className="btn btn-secondary btn-sm"
+                                      title="Mail Students"
+                                      aria-label="Mail students"
+                                    >
+                                      <Users size={15} />
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        void handleCopyDriveDetails(
+                                          company,
+                                          drive,
+                                        )
+                                      }
+                                      className="btn btn-secondary btn-sm"
+                                      title={
+                                        copiedDriveActionKey ===
+                                        `copy:${drive.id}`
+                                          ? "Copied"
+                                          : "Copy Details"
+                                      }
+                                      aria-label={
+                                        copiedDriveActionKey ===
+                                        `copy:${drive.id}`
+                                          ? "Copied drive details"
+                                          : "Copy drive details"
+                                      }
+                                    >
+                                      {copiedDriveActionKey ===
+                                      `copy:${drive.id}` ? (
+                                        <Check size={15} />
+                                      ) : (
+                                        <Copy size={15} />
+                                      )}
                                     </button>
                                   </div>
                                 </div>
@@ -1490,12 +2211,12 @@ export default function ConfirmedPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                           No drives available for this company-season cycle.
                         </div>
                       )}
 
-                      <div className="flex flex-wrap justify-start gap-2">
+                      <div className="flex flex-wrap justify-start gap-2 mt-5">
                         <button
                           type="button"
                           onClick={() => {
@@ -1507,21 +2228,13 @@ export default function ConfirmedPage() {
                             }
 
                             dismissActionFlushbar();
-                            void logCall(company);
+                            openCallModal(company);
                           }}
-                          disabled={
-                            submittingAction[`call:${company.companyId}`]
-                          }
-                          className="btn btn-primary btn-sm w-auto justify-center text-center"
+                          className="btn btn-primary btn-sm"
+                          aria-label="Call company contact"
                         >
-                          {submittingAction[`call:${company.companyId}`] ? (
-                            <Loader2 size={15} className="animate-spin" />
-                          ) : (
-                            <PhoneCall size={15} />
-                          )}
-                          {submittingAction[`call:${company.companyId}`]
-                            ? "Logging..."
-                            : "Call"}
+                          <PhoneCall size={15} />
+                          Call
                         </button>
                         <button
                           type="button"
@@ -1536,47 +2249,36 @@ export default function ConfirmedPage() {
                             dismissActionFlushbar();
                             openScheduleModal(company);
                           }}
-                          className="btn btn-primary btn-sm w-auto justify-center text-center"
+                          className="btn btn-primary btn-sm"
+                          aria-label="Schedule event"
                         >
                           <CalendarPlus size={15} />
                           Schedule
                         </button>
                         <button
                           type="button"
-                          onClick={() => void sendMailRequest(company)}
-                          disabled={
-                            submittingAction[
-                              `mail:students:${company.companyId}`
-                            ]
-                          }
-                          className="btn btn-primary btn-sm w-auto justify-center text-center"
+                          onClick={() => {
+                            if (!hasContacts) {
+                              showActionWarning(
+                                "No contact is available for this company.",
+                              );
+                              return;
+                            }
+
+                            dismissActionFlushbar();
+                            openCompanyMailModal(company);
+                          }}
+                          className="btn btn-primary btn-sm"
+                          aria-label="Send company mail"
                         >
-                          {submittingAction[
-                            `mail:students:${company.companyId}`
-                          ] ? (
-                            <Loader2 size={15} className="animate-spin" />
-                          ) : (
-                            <Users size={15} />
-                          )}
-                          {submittingAction[
-                            `mail:students:${company.companyId}`
-                          ]
-                            ? "Requesting..."
-                            : "Mail"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openTelegramModal(company)}
-                          className="btn btn-primary btn-sm w-auto justify-center text-center"
-                        >
-                          <Send size={15} />
-                          Telegram
+                          <Mail size={15} />
+                          Mail
                         </button>
                         <button
                           type="button"
                           onClick={() => openGoogleForm(company)}
-                          className="btn btn-primary btn-sm w-auto justify-center text-center"
-                          title="Open prefilled Google Form"
+                          className="btn btn-primary btn-sm"
+                          aria-label="Open prefilled Google form"
                         >
                           <ExternalLink size={15} />
                           Form
@@ -1592,109 +2294,422 @@ export default function ConfirmedPage() {
       </section>
 
       <Modal
-        isOpen={telegramModalOpen}
-        onClose={() => setTelegramModalOpen(false)}
+        isOpen={Boolean(addRoleCompany)}
+        onClose={() => closeAddRoleModal()}
         title={
-          telegramCompany
-            ? `Telegram - ${telegramCompany.companyName}`
-            : "Telegram"
+          addRoleCompany
+            ? `Add Role - ${addRoleCompany.companyName}`
+            : "Add Role"
         }
-        size="lg"
+        size="sm"
         footer={
           <>
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => setTelegramModalOpen(false)}
+              onClick={() => closeAddRoleModal()}
+              disabled={addRoleSubmitting}
             >
-              Close
+              Cancel
             </button>
             <button
               type="button"
               className="btn btn-primary btn-sm"
-              onClick={() => {
-                setTelegramModalOpen(false);
-                setActionMessage("Telegram draft saved for selected company.");
-              }}
-              disabled={!telegramCompany}
+              onClick={() => void submitAddRole()}
+              disabled={addRoleSubmitting || !addRoleTitle.trim()}
             >
-              Save Draft
+              {addRoleSubmitting ? "Adding..." : "Add role"}
             </button>
           </>
         }
       >
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
-            <p className="text-xs font-semibold text-slate-600 mb-1">
-              Template
-            </p>
-            <FilterSelect
-              value={telegramTemplateId}
-              onChange={applyTelegramTemplate}
-              options={templateOptions}
-              placeholder="Select template"
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Role title
+            </label>
+            <input
+              className="input-base"
+              value={addRoleTitle}
+              onChange={(event) => setAddRoleTitle(event.target.value)}
+              placeholder="e.g. SDE Intern"
+              disabled={addRoleSubmitting}
             />
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-            <p className="font-semibold text-slate-800 mb-1">Company Context</p>
-            {telegramCompany ? (
-              <div className="space-y-0.5">
-                <p>Company: {telegramCompany.companyName}</p>
-                <p>Season: {telegramCompany.season.name}</p>
-                <p>
-                  Roles:{" "}
-                  {telegramCompany.roles.length > 0
-                    ? telegramCompany.roles.join(", ")
-                    : "Not mapped"}
-                </p>
-                <p>Notes: {telegramCompany.notes ?? "None"}</p>
-              </div>
-            ) : (
-              <p>No company selected.</p>
-            )}
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700">
-            <p className="font-semibold text-slate-800 mb-1">
-              Selected Contact
-            </p>
-            {telegramContact ? (
-              <div className="space-y-0.5">
-                <p>Name: {telegramContact.name}</p>
-                <p>
-                  Designation: {telegramContact.designation ?? "Not available"}
-                </p>
-                <p>Phone: {telegramContact.phones[0] ?? "Not available"}</p>
-                <p>Email: {telegramContact.emails[0] ?? "Not available"}</p>
-              </div>
-            ) : (
-              <p>No contact selected.</p>
-            )}
-          </div>
-
           <div>
-            <p className="text-xs font-semibold text-slate-600 mb-1">
-              Telegram Message
-            </p>
-            <textarea
-              className="input-base min-h-52 resize-y"
-              disabled={!telegramCompany}
-              value={
-                telegramCompany
-                  ? (manualTelegramByCompany[telegramCompany.companyId] ?? "")
-                  : ""
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              {addRoleCompany?.season.seasonType === "intern"
+                ? "Stipend"
+                : "Package"}{" "}
+              (optional)
+            </label>
+            <div className="grid grid-cols-[1fr_auto] gap-2">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="input-base"
+                value={addRoleCompensation}
+                onChange={(event) => setAddRoleCompensation(event.target.value)}
+                placeholder="e.g. 12"
+                disabled={addRoleSubmitting}
+              />
+              <select
+                className="input-base min-w-20"
+                value={addRoleCompensationUnit}
+                onChange={(event) =>
+                  setAddRoleCompensationUnit(
+                    event.target.value as CompensationInputUnit,
+                  )
+                }
+                disabled={addRoleSubmitting}
+              >
+                {addRoleCompany?.season.seasonType === "placement" ? (
+                  <>
+                    <option value="lpa">LPA</option>
+                    <option value="cr">Cr</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="lpm">LPM</option>
+                    <option value="kpm">KPM</option>
+                  </>
+                )}
+              </select>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(callCompany)}
+        onClose={closeCallModal}
+        title={callCompany ? `Call - ${callCompany.companyName}` : "Call"}
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={closeCallModal}
+            >
+              Cancel
+            </button>
+            <a
+              href={
+                selectedCallContact?.phones[0]
+                  ? `tel:${selectedCallContact.phones[0]}`
+                  : undefined
               }
+              className={`btn btn-primary btn-sm ${!selectedCallContact?.phones[0] ? "pointer-events-none opacity-45" : ""}`}
+            >
+              <PhoneCall size={14} />
+              Call Now
+            </a>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Contact
+            </label>
+            <select
+              className="input-base"
+              value={callContactId}
+              onChange={(event) => setCallContactId(event.target.value)}
+            >
+              <option value="">Select a contact</option>
+              {(callCompany?.contacts ?? []).map(
+                (contact: ConfirmedContact) => (
+                  <option key={contact.id} value={contact.id}>
+                    {contact.name}
+                    {contact.designation ? ` (${contact.designation})` : ""}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+          {selectedCallContact ? (
+            <div className="space-y-1 rounded-lg border border-[#DBEAFE] bg-[#EFF6FF] px-4 py-3">
+              <p className="text-sm font-semibold text-slate-800">
+                {selectedCallContact.name}
+              </p>
+              <p className="text-xs text-slate-500">
+                {selectedCallContact.designation ?? "No designation available"}
+              </p>
+              {selectedCallContact.phones.length > 0 ? (
+                selectedCallContact.phones.map((phone) => (
+                  <a
+                    key={phone}
+                    href={`tel:${phone}`}
+                    className="flex items-center gap-2 text-sm font-medium text-[#1D4ED8] hover:underline"
+                  >
+                    <PhoneCall size={13} />
+                    {phone}
+                  </a>
+                ))
+              ) : (
+                <p className="text-xs text-slate-500">
+                  No phone number available for this contact.
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="py-2 text-center text-xs text-slate-400">
+              Select a contact to see phone numbers.
+            </p>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(mailCompany)}
+        onClose={() => closeCompanyMailModal()}
+        title={
+          mailCompany ? `Send Mail - ${mailCompany.companyName}` : "Send Mail"
+        }
+        size="lg"
+        bodyClassName="mail-scroll overflow-y-scroll"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => closeCompanyMailModal()}
+              disabled={companyMailSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => void submitCompanyMail()}
+              disabled={
+                companyMailSubmitting ||
+                parseRecipientInput(mailToRecipients).length === 0 ||
+                (mailRequestType === "template"
+                  ? !mailTemplateId
+                  : !mailSubject.trim() || !htmlToPlainText(mailBody))
+              }
+            >
+              {companyMailSubmitting ? "Queueing..." : "Queue Mail"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Contact
+            </label>
+            <select
+              className="input-base"
+              value={mailContactId}
               onChange={(event) => {
-                if (!telegramCompany) return;
-                const next = event.target.value;
-                setManualTelegramByCompany((prev) => ({
-                  ...prev,
-                  [telegramCompany.companyId]: next,
-                }));
+                const nextContactId = event.target.value;
+                setMailContactId(nextContactId);
+
+                const contact =
+                  mailCompany?.contacts.find(
+                    (candidate) => candidate.id === nextContactId,
+                  ) ?? null;
+
+                if (contact) {
+                  setMailToRecipients((current) => {
+                    const existing = parseRecipientInput(current);
+                    const next = Array.from(
+                      new Set([...contact.emails, ...existing]),
+                    );
+                    return next.join(", ");
+                  });
+                }
               }}
-              placeholder="Write telegram message here"
+            >
+              <option value="">Select a contact</option>
+              {(mailCompany?.contacts ?? []).map(
+                (contact: ConfirmedContact) => (
+                  <option key={contact.id} value={contact.id}>
+                    {contact.name}
+                    {contact.designation ? ` (${contact.designation})` : ""}
+                  </option>
+                ),
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              To
+            </label>
+            <input
+              className="input-base"
+              value={mailToRecipients}
+              onChange={(event) => setMailToRecipients(event.target.value)}
+              placeholder="Add recipient emails separated by commas"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              CC
+            </label>
+            <input
+              className="input-base"
+              value={mailCcRecipients}
+              onChange={(event) => setMailCcRecipients(event.target.value)}
+              placeholder="Add CC emails separated by commas (optional)"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            {(["template", "custom"] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setMailRequestType(type)}
+                className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium ${mailRequestType === type ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 bg-white text-slate-600"}`}
+              >
+                {type === "template" ? "Template" : "Custom"}
+              </button>
+            ))}
+          </div>
+
+          {mailRequestType === "template" ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Template
+              </label>
+              <select
+                className="input-base"
+                value={mailTemplateId}
+                onChange={(event) => setMailTemplateId(event.target.value)}
+              >
+                <option value="">Select a template</option>
+                {mailTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <>
+              <input
+                className="input-base"
+                value={mailSubject}
+                onChange={(event) => setMailSubject(event.target.value)}
+                placeholder="Email subject"
+              />
+              <RichTextEditor
+                value={mailBody}
+                onChange={setMailBody}
+                enterKeyMode="lineBreak"
+                placeholder="Write the email content"
+              />
+            </>
+          )}
+          <MailAttachmentInput
+            value={mailAttachments}
+            onChange={setMailAttachments}
+            disabled={companyMailSubmitting}
+            maxFiles={6}
+          />
+          <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+            <AlertCircle size={14} className="mt-0.5 shrink-0" />
+            <span>
+              Company mails are queued for approval before dispatch, matching
+              the outreach flow.
+            </span>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(studentMailCompany && studentMailDrive)}
+        onClose={() => closeStudentMailModal()}
+        title={
+          studentMailCompany && studentMailDrive
+            ? `Mail Students - ${studentMailCompany.companyName} - ${studentMailDrive.title}`
+            : "Mail Students"
+        }
+        size="lg"
+        bodyClassName="mail-scroll overflow-y-scroll"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => closeStudentMailModal()}
+              disabled={studentMailSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => void submitStudentMailRequest()}
+              disabled={
+                studentMailSubmitting ||
+                studentMailToEmails.length === 0 ||
+                !studentMailSubject.trim() ||
+                !studentMailBody.trim()
+              }
+            >
+              {studentMailSubmitting ? "Queueing..." : "Queue Mail"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              To
+            </label>
+            <div className="mail-scroll h-24 overflow-y-scroll overscroll-contain rounded-lg border border-[#DBEAFE] bg-[#EFF6FF] px-3 py-2 text-sm text-slate-700">
+              {studentMailToEmails.length > 0 ? (
+                <ul className="space-y-1">
+                  {studentMailToEmails.map((email) => (
+                    <li key={email} className="break-all">
+                      {email}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-slate-500">No recipients available.</p>
+              )}
+            </div>
+          </div>
+
+          <input
+            className="input-base"
+            value={studentMailSubject}
+            onChange={(event) => setStudentMailSubject(event.target.value)}
+            placeholder="Email subject"
+            disabled={studentMailSubmitting}
+          />
+
+          <RichTextEditor
+            value={studentMailBody}
+            onChange={setStudentMailBody}
+            enterKeyMode="lineBreak"
+            placeholder="Write the email content"
+          />
+
+          <MailAttachmentInput
+            value={studentMailAttachments}
+            onChange={setStudentMailAttachments}
+            disabled={studentMailSubmitting}
+            maxFiles={6}
+          />
+
+          <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-700">
+            <AlertCircle size={14} className="mt-0.5 shrink-0" />
+            <span>
+              Student mails are queued for approval before dispatch, matching
+              the outreach flow.
+            </span>
           </div>
         </div>
       </Modal>

@@ -277,17 +277,17 @@ Submit blog draft.
 - **Auth Required**: Yes (student, tpo_admin, coordinator)
 - **Body**: `{ companyId, title, body, tags?, isAiAssisted? }`
 
-#### `GET /api/v1/admin/blogs/moderation?status=pending`
+#### `GET /api/v1/blogs/moderation?status=pending`
 
 Get moderation queue.
 
 - **Auth Required**: Yes (tpo_admin, coordinator)
 
-#### `POST /api/v1/admin/blogs/:blogId/approve`
+#### `POST /api/v1/blogs/:blogId/approve`
 
 Approve blog.
 
-#### `POST /api/v1/admin/blogs/:blogId/reject`
+#### `POST /api/v1/blogs/:blogId/reject`
 
 Reject blog with note.
 

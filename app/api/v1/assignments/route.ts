@@ -37,10 +37,18 @@ type UnassignedCycleItem = {
   companyId: string;
   companyName: string;
   industry: string | null;
+  priority: number | null;
   status: string;
   seasonId: string;
   season: string;
   updatedAt: string;
+};
+
+type CompanyListItem = {
+  companyId: string;
+  companyName: string;
+  industry: string | null;
+  priority: number | null;
 };
 
 export async function GET() {
@@ -57,7 +65,7 @@ export async function GET() {
   }
 
   try {
-    const [coordinatorRows, cycleRows] = await Promise.all([
+    const [coordinatorRows, cycleRows, companyRows] = await Promise.all([
       db.user.findMany({
         where: {
           role: "coordinator",
@@ -97,6 +105,15 @@ export async function GET() {
           { createdAt: "desc" },
         ],
       }),
+      db.company.findMany({
+        select: {
+          id: true,
+          name: true,
+          industry: true,
+          priority: true,
+        },
+        orderBy: { name: "asc" },
+      }),
     ]);
 
     const assignments: AssignmentListItem[] = cycleRows.flatMap((cycle) => {
@@ -127,16 +144,25 @@ export async function GET() {
         companyId: cycle.company.id,
         companyName: cycle.company.name,
         industry: cycle.company.industry,
+        priority: cycle.company.priority,
         status: cycle.status,
         seasonId: cycle.season.id,
         season: cycle.season.name,
         updatedAt: cycle.updatedAt.toISOString(),
       }));
 
+    const companies: CompanyListItem[] = companyRows.map((company) => ({
+      companyId: company.id,
+      companyName: company.name,
+      industry: company.industry,
+      priority: company.priority,
+    }));
+
     return success({
       coordinators: coordinatorRows,
       assignments,
       unassignedCycles,
+      companies,
     });
   } catch (error) {
     console.error("Error fetching assignments:", error);

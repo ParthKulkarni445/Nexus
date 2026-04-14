@@ -74,7 +74,6 @@ body::before {
   animation: gridDrift 6s linear infinite;
   will-change: transform; */
 }
-/* 
 @keyframes gridDrift {
   from {
     transform: translate3d(0, 0, 0);
@@ -83,9 +82,19 @@ body::before {
   to {
     transform: translate3d(144px, 144px, 0);
   }
-} */
+}
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
+@keyframes gridPanelDrift {
+  from {
+    background-position: -72px -72px;
+  }
+
+  to {
+    background-position: 72px 72px;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 0;
   height: 0;
@@ -144,6 +153,30 @@ body::before {
 
 .schedule-scroll::-webkit-scrollbar-thumb:hover {
   background: #60A5FA;
+}
+
+.mail-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #94A3B8 #E2E8F0;
+}
+
+.mail-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.mail-scroll::-webkit-scrollbar-track {
+  background: #E2E8F0;
+  border-radius: 9999px;
+}
+
+.mail-scroll::-webkit-scrollbar-thumb {
+  background: #94A3B8;
+  border-radius: 9999px;
+}
+
+.mail-scroll::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
 }
 
 /* ── Animations ────────────────────────────────────────────── */
@@ -311,13 +344,13 @@ body::before {
 }
 
 .btn-secondary {
-  background: #484848;
+  background: #6B7280;
   color: #fff;
   border-color: var(--card-border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #8f8f8f;
+  background: #4B5563;
 }
 
 .btn-danger {
@@ -366,7 +399,7 @@ body::before {
 .flushbar-stack {
   position: fixed;
   bottom: 16px;
-  left: 16px;
+  right: 16px;
   z-index: 50;
   width: min(92vw, 380px);
   pointer-events: none;
@@ -379,7 +412,7 @@ body::before {
   --flushbar-track: #DBEAFE;
   --flushbar-progress: var(--primary);
 
-  overflow: hidden;
+  width: 100%;
   border: 1px solid var(--flushbar-border);
   border-radius: 12px;
   background: var(--flushbar-bg);
@@ -389,38 +422,43 @@ body::before {
 }
 
 .flushbar-warning {
-  --flushbar-bg: var(--primary-light);
-  --flushbar-border: var(--ring);
-  --flushbar-icon: var(--primary-hover);
-  --flushbar-track: #DBEAFE;
-  --flushbar-progress: var(--primary);
+  --flushbar-bg: #FFFAEB;
+  --flushbar-border: #FED7AA;
+  --flushbar-icon: #D97706;
+  --flushbar-track: #FCD34D;
+  --flushbar-progress: #F59E0B;
 }
 
 .flushbar-error {
-  --flushbar-bg: var(--primary-light);
-  --flushbar-border: var(--ring);
-  --flushbar-icon: var(--primary-hover);
-  --flushbar-track: #DBEAFE;
-  --flushbar-progress: var(--primary);
+  --flushbar-bg: #FEF2F2;
+  --flushbar-border: #FECACA;
+  --flushbar-icon: #DC2626;
+  --flushbar-track: #FCA5A5;
+  --flushbar-progress: #EF4444;
+}
+
+.flushbar-success {
+  --flushbar-bg: #F0FDF4;
+  --flushbar-border: #DCFCE7;
+  --flushbar-icon: #16A34A;
+  --flushbar-track: #BBFACB;
+  --flushbar-progress: #22C55E;
 }
 
 .flushbar-progress-track {
-  height: 4px;
+  height: 3px;
   width: 100%;
   background: var(--flushbar-track);
 }
 
 .flushbar-progress {
   height: 100%;
-  width: 100%;
   background: var(--flushbar-progress);
-  transition-property: width;
-  transition-timing-function: linear;
 }
 
 .flushbar-body {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   padding: 12px 14px;
 }
@@ -436,6 +474,8 @@ body::before {
   font-size: 14px;
   font-weight: 500;
   line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
 }
 
 /* ── Nav active glow ───────────────────────────────────────── */

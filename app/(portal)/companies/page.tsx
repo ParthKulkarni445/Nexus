@@ -234,16 +234,16 @@ function CompaniesTableSkeleton() {
   return (
     <div className="min-w-160 p-4">
       <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
-        <div className="grid grid-cols-[minmax(0,2.4fr)_1fr_0.9fr_1.1fr_1.2fr_0.9fr] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
-          {Array.from({ length: 6 }, (_, index) => (
+        <div className="grid grid-cols-[minmax(0,2.4fr)_1fr_0.9fr_1.2fr_auto] gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
+          {Array.from({ length: 5 }, (_, index) => (
             <div
               key={index}
-              className={`shimmer h-3 rounded-full ${
+              className={`shimmer h-4 rounded-full ${
                 index === 0
                   ? "w-20"
-                  : index === 4
+                  : index === 3
                     ? "w-24 justify-self-center"
-                    : index === 5
+                    : index === 4
                       ? "w-16 justify-self-center"
                       : "w-14"
               }`}
@@ -254,26 +254,23 @@ function CompaniesTableSkeleton() {
           {Array.from({ length: 7 }, (_, index) => (
             <div
               key={index}
-              className="grid grid-cols-[minmax(0,2.4fr)_1fr_0.9fr_1.1fr_1.2fr_0.9fr] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
+              className="grid grid-cols-[minmax(0,2.4fr)_1fr_0.9fr_1.2fr_auto] items-center gap-2 border-b border-slate-100 px-4 py-3 last:border-b-0"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <div className="shimmer h-8 w-8 rounded-lg shrink-0" />
+                <div className="shimmer h-10 w-10 rounded-lg shrink-0" />
                 <div className="min-w-0 space-y-2">
-                  <div className="shimmer h-4 w-36 rounded-full" />
-                  <div className="shimmer h-3 w-20 rounded-full" />
+                  <div className="shimmer h-5 w-36 rounded-full" />
+                  <div className="shimmer h-4 w-20 rounded-full" />
                 </div>
               </div>
-              <div className="shimmer h-4 w-20 rounded-full" />
-              <div className="shimmer h-6 w-16 rounded-full" />
-              <div className="shimmer h-4 w-24 rounded-full" />
-              <div className="flex justify-center">
-                <div className="shimmer h-4 w-28 rounded-full" />
-              </div>
-              <div className="flex justify-center gap-2">
-                <div className="shimmer h-8 w-8 rounded-lg" />
-                <div className="shimmer h-8 w-8 rounded-lg" />
-                <div className="shimmer h-8 w-8 rounded-lg" />
-                <div className="shimmer h-8 w-8 rounded-lg" />
+              <div className="shimmer h-5 w-20 rounded-full" />
+              <div className="shimmer h-7 w-16 rounded-full" />
+              <div className="shimmer h-5 w-24 rounded-full" />
+              <div className="flex justify-center gap-1">
+                <div className="shimmer h-10 w-10 rounded-lg" />
+                <div className="shimmer h-10 w-10 rounded-lg" />
+                <div className="shimmer h-10 w-10 rounded-lg" />
+                <div className="shimmer h-10 w-10 rounded-lg" />
               </div>
             </div>
           ))}
@@ -485,7 +482,6 @@ export default function CompaniesPage() {
   const [search, setSearch] = useState("");
   const [industryFilter, setIndustryFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
-  const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
   const [sortField, setSortField] = useState<keyof Company | null>(null);
   const [sortDir, setSortDir] = useState<"none" | "asc" | "desc">("none");
   const [page, setPage] = useState(1);
@@ -868,8 +864,6 @@ export default function CompaniesPage() {
       data = data.filter((c) => industryFilter.includes(c.industry));
     if (priorityFilter.length > 0)
       data = data.filter((c) => priorityFilter.includes(c.priority));
-    if (assigneeFilter.length > 0)
-      data = data.filter((c) => assigneeFilter.includes(c.assignedTo));
 
     if (sortField && sortDir !== "none") {
       data = [...data].sort((a, b) => {
@@ -881,33 +875,7 @@ export default function CompaniesPage() {
     }
 
     return data;
-  }, [
-    search,
-    industryFilter,
-    priorityFilter,
-    assigneeFilter,
-    sortField,
-    sortDir,
-    companies,
-  ]);
-
-  const coordinatorOptions = useMemo(() => {
-    const values = new Set(companies.map((company) => company.assignedTo));
-    values.add("Unassigned");
-
-    return Array.from(values)
-      .filter(Boolean)
-      .sort((a, b) => {
-        if (a === "Unassigned") {
-          return 1;
-        }
-        if (b === "Unassigned") {
-          return -1;
-        }
-        return a.localeCompare(b);
-      })
-      .map((value) => ({ value, label: value }));
-  }, [companies]);
+  }, [search, industryFilter, priorityFilter, sortField, sortDir, companies]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
@@ -960,370 +928,342 @@ export default function CompaniesPage() {
     );
   };
 
-  const activeFilterCount =
-    industryFilter.length + priorityFilter.length + assigneeFilter.length;
+  const activeFilterCount = industryFilter.length + priorityFilter.length;
 
   return (
     <div className="animate-fade-in xl:h-full pb-6 pt-6">
       <div className="card overflow-hidden min-w-0 xl:h-full flex flex-col">
-          {/* Toolbar */}
-          <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
-            {(toolbarMessage || toolbarError) && (
-              <div
-                className={`rounded-lg px-3 py-2 text-sm ${
-                  toolbarError
-                    ? "border border-red-200 bg-red-50 text-red-700"
-                    : "border border-emerald-200 bg-emerald-50 text-emerald-700"
+        {/* Toolbar */}
+        <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
+          {(toolbarMessage || toolbarError) && (
+            <div
+              className={`rounded-lg px-3 py-2 text-sm ${
+                toolbarError
+                  ? "border border-red-200 bg-red-50 text-red-700"
+                  : "border border-emerald-200 bg-emerald-50 text-emerald-700"
+              }`}
+            >
+              {toolbarError ?? toolbarMessage}
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <SearchBar
+              value={search}
+              onChange={(v) => {
+                setSearch(v);
+                setPage(1);
+              }}
+              placeholder="Search companies..."
+              className="flex-1 min-w-0"
+            />
+            <div className="ml-auto flex items-center gap-2 shrink-0">
+              <button
+                className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
+                  showFilters
+                    ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]"
+                    : ""
                 }`}
+                onClick={() => {
+                  setToolbarMessage(null);
+                  setToolbarError(null);
+                  setShowFilters((v) => !v);
+                }}
               >
-                {toolbarError ?? toolbarMessage}
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <SearchBar
-                value={search}
+                <Filter size={14} />
+                Filters
+                {activeFilterCount > 0 && (
+                  <span className="w-4 h-4 rounded-full bg-[#2563EB] text-white text-[10px] flex items-center justify-center">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </button>
+              <div className="w-px h-5 bg-(--card-border) shrink-0" />
+              <button
+                className="btn btn-secondary btn-sm gap-1.5 shrink-0"
+                onClick={() => void handleExportCompanies()}
+                disabled={exportingCompanies || importingCompanies}
+              >
+                <Download size={14} />
+                {exportingCompanies ? "Exporting..." : "Export"}
+              </button>
+              <button
+                className="btn btn-secondary btn-sm gap-1.5 shrink-0"
+                onClick={handleImportCompaniesClick}
+                disabled={importingCompanies || exportingCompanies}
+              >
+                <Upload size={14} />
+                {importingCompanies ? "Importing..." : "Import"}
+              </button>
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                className="hidden"
+                onChange={(event) => {
+                  void handleImportFileChange(event);
+                }}
+              />
+              <button
+                className="btn btn-primary btn-sm gap-1.5 shrink-0"
+                onClick={() => {
+                  setModalError(null);
+                  setSelectedCompany(null);
+                  setAddEditOpen(true);
+                }}
+              >
+                <Plus size={14} />
+                Add
+              </button>
+            </div>
+          </div>
+
+          {/* Filter row */}
+          {showFilters && (
+            <div className="flex items-center gap-2 pt-1 pb-0.5 w-full">
+              <FilterSelect
+                multiple
+                value={industryFilter}
                 onChange={(v) => {
-                  setSearch(v);
+                  setIndustryFilter(v);
                   setPage(1);
                 }}
-                placeholder="Search companies..."
+                options={INDUSTRY_OPTIONS}
+                placeholder="Industry"
                 className="flex-1 min-w-0"
               />
-              <div className="ml-auto flex items-center gap-2 shrink-0">
+              <FilterSelect
+                multiple
+                value={priorityFilter}
+                onChange={(v) => {
+                  setPriorityFilter(v);
+                  setPage(1);
+                }}
+                options={PRIORITY_OPTIONS}
+                placeholder="Priority"
+                className="flex-1 min-w-0"
+              />
+              {activeFilterCount > 0 && (
                 <button
-                  className={`btn btn-secondary btn-sm gap-1 shrink-0 ${
-                    showFilters
-                      ? "bg-[#EFF6FF] border-[#BFDBFE] text-[#1D4ED8]"
-                      : ""
-                  }`}
+                  className="btn btn-ghost btn-sm text-slate-500 hover:text-slate-700 shrink-0"
                   onClick={() => {
-                    setToolbarMessage(null);
-                    setToolbarError(null);
-                    setShowFilters((v) => !v);
+                    setIndustryFilter([]);
+                    setPriorityFilter([]);
+                    setPage(1);
                   }}
                 >
-                  <Filter size={14} />
-                  Filters
-                  {activeFilterCount > 0 && (
-                    <span className="w-4 h-4 rounded-full bg-[#2563EB] text-white text-[10px] flex items-center justify-center">
-                      {activeFilterCount}
-                    </span>
-                  )}
+                  Clear all
                 </button>
-                <div className="w-px h-5 bg-(--card-border) shrink-0" />
-                <button
-                  className="btn btn-secondary btn-sm gap-1.5 shrink-0"
-                  onClick={() => void handleExportCompanies()}
-                  disabled={exportingCompanies || importingCompanies}
-                >
-                  <Download size={14} />
-                  {exportingCompanies ? "Exporting..." : "Export"}
-                </button>
-                <button
-                  className="btn btn-secondary btn-sm gap-1.5 shrink-0"
-                  onClick={handleImportCompaniesClick}
-                  disabled={importingCompanies || exportingCompanies}
-                >
-                  <Upload size={14} />
-                  {importingCompanies ? "Importing..." : "Import"}
-                </button>
-                <input
-                  ref={importFileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                  className="hidden"
-                  onChange={(event) => {
-                    void handleImportFileChange(event);
-                  }}
-                />
-                <button
-                  className="btn btn-primary btn-sm gap-1.5 shrink-0"
-                  onClick={() => {
-                    setModalError(null);
-                    setSelectedCompany(null);
-                    setAddEditOpen(true);
-                  }}
-                >
-                  <Plus size={14} />
-                  Add
-                </button>
-              </div>
+              )}
             </div>
+          )}
+        </div>
 
-            {/* Filter row */}
-            {showFilters && (
-              <div className="flex items-center gap-2 pt-1 pb-0.5 w-full">
-                <FilterSelect
-                  multiple
-                  value={industryFilter}
-                  onChange={(v) => {
-                    setIndustryFilter(v);
-                    setPage(1);
-                  }}
-                  options={INDUSTRY_OPTIONS}
-                  placeholder="Industry"
-                  className="flex-1 min-w-0"
-                />
-                <FilterSelect
-                  multiple
-                  value={priorityFilter}
-                  onChange={(v) => {
-                    setPriorityFilter(v);
-                    setPage(1);
-                  }}
-                  options={PRIORITY_OPTIONS}
-                  placeholder="Priority"
-                  className="flex-1 min-w-0"
-                />
-                <FilterSelect
-                  multiple
-                  value={assigneeFilter}
-                  onChange={(v) => {
-                    setAssigneeFilter(v);
-                    setPage(1);
-                  }}
-                  options={coordinatorOptions}
-                  placeholder="Coordinator"
-                  className="flex-1 min-w-0"
-                />
-                {activeFilterCount > 0 && (
-                  <button
-                    className="btn btn-ghost btn-sm text-slate-500 hover:text-slate-700 shrink-0"
-                    onClick={() => {
-                      setIndustryFilter([]);
-                      setPriorityFilter([]);
-                      setAssigneeFilter([]);
-                      setPage(1);
-                    }}
-                  >
-                    Clear all
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Table */}
-          <div className="flex-1 overflow-auto">
-            {loading ? (
-              <CompaniesTableSkeleton />
-            ) : listError ? (
-              <EmptyState
-                icon={Building2}
-                title="Unable to load companies"
-                description={listError}
-              />
-            ) : paginated.length === 0 ? (
-              <EmptyState
-                icon={Building2}
-                title="No companies found"
-                description="Try adjusting your search or filters"
-              />
-            ) : (
-              <table className="w-full text-sm min-w-160">
-                <thead>
-                  <tr className="bg-slate-100 border-b border-slate-100">
-                    {(
-                      [
-                        "name",
-                        "industry",
-                        "priority",
-                        "assignedTo",
-                        "lastUpdated",
-                      ] as (keyof Company)[]
-                    ).map((f) => (
-                      <th
-                        key={f}
-                        className={`px-4 py-3 ${f === "lastUpdated" ? "text-center" : "text-left"} text-xs font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap group cursor-pointer select-none`}
-                        onClick={() => handleSort(f)}
-                      >
-                        <span
-                          className={`flex items-center ${f === "lastUpdated" ? "justify-center" : "justify-left"} gap-1`}
-                        >
-                          {f === "name"
-                            ? "Company"
-                            : f === "assignedTo"
-                              ? "Assigned To"
-                              : f === "lastUpdated"
-                                ? "Last Updated"
-                                : f.charAt(0).toUpperCase() + f.slice(1)}
-                          <SortIcon field={f} />
-                        </span>
-                      </th>
-                    ))}
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {paginated.map((company) => (
-                    <tr
-                      key={company.id}
-                      className="table-row-hover transition-colors"
+        {/* Table */}
+        <div className="flex-1 overflow-auto">
+          {loading ? (
+            <CompaniesTableSkeleton />
+          ) : listError ? (
+            <EmptyState
+              icon={Building2}
+              title="Unable to load companies"
+              description={listError}
+            />
+          ) : paginated.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title="No companies found"
+              description="Try adjusting your search or filters"
+            />
+          ) : (
+            <table className="w-full text-sm min-w-160">
+              <thead>
+                <tr className="bg-slate-100 border-b border-slate-100">
+                  {(
+                    [
+                      "name",
+                      "industry",
+                      "priority",
+                      "lastUpdated",
+                    ] as (keyof Company)[]
+                  ).map((f) => (
+                    <th
+                      key={f}
+                      className={`px-4 py-3 ${f === "lastUpdated" ? "text-center" : "text-left"} text-xs font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap group cursor-pointer select-none`}
+                      onClick={() => handleSort(f)}
                     >
-                      <td className="px-4 py-3">
+                      <span
+                        className={`flex items-center ${f === "lastUpdated" ? "justify-center" : "justify-left"} gap-1`}
+                      >
+                        {f === "name"
+                          ? "Company"
+                          : f === "lastUpdated"
+                            ? "Last Updated"
+                            : f.charAt(0).toUpperCase() + f.slice(1)}
+                        <SortIcon field={f} />
+                      </span>
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {paginated.map((company) => (
+                  <tr
+                    key={company.id}
+                    className="table-row-hover transition-colors"
+                  >
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/companies/${company.id}`}
+                        className="flex items-center gap-3 group"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#2563EB] font-semibold text-xs shrink-0">
+                          {company.name.charAt(0)}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-slate-900 group-hover:text-[#2563EB] transition-colors truncate">
+                            {company.name}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {company.contacts} contacts
+                          </p>
+                        </div>
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {company.industry}
+                    </td>
+                    <td className="px-4 py-3">
+                      {PRIORITY_BADGE[company.priority]}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-2">
+                        <span>
+                          {new Date(company.lastUpdated).toLocaleString(
+                            "en-IN",
+                            {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            },
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-200 text-slate-500 hover:text-[#2563EB] hover:border-[#BFDBFE] hover:bg-[#EFF6FF] transition-colors"
+                          aria-label="Show update details"
+                          title="Show update details"
+                          onClick={(event) =>
+                            handleOpenUpdateDetails(company, event)
+                          }
+                        >
+                          <Info size={12} />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1 relative">
                         <Link
                           href={`/companies/${company.id}`}
-                          className="flex items-center gap-3 group"
+                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
+                          title="View"
                         >
-                          <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#2563EB] font-semibold text-xs shrink-0">
-                            {company.name.charAt(0)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-medium text-slate-900 group-hover:text-[#2563EB] transition-colors truncate">
-                              {company.name}
-                            </p>
-                            <p className="text-xs text-slate-400">
-                              {company.contacts} contacts
-                            </p>
-                          </div>
+                          <Eye size={15} />
                         </Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {company.industry}
-                      </td>
-                      <td className="px-4 py-3">
-                        {PRIORITY_BADGE[company.priority]}
-                      </td>
-                      <td className="px-4 py-3">
-                        {company.assignedTo === "Unassigned" ? (
-                          <span className="text-slate-400 text-xs italic">
-                            Unassigned
+                        <button
+                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
+                          title="Edit"
+                          onClick={() => {
+                            setModalError(null);
+                            setSelectedCompany(company);
+                            setAddEditOpen(true);
+                          }}
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
+                          title="Add Contact"
+                          onClick={() => {
+                            setModalError(null);
+                            setContactTargetCompany(company);
+                            setContactModalOpen(true);
+                          }}
+                        >
+                          <span className="relative inline-flex items-center justify-center">
+                            <PhoneCall size={14} />
+                            <Plus
+                              size={9}
+                              className="absolute -right-1 -bottom-1 bg-white rounded-full"
+                            />
                           </span>
-                        ) : (
-                          <span className="text-slate-700 text-sm">
-                            {company.assignedTo}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
-                        <div className="flex items-center justify-center gap-2">
-                          <span>
-                            {new Date(company.lastUpdated).toLocaleString(
-                              "en-IN",
-                              {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              },
-                            )}
-                          </span>
-                          <button
-                            type="button"
-                            className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-200 text-slate-500 hover:text-[#2563EB] hover:border-[#BFDBFE] hover:bg-[#EFF6FF] transition-colors"
-                            aria-label="Show update details"
-                            title="Show update details"
-                            onClick={(event) =>
-                              handleOpenUpdateDetails(company, event)
-                            }
-                          >
-                            <Info size={12} />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1 relative">
-                          <Link
-                            href={`/companies/${company.id}`}
-                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
-                            title="View"
-                          >
-                            <Eye size={15} />
-                          </Link>
-                          <button
-                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
-                            title="Edit"
-                            onClick={() => {
-                              setModalError(null);
-                              setSelectedCompany(company);
-                              setAddEditOpen(true);
-                            }}
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
-                            title="Add Contact"
-                            onClick={() => {
-                              setModalError(null);
-                              setContactTargetCompany(company);
-                              setContactModalOpen(true);
-                            }}
-                          >
-                            <span className="relative inline-flex items-center justify-center">
-                              <PhoneCall size={14} />
-                              <Plus
-                                size={9}
-                                className="absolute -right-1 -bottom-1 bg-white rounded-full"
-                              />
-                            </span>
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
-                            title="Delete"
-                            onClick={() => {
-                              setModalError(null);
-                              setSelectedCompany(company);
-                              setDeleteOpen(true);
-                            }}
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
+                          title="Delete"
+                          onClick={() => {
+                            setModalError(null);
+                            setSelectedCompany(company);
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
 
-          {/* Pagination */}
-          <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-4">
-            <p className="text-xs text-slate-500">
-              {filtered.length}{" "}
-              {filtered.length === 1 ? "company" : "companies"}
-              {totalPages > 1 && (
-                <>
-                  {" "}
-                  &mdash; page {page} of {totalPages}
-                </>
-              )}
-            </p>
+        {/* Pagination */}
+        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-4">
+          <p className="text-xs text-slate-500">
+            {filtered.length} {filtered.length === 1 ? "company" : "companies"}
             {totalPages > 1 && (
-              <div className="flex items-center gap-1">
-                <button
-                  className="btn btn-secondary btn-sm btn-icon"
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const p = i + 1;
-                  return (
-                    <button
-                      key={p}
-                      className={`btn btn-sm w-8 h-8 p-0 justify-center ${page === p ? "btn-primary" : "btn-secondary"}`}
-                      onClick={() => setPage(p)}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-                <button
-                  className="btn btn-secondary btn-sm btn-icon"
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => p + 1)}
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </div>
+              <>
+                {" "}
+                &mdash; page {page} of {totalPages}
+              </>
             )}
-          </div>
+          </p>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                className="btn btn-secondary btn-sm btn-icon"
+                disabled={page === 1}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                <ChevronLeft size={14} />
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const p = i + 1;
+                return (
+                  <button
+                    key={p}
+                    className={`btn btn-sm w-8 h-8 p-0 justify-center ${page === p ? "btn-primary" : "btn-secondary"}`}
+                    onClick={() => setPage(p)}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+              <button
+                className="btn btn-secondary btn-sm btn-icon"
+                disabled={page === totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {updateDetails && (

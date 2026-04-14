@@ -721,7 +721,8 @@ function ActionModals({
               placeholder="hr@example.com, team@example.com"
             />
             <p className="mt-1 text-xs text-slate-500">
-              Add multiple CC emails separated by commas, semicolons, or new lines.
+              Add multiple CC emails separated by commas, semicolons, or new
+              lines.
             </p>
           </div>
           {effectiveReplyContext ? (
@@ -1431,7 +1432,7 @@ export default function OutreachPage() {
             ].map((item) => (
               <div
                 key={item.title}
-                className="rounded-xl border border-[#3B82F6] bg-[#3B82F6] px-3 py-2.5 shadow-sm"
+                className="rounded-xl border border-[#3B82F6] bg-[#3B82F6] px-3 py-2.5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -1540,7 +1541,7 @@ export default function OutreachPage() {
                           onClick={() => setSelectedCompanyId(entry.companyId)}
                           className={`w-full rounded-xl border px-4 py-3 text-left transition-all ${
                             isSelected
-                              ? "border-[#93C5FD] bg-[#EFF6FF] shadow-sm"
+                              ? "border-[#93C5FD] bg-[#EFF6FF]"
                               : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
                           }`}
                         >
@@ -1802,108 +1803,110 @@ export default function OutreachPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between gap-3 pb-4">
-                          <div>
-                            <h4 className="text-sm font-semibold text-slate-800">
-                              Activity Timeline
-                            </h4>
-                            <p className="mt-1 text-xs text-slate-500">
-                              Calls, mails, and notes logged for this company.
-                            </p>
+                        <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
+                          <div className="flex items-center justify-between gap-3 pb-4">
+                            <div>
+                              <h4 className="text-sm font-semibold text-slate-800">
+                                Activity Timeline
+                              </h4>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Calls, mails, and notes logged for this company.
+                              </p>
+                            </div>
+                            <Badge size="sm" variant="gray">
+                              {selectedEntry.interactions.length}
+                            </Badge>
                           </div>
-                          <Badge size="sm" variant="gray">
-                            {selectedEntry.interactions.length}
-                          </Badge>
-                        </div>
 
-                        {selectedEntry.interactions.length > 0 ? (
-                          <div className="schedule-scroll min-h-0 flex-1 overflow-y-auto pr-1">
-                            <div className="space-y-0 pr-2">
-                              {selectedEntry.interactions.map(
-                                (interaction, index) => {
-                                  const meta = getInteractionMeta(
-                                    interaction.action,
-                                  );
-                                  const Icon = meta.icon;
-                                  const isLast =
-                                    index ===
-                                    selectedEntry.interactions.length - 1;
+                          {selectedEntry.interactions.length > 0 ? (
+                            <div className="schedule-scroll min-h-0 flex-1 overflow-y-auto pr-1 border border-slate-200 bg-white rounded-lg p-3 -mx-1">
+                              <div className="space-y-0 pr-2">
+                                {selectedEntry.interactions.map(
+                                  (interaction, index) => {
+                                    const meta = getInteractionMeta(
+                                      interaction.action,
+                                    );
+                                    const Icon = meta.icon;
+                                    const isLast =
+                                      index ===
+                                      selectedEntry.interactions.length - 1;
 
-                                  return (
-                                    <div
-                                      key={interaction.id}
-                                      className="flex gap-3"
-                                    >
-                                      <div className="flex shrink-0 flex-col items-center">
-                                        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#DBEAFE] bg-[#EFF6FF]">
-                                          <Icon
-                                            size={14}
-                                            className="text-[#2563EB]"
-                                          />
-                                        </div>
-                                        {!isLast && (
-                                          <div className="my-1 w-0.5 flex-1 bg-slate-100" />
-                                        )}
-                                      </div>
-
+                                    return (
                                       <div
-                                        className={`${isLast ? "pb-0" : "pb-5"} min-w-0 flex-1`}
+                                        key={interaction.id}
+                                        className="flex gap-3"
                                       >
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <span
-                                            className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.badgeClass}`}
-                                          >
-                                            {meta.label}
-                                          </span>
-                                          <span className="text-[11px] text-slate-400">
-                                            {formatDateTime(
-                                              interaction.createdAt,
-                                            )}
-                                          </span>
+                                        <div className="flex shrink-0 flex-col items-center">
+                                          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#DBEAFE] bg-[#EFF6FF]">
+                                            <Icon
+                                              size={14}
+                                              className="text-[#2563EB]"
+                                            />
+                                          </div>
+                                          {!isLast && (
+                                            <div className="my-1 w-0.5 flex-1 bg-slate-100" />
+                                          )}
                                         </div>
-                                        <p className="mt-2 text-sm font-medium text-slate-800">
-                                          {interaction.summary}
-                                        </p>
-                                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                                          {interaction.contactName ? (
-                                            <span className="rounded-full bg-slate-100 px-2 py-1">
-                                              {interaction.contactName}
+
+                                        <div
+                                          className={`${isLast ? "pb-0" : "pb-5"} min-w-0 flex-1`}
+                                        >
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span
+                                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.badgeClass}`}
+                                            >
+                                              {meta.label}
                                             </span>
-                                          ) : null}
-                                          {interaction.season ? (
-                                            <span className="rounded-full bg-slate-100 px-2 py-1">
-                                              {interaction.season}
-                                            </span>
-                                          ) : null}
-                                          {interaction.outcome ? (
-                                            <span className="rounded-full bg-slate-100 px-2 py-1">
-                                              Outcome: {interaction.outcome}
-                                            </span>
-                                          ) : null}
-                                          {interaction.nextFollowUpAt ? (
-                                            <span className="rounded-full bg-[#EFF6FF] px-2 py-1 text-[#1D4ED8]">
-                                              Follow-up:{" "}
-                                              {formatDate(
-                                                interaction.nextFollowUpAt,
+                                            <span className="text-[11px] text-slate-400">
+                                              {formatDateTime(
+                                                interaction.createdAt,
                                               )}
                                             </span>
-                                          ) : null}
+                                          </div>
+                                          <p className="mt-2 text-sm font-medium text-slate-800">
+                                            {interaction.summary}
+                                          </p>
+                                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                                            {interaction.contactName ? (
+                                              <span className="rounded-full bg-slate-100 px-2 py-1">
+                                                {interaction.contactName}
+                                              </span>
+                                            ) : null}
+                                            {interaction.season ? (
+                                              <span className="rounded-full bg-slate-100 px-2 py-1">
+                                                {interaction.season}
+                                              </span>
+                                            ) : null}
+                                            {interaction.outcome ? (
+                                              <span className="rounded-full bg-slate-100 px-2 py-1">
+                                                Outcome: {interaction.outcome}
+                                              </span>
+                                            ) : null}
+                                            {interaction.nextFollowUpAt ? (
+                                              <span className="rounded-full bg-[#EFF6FF] px-2 py-1 text-[#1D4ED8]">
+                                                Follow-up:{" "}
+                                                {formatDate(
+                                                  interaction.nextFollowUpAt,
+                                                )}
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                          <p className="mt-2 text-xs text-slate-400">
+                                            Logged by {interaction.createdBy}
+                                          </p>
                                         </div>
-                                        <p className="mt-2 text-xs text-slate-400">
-                                          Logged by {interaction.createdBy}
-                                        </p>
                                       </div>
-                                    </div>
-                                  );
-                                },
-                              )}
+                                    );
+                                  },
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-sm text-slate-500">
-                            Logged outreach activity will appear here.
-                          </div>
-                        )}
+                          ) : (
+                            <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-sm text-slate-500">
+                              Logged outreach activity will appear here.
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>

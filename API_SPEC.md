@@ -154,11 +154,11 @@
   - Student submits blog draft.
 - `GET /blogs?company=&tag=&page=`
   - Browse approved blogs with filters.
-- `GET /admin/blogs/moderation?status=pending`
+- `GET /blogs/moderation?status=pending`
   - Moderation queue.
-- `POST /admin/blogs/:blogId/approve`
+- `POST /blogs/:blogId/approve`
   - Approve blog.
-- `POST /admin/blogs/:blogId/reject`
+- `POST /blogs/:blogId/reject`
   - Reject blog with note.
 
 ## 13) Student Company-wise History/Stats

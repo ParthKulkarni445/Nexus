@@ -101,9 +101,42 @@ export default function LoginPage() {
       </div>
 
       {/* ── Right form panel ────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-14">
+      <div
+        className="relative flex-1 flex flex-col items-center justify-center overflow-hidden px-6 py-14"
+        style={{
+          background:
+            "linear-gradient(135deg, #F8FBFF 0%, #EEF5FF 48%, #F8FBFF 100%)",
+        }}
+      >
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 z-0"
+          style={{
+            background:
+              "radial-gradient(circle at top left, rgba(37,99,235,0.16), transparent 34%), radial-gradient(circle at bottom right, rgba(59,130,246,0.18), transparent 40%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 z-0 opacity-100"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(37,99,235,0.25) 2px, transparent 2px), linear-gradient(90deg, rgba(37,99,235,0.25) 2px, transparent 2px)",
+            backgroundSize: "72px 72px",
+            backgroundPosition: "-72px -72px",
+            animation: "gridPanelDrift 7s linear infinite",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="absolute inset-y-0 right-0 z-0 hidden w-2/3 lg:block"
+          style={{
+            background:
+              "radial-gradient(circle at center, rgba(255,255,255,0.18), rgba(255,255,255,0) 68%)",
+          }}
+        />
         {/* Mobile logo */}
-        <div className="lg:hidden flex items-center gap-2 mb-10 select-none">
+        <div className="relative z-10 lg:hidden flex items-center gap-2 mb-10 select-none">
           <OrbitIcon size={26} className="text-black" />
           <span className="font-black text-[#2563EB]">
             <span className="text-2xl leading-none">N</span>
@@ -111,7 +144,7 @@ export default function LoginPage() {
           </span>
         </div>
 
-        <div className="card w-full max-w-sm p-8">
+        <div className="relative z-10 card w-full max-w-sm p-8 backdrop-blur-[2px]">
           {/* Heading */}
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-[#0F172A]">Welcome back</h1>

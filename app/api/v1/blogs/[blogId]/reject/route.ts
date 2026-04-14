@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { getCurrentUser, hasRole } from "@/lib/api/auth";
 import {
   success,
@@ -8,9 +9,14 @@ import {
   notFound,
   serverError,
 } from "@/lib/api/response";
+import { validateBody } from "@/lib/api/validation";
 import { createAuditLog, getClientInfo } from "@/lib/api/audit";
 import { db } from "@/lib/db";
 import { headers } from "next/headers";
+
+const rejectSchema = z.object({
+  moderationNote: z.string().min(1),
+});
 
 export async function POST(
   request: NextRequest,
@@ -19,50 +25,43 @@ export async function POST(
   const user = await getCurrentUser();
 
   if (!user) {
-    console.error("❌ [approveBlog] No authenticated user found");
     return unauthorized();
   }
 
   if (!hasRole(user, ["tpo_admin", "coordinator"])) {
-    console.error("❌ [approveBlog] User lacks required role", {
-      userId: user.id,
-      email: user.email,
-      role: user.role,
-      coordinatorType: user.coordinatorType,
-      required: ["tpo_admin", "coordinator"],
-    });
     return forbidden("Insufficient permissions");
   }
 
-  console.log("✅ [approveBlog] Permission granted", {
-    userId: user.id,
-    role: user.role,
-  });
-
   const { blogId } = await params;
+  const validation = await validateBody(request, rejectSchema);
+
+  if (validation instanceof Response) {
+    return validation;
+  }
+
   const headersList = await headers();
   const clientInfo = getClientInfo(headersList);
 
   try {
-    const approvedBlog = await db.blog.update({
+    const rejectedBlog = await db.blog.update({
       where: { id: blogId },
       data: {
-        moderationStatus: "approved",
-        approvedBy: user.id,
-        approvedAt: new Date(),
+        moderationStatus: "rejected",
+        moderationNote: validation.moderationNote,
         updatedAt: new Date(),
       },
     });
 
     await createAuditLog({
       actorId: user.id,
-      action: "approve_blog",
+      action: "reject_blog",
       targetType: "blog",
       targetId: blogId,
+      meta: { note: validation.moderationNote },
       ...clientInfo,
     });
 
-    return success(approvedBlog);
+    return success(rejectedBlog);
   } catch (error: unknown) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -71,7 +70,7 @@ export async function POST(
       return notFound("Blog not found");
     }
 
-    console.error("Error approving blog:", error);
+    console.error("Error rejecting blog:", error);
     return serverError();
   }
 }

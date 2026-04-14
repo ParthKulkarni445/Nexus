@@ -10,6 +10,7 @@ import {
   UserCheck,
   UserPlus,
   RefreshCw,
+  Power,
 } from "lucide-react";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Badge from "@/components/ui/Badge";
@@ -43,6 +44,7 @@ type UnassignedCycle = {
   companyId: string;
   companyName: string;
   industry: string | null;
+  priority: number | null;
   status: string;
   seasonId: string;
   season: string;
@@ -57,6 +59,12 @@ type AssignmentsDashboardResponse = {
   }>;
   assignments: AssignmentListItem[];
   unassignedCycles: UnassignedCycle[];
+  companies: Array<{
+    companyId: string;
+    companyName: string;
+    industry: string | null;
+    priority: number | null;
+  }>;
 };
 
 type SeasonRecord = {
@@ -65,6 +73,13 @@ type SeasonRecord = {
   seasonType: "intern" | "placement";
   academicYear: string;
   isActive: boolean;
+};
+
+type InactiveCompany = {
+  companyId: string;
+  companyName: string;
+  industry: string | null;
+  priority: number | null;
 };
 
 type ApiErrorEnvelope = {
@@ -85,6 +100,18 @@ const STATUS_OPTIONS = [
   { value: "rejected", label: "Rejected" },
 ];
 
+const PRIORITY_OPTIONS = [
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
+
+function priorityLabel(value: number | null) {
+  if ((value ?? 0) >= 3) return "high";
+  if ((value ?? 0) >= 2) return "medium";
+  return "low";
+}
+
 function getInitials(name: string): string {
   return name
     .split(" ")
@@ -92,6 +119,14 @@ function getInitials(name: string): string {
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("");
+}
+
+function areSetsEqual<T>(left: Set<T>, right: Set<T>) {
+  if (left.size !== right.size) return false;
+  for (const value of left) {
+    if (!right.has(value)) return false;
+  }
+  return true;
 }
 
 async function requestApi<T>(url: string, init?: RequestInit): Promise<T> {
@@ -421,10 +456,13 @@ function UnassignedListSkeleton({ rows = 6 }: { rows?: number }) {
 }
 
 export default function AssignmentsPage() {
-  const [tab, setTab] = useState<"assigned" | "unassigned">("assigned");
+  const [tab, setTab] = useState<"assigned" | "unassigned" | "inactive">(
+    "assigned",
+  );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [coordinatorFilter, setCoordinatorFilter] = useState<string[]>([]);
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
 
   const [coordinators, setCoordinators] = useState<Coordinator[]>([]);
@@ -433,12 +471,18 @@ export default function AssignmentsPage() {
   const [unassignedCycles, setUnassignedCycles] = useState<UnassignedCycle[]>(
     [],
   );
+  const [companies, setCompanies] = useState<InactiveCompany[]>([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [isAssignSubmitting, setIsAssignSubmitting] = useState(false);
   const [isReassignSubmitting, setIsReassignSubmitting] = useState(false);
+  const [activatingCompanyIds, setActivatingCompanyIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [isBulkActivateSubmitting, setIsBulkActivateSubmitting] =
+    useState(false);
 
   const [assignModal, setAssignModal] = useState<{
     companies: UnassignedCycle[];
@@ -450,11 +494,15 @@ export default function AssignmentsPage() {
   const [selectedUnassigned, setSelectedUnassigned] = useState<Set<string>>(
     new Set(),
   );
+  const [selectedInactive, setSelectedInactive] = useState<Set<string>>(
+    new Set(),
+  );
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   /* ── Sticky stats-card ── */
   const statsCardRef = useRef<HTMLDivElement>(null);
   const [stickyTop, setStickyTop] = useState(16);
+  const hasAutoSelectedInitialTab = useRef(false);
 
   const loadAssignmentsData = useCallback(async () => {
     setIsLoading(true);
@@ -475,6 +523,7 @@ export default function AssignmentsPage() {
       setSeasons(seasonList);
       setAssignments(response.assignments);
       setUnassignedCycles(response.unassignedCycles);
+      setCompanies(response.companies);
       setSelectedSeasonId((current) => {
         if (current && seasonList.some((season) => season.id === current)) {
           return current;
@@ -506,9 +555,48 @@ export default function AssignmentsPage() {
       const validIds = new Set(
         unassignedCycles.map((cycle) => cycle.companySeasonCycleId),
       );
-      return new Set(Array.from(previous).filter((id) => validIds.has(id)));
+      const next = new Set(
+        Array.from(previous).filter((id) => validIds.has(id)),
+      );
+      return areSetsEqual(previous, next) ? previous : next;
     });
   }, [unassignedCycles]);
+
+  const seasonAssignments = useMemo(
+    () =>
+      assignments.filter(
+        (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
+      ),
+    [assignments, selectedSeasonId],
+  );
+  const seasonUnassigned = useMemo(
+    () =>
+      unassignedCycles.filter(
+        (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
+      ),
+    [unassignedCycles, selectedSeasonId],
+  );
+
+  const inactiveCompanies = useMemo(() => {
+    const activeCompanyIds = new Set(
+      [...seasonAssignments, ...seasonUnassigned].map((item) => item.companyId),
+    );
+    return companies.filter(
+      (company) => !activeCompanyIds.has(company.companyId),
+    );
+  }, [companies, seasonAssignments, seasonUnassigned]);
+
+  useEffect(() => {
+    setSelectedInactive((previous) => {
+      const validIds = new Set(
+        inactiveCompanies.map((company) => company.companyId),
+      );
+      const next = new Set(
+        Array.from(previous).filter((id) => validIds.has(id)),
+      );
+      return areSetsEqual(previous, next) ? previous : next;
+    });
+  }, [inactiveCompanies]);
 
   const coordinatorOptions = useMemo(
     () =>
@@ -554,11 +642,18 @@ export default function AssignmentsPage() {
       unassigned: unassignedCycles.filter(
         (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
       ).length,
+      inactive: inactiveCompanies.length,
       byCoord,
     };
-  }, [coordinators, assignments, unassignedCycles, selectedSeasonId]);
+  }, [
+    coordinators,
+    assignments,
+    unassignedCycles,
+    selectedSeasonId,
+    inactiveCompanies.length,
+  ]);
 
-  const totalCycles = stats.assigned + stats.unassigned;
+  const totalItems = stats.assigned + stats.unassigned + stats.inactive;
 
   /* ── Recalc sticky top when content changes ── */
   useEffect(() => {
@@ -568,7 +663,9 @@ export default function AssignmentsPage() {
     const recalc = () => {
       // Measure the actual card content, not the flex-stretched container
       const child = el.firstElementChild as HTMLElement | null;
-      const cardH = child ? child.getBoundingClientRect().height : el.scrollHeight;
+      const cardH = child
+        ? child.getBoundingClientRect().height
+        : el.scrollHeight;
       const vh = window.innerHeight;
       // Stick so the card's bottom edge aligns with the viewport bottom.
       // When card is shorter than viewport, stick near the top (16px gap).
@@ -590,15 +687,9 @@ export default function AssignmentsPage() {
       ro.disconnect();
       window.removeEventListener("resize", recalc);
     };
-  }, [isLoading, totalCycles]);
+  }, [isLoading, totalItems]);
   const assignedRatio =
-    totalCycles > 0 ? Math.round((stats.assigned / totalCycles) * 100) : 0;
-  const seasonAssignments = assignments.filter(
-    (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
-  );
-  const seasonUnassigned = unassignedCycles.filter(
-    (item) => !selectedSeasonId || item.seasonId === selectedSeasonId,
-  );
+    totalItems > 0 ? Math.round((stats.assigned / totalItems) * 100) : 0;
   const statusCycles = [...seasonAssignments, ...seasonUnassigned];
   const acceptedCount = statusCycles.filter(
     (item) => item.status === "accepted",
@@ -610,12 +701,12 @@ export default function AssignmentsPage() {
     (item) => item.status === "not_contacted",
   ).length;
   const acceptedRatio =
-    totalCycles > 0 ? Math.round((acceptedCount / totalCycles) * 100) : 0;
+    totalItems > 0 ? Math.round((acceptedCount / totalItems) * 100) : 0;
   const statsCardItems = [
     {
       label: "Total",
-      value: totalCycles,
-      sub: "Season cycles",
+      value: totalItems,
+      sub: "Companies",
     },
     {
       label: "Accepted",
@@ -636,9 +727,9 @@ export default function AssignmentsPage() {
   const r = 46;
   const circ = 2 * Math.PI * r;
   const assignedFilled =
-    totalCycles > 0 ? (stats.assigned / totalCycles) * circ : 0;
+    totalItems > 0 ? (stats.assigned / totalItems) * circ : 0;
   const acceptedFilled =
-    totalCycles > 0 ? (acceptedCount / totalCycles) * circ : 0;
+    totalItems > 0 ? (acceptedCount / totalItems) * circ : 0;
 
   const filteredAssigned = useMemo(() => {
     let data = assignments;
@@ -690,6 +781,57 @@ export default function AssignmentsPage() {
     return data;
   }, [unassignedCycles, search, selectedSeasonId]);
 
+  const filteredInactive = useMemo(() => {
+    let data = inactiveCompanies;
+
+    if (search) {
+      const query = search.toLowerCase();
+      data = data.filter((company) =>
+        company.companyName.toLowerCase().includes(query),
+      );
+    }
+
+    if (priorityFilter.length > 0) {
+      data = data.filter((company) =>
+        priorityFilter.includes(priorityLabel(company.priority)),
+      );
+    }
+
+    return data;
+  }, [inactiveCompanies, search, priorityFilter]);
+
+  useEffect(() => {
+    if (isLoading || hasAutoSelectedInitialTab.current) {
+      return;
+    }
+
+    const orderedTabs: Array<"assigned" | "unassigned" | "inactive"> = [
+      "assigned",
+      "unassigned",
+      "inactive",
+    ];
+    const counts = {
+      assigned: seasonAssignments.length,
+      unassigned: seasonUnassigned.length,
+      inactive: inactiveCompanies.length,
+    };
+
+    const firstNonEmpty =
+      orderedTabs.find((item) => counts[item] > 0) ?? "assigned";
+
+    hasAutoSelectedInitialTab.current = true;
+
+    if (counts[tab] === 0 && tab !== firstNonEmpty) {
+      setTab(firstNonEmpty);
+    }
+  }, [
+    isLoading,
+    tab,
+    seasonAssignments.length,
+    seasonUnassigned.length,
+    inactiveCompanies.length,
+  ]);
+
   const groupedByCoordinator = useMemo(() => {
     const groups: Record<string, AssignmentListItem[]> = {};
 
@@ -707,7 +849,7 @@ export default function AssignmentsPage() {
     setExpandedGroups((previous) => {
       const groupNames = Object.keys(groupedByCoordinator);
       if (groupNames.length === 0) {
-        return new Set();
+        return previous.size === 0 ? previous : new Set();
       }
 
       if (previous.size === 0) {
@@ -721,7 +863,8 @@ export default function AssignmentsPage() {
         }
       }
 
-      return next.size > 0 ? next : new Set(groupNames);
+      const fallback = next.size > 0 ? next : new Set(groupNames);
+      return areSetsEqual(previous, fallback) ? previous : fallback;
     });
   }, [groupedByCoordinator]);
 
@@ -739,6 +882,18 @@ export default function AssignmentsPage() {
 
   const toggleSelectUnassigned = (id: string) => {
     setSelectedUnassigned((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectInactive = (id: string) => {
+    setSelectedInactive((previous) => {
       const next = new Set(previous);
       if (next.has(id)) {
         next.delete(id);
@@ -799,6 +954,41 @@ export default function AssignmentsPage() {
     }
   };
 
+  const handleActivate = async (
+    companyIds: string[],
+    source: "single" | "bulk" = "single",
+  ) => {
+    if (!selectedSeasonId || companyIds.length === 0) return;
+
+    if (source === "single") {
+      setActivatingCompanyIds(new Set(companyIds));
+    } else {
+      setIsBulkActivateSubmitting(true);
+    }
+
+    try {
+      await requestApi("/api/v1/assignments/activate-bulk", {
+        method: "POST",
+        body: JSON.stringify({
+          seasonId: selectedSeasonId,
+          companyIds,
+        }),
+      });
+
+      await loadAssignmentsData();
+      setSelectedInactive(new Set());
+    } finally {
+      if (source === "single") {
+        setActivatingCompanyIds(new Set());
+      } else {
+        setIsBulkActivateSubmitting(false);
+      }
+    }
+  };
+
+  const isActivateSubmitting =
+    activatingCompanyIds.size > 0 || isBulkActivateSubmitting;
+
   const tabs = [
     { key: "assigned" as const, label: "Assigned", count: stats.assigned },
     {
@@ -806,9 +996,19 @@ export default function AssignmentsPage() {
       label: "Unassigned",
       count: stats.unassigned,
     },
+    {
+      key: "inactive" as const,
+      label: "Inactive",
+      count: stats.inactive,
+    },
   ];
 
-  const activeFilterCount = statusFilter.length + coordinatorFilter.length;
+  const activeFilterCount =
+    tab === "assigned"
+      ? statusFilter.length + coordinatorFilter.length
+      : tab === "inactive"
+        ? priorityFilter.length
+        : 0;
 
   return (
     <div className="-mt-6 xl:mt-0 space-y-5 pl-4 pr-4 pb-6 animate-fade-in">
@@ -855,7 +1055,9 @@ export default function AssignmentsPage() {
                   placeholder={
                     tab === "assigned"
                       ? "Search company or coordinator..."
-                      : "Search company..."
+                      : tab === "inactive"
+                        ? "Search inactive company..."
+                        : "Search company..."
                   }
                   className={`min-w-0 ${
                     tab === "assigned"
@@ -885,12 +1087,34 @@ export default function AssignmentsPage() {
                   </div>
                 )}
 
+                {tab === "inactive" && (
+                  <FilterSelect
+                    multiple
+                    value={priorityFilter}
+                    onChange={setPriorityFilter}
+                    options={PRIORITY_OPTIONS}
+                    placeholder="Priority"
+                    className="z-20 w-full sm:w-44 xl:shrink-0"
+                  />
+                )}
+
                 {tab === "assigned" && activeFilterCount > 0 && (
                   <button
                     className="btn btn-ghost btn-sm shrink-0 self-start text-slate-500 hover:text-slate-700 xl:self-auto"
                     onClick={() => {
                       setStatusFilter([]);
                       setCoordinatorFilter([]);
+                    }}
+                  >
+                    Clear all
+                  </button>
+                )}
+
+                {tab === "inactive" && activeFilterCount > 0 && (
+                  <button
+                    className="btn btn-ghost btn-sm shrink-0 self-start text-slate-500 hover:text-slate-700 xl:self-auto"
+                    onClick={() => {
+                      setPriorityFilter([]);
                     }}
                   >
                     Clear all
@@ -911,6 +1135,21 @@ export default function AssignmentsPage() {
                   >
                     <UserPlus size={14} />
                     Bulk Assign ({selectedUnassigned.size})
+                  </button>
+                )}
+
+                {tab === "inactive" && selectedInactive.size > 0 && (
+                  <button
+                    className="btn btn-primary btn-sm gap-1 shrink-0"
+                    disabled={!selectedSeasonId || isBulkActivateSubmitting}
+                    onClick={() =>
+                      void handleActivate(Array.from(selectedInactive), "bulk")
+                    }
+                  >
+                    <Power size={14} />
+                    {isBulkActivateSubmitting
+                      ? "Activating..."
+                      : `Bulk Activate (${selectedInactive.size})`}
                   </button>
                 )}
               </div>
@@ -959,95 +1198,120 @@ export default function AssignmentsPage() {
                   />
                 ) : (
                   Object.entries(groupedByCoordinator).map(
-                    ([coordinatorName, entries]) => (
-                      <div
-                        key={coordinatorName}
-                        className="border border-[#DBEAFE] rounded-xl overflow-hidden"
-                      >
-                        <button
-                          className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 transition-colors"
-                          onClick={() => toggleGroup(coordinatorName)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-[#2563EB] flex items-center justify-center text-white text-xs font-semibold">
-                              {coordinatorName
-                                .split(" ")
-                                .map((name) => name[0])
-                                .join("")}
-                            </div>
-                            <div className="text-left">
-                              <p className="text-sm font-semibold text-black">
-                                {coordinatorName}
-                              </p>
-                              {/* <p className="text-xs text-slate-500">
-                                {entries.length} companies assigned
-                              </p> */}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="danger" size="sm">
-                              {entries.length}
-                            </Badge>
-                            {expandedGroups.has(coordinatorName) ? (
-                              <ChevronUp size={16} className="text-slate-400" />
-                            ) : (
-                              <ChevronDown
-                                size={16}
-                                className="text-slate-400"
-                              />
-                            )}
-                          </div>
-                        </button>
+                    ([coordinatorName, entries]) =>
+                      (() => {
+                        const contactedCount = entries.filter(
+                          (entry) => entry.status !== "not_contacted",
+                        ).length;
+                        const totalCount = entries.length;
+                        const contactedPercent =
+                          totalCount > 0
+                            ? Math.round((contactedCount / totalCount) * 100)
+                            : 0;
 
-                        {expandedGroups.has(coordinatorName) && (
-                          <div className="divide-y divide-[#EFF6FF]">
-                            {entries.map((assignment) => (
-                              <div
-                                key={assignment.companySeasonCycleId}
-                                className="flex items-center gap-5 px-4 py-3 hover:bg-[#F5F9FF] transition-colors"
-                              >
-                                <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
-                                  {assignment.companyName.charAt(0)}
+                        return (
+                          <div
+                            key={coordinatorName}
+                            className="border border-[#DBEAFE] rounded-xl overflow-hidden"
+                          >
+                            <button
+                              className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 transition-colors"
+                              onClick={() => toggleGroup(coordinatorName)}
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-full bg-[#2563EB] flex items-center justify-center text-white text-xs font-semibold">
+                                  {coordinatorName
+                                    .split(" ")
+                                    .map((name) => name[0])
+                                    .join("")}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <Link
-                                    href={`/companies/${assignment.companyId}`}
-                                    className="text-sm font-medium text-slate-900 hover:text-[#2563EB] transition-colors truncate block"
-                                  >
-                                    {assignment.companyName}
-                                  </Link>
-                                  <p className="text-xs text-slate-400">
-                                    {assignment.industry || "Unspecified"} ·{" "}
-                                    {assignment.season}
+                                <div className="text-left min-w-0">
+                                  <p className="text-sm font-semibold text-black">
+                                    {coordinatorName}
                                   </p>
                                 </div>
-                                <div className="hidden w-30 shrink-0 items-center justify-center sm:flex">
-                                  <StatusBadge
-                                    status={assignment.status}
-                                    size="sm"
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="hidden sm:block w-52">
+                                  <div className="flex items-center justify-between gap-2 text-[11px] text-slate-600">
+                                    <span>
+                                      Contacted {contactedCount} of {totalCount}
+                                    </span>
+                                    <span>{contactedPercent}%</span>
+                                  </div>
+                                  <div className="mt-1 h-1.5 rounded-full bg-slate-300">
+                                    <div
+                                      className="h-full rounded-full bg-slate-600 transition-all"
+                                      style={{ width: `${contactedPercent}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                {expandedGroups.has(coordinatorName) ? (
+                                  <ChevronUp
+                                    size={16}
+                                    className="text-slate-400"
                                   />
-                                </div>
-                                <div className="hidden w-32 shrink-0 items-center justify-center sm:flex">
-                                  <button
-                                    className="btn btn-ghost btn-sm gap-1 text-slate-500 hover:text-[#2563EB] justify-center"
-                                    onClick={() => setReassignModal(assignment)}
+                                ) : (
+                                  <ChevronDown
+                                    size={16}
+                                    className="text-slate-400"
+                                  />
+                                )}
+                              </div>
+                            </button>
+
+                            {expandedGroups.has(coordinatorName) && (
+                              <div className="divide-y divide-[#EFF6FF]">
+                                {entries.map((assignment) => (
+                                  <div
+                                    key={assignment.companySeasonCycleId}
+                                    className="flex items-center gap-5 px-4 py-3 hover:bg-[#F5F9FF] transition-colors"
                                   >
-                                    <RefreshCw size={13} />
-                                    Reassign
-                                  </button>
-                                </div>
-                                {/* <button
+                                    <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
+                                      {assignment.companyName.charAt(0)}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <Link
+                                        href={`/companies/${assignment.companyId}`}
+                                        className="text-sm font-medium text-slate-900 hover:text-[#2563EB] transition-colors truncate block"
+                                      >
+                                        {assignment.companyName}
+                                      </Link>
+                                      <p className="text-xs text-slate-400">
+                                        {assignment.industry || "Unspecified"} ·{" "}
+                                        {assignment.season}
+                                      </p>
+                                    </div>
+                                    <div className="hidden w-30 shrink-0 items-center justify-center sm:flex">
+                                      <StatusBadge
+                                        status={assignment.status}
+                                        size="sm"
+                                      />
+                                    </div>
+                                    <div className="hidden w-32 shrink-0 items-center justify-center sm:flex">
+                                      <button
+                                        className="btn btn-ghost btn-sm gap-1 text-slate-500 hover:text-[#2563EB] justify-center"
+                                        onClick={() =>
+                                          setReassignModal(assignment)
+                                        }
+                                      >
+                                        <RefreshCw size={13} />
+                                        Reassign
+                                      </button>
+                                    </div>
+                                    {/* <button
                                   className="sm:hidden btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-[#2563EB]"
                                   onClick={() => setReassignModal(assignment)}
                                 >
                                   <RefreshCw size={14} />
                                 </button> */}
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ),
+                        );
+                      })(),
                   )
                 )}
               </div>
@@ -1097,9 +1361,25 @@ export default function AssignmentsPage() {
                           {company.industry || "Unspecified"} · {company.season}
                         </p>
                       </div>
-                      <Badge variant="warning" size="sm" dot>
-                        {company.status.replace(/_/g, " ")}
-                      </Badge>
+                      <div className="hidden w-30 shrink-0 items-center justify-center sm:flex">
+                        <Badge variant="warning" size="sm" dot>
+                          {company.status.replace(/_/g, " ")}
+                        </Badge>
+                      </div>
+                      <div className="hidden w-24 shrink-0 items-center justify-center sm:flex">
+                        <Badge
+                          variant={
+                            priorityLabel(company.priority) === "high"
+                              ? "danger"
+                              : priorityLabel(company.priority) === "medium"
+                                ? "warning"
+                                : "gray"
+                          }
+                          size="sm"
+                        >
+                          {priorityLabel(company.priority)}
+                        </Badge>
+                      </div>
                       <button
                         className="btn btn-primary btn-sm gap-1 shrink-0"
                         onClick={() =>
@@ -1108,6 +1388,91 @@ export default function AssignmentsPage() {
                       >
                         <UserPlus size={13} />
                         <span className="hidden sm:inline">Assign</span>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {tab === "inactive" && (
+              <div className="p-4 space-y-2">
+                {isLoading ? (
+                  <UnassignedListSkeleton />
+                ) : !selectedSeasonId ? (
+                  <EmptyState
+                    icon={Users}
+                    title="Select a season first"
+                    description="Choose a season to view inactive companies."
+                  />
+                ) : filteredInactive.length === 0 ? (
+                  <EmptyState
+                    icon={CheckCircle2}
+                    title="No inactive companies"
+                    description="Every company in this season is already activated."
+                  />
+                ) : (
+                  filteredInactive.map((company) => (
+                    <div
+                      key={company.companyId}
+                      className="flex items-center gap-4 p-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors group"
+                    >
+                      <button
+                        onClick={() => toggleSelectInactive(company.companyId)}
+                        className="text-slate-300 group-hover:text-slate-400 hover:text-[#2563EB]! transition-colors shrink-0"
+                      >
+                        {selectedInactive.has(company.companyId) ? (
+                          <CheckCircle2 size={16} className="text-[#2563EB]" />
+                        ) : (
+                          <div className="w-4 h-4 rounded border border-slate-300 group-hover:border-[#3B82F6]" />
+                        )}
+                      </button>
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 text-xs font-semibold shrink-0">
+                        {company.companyName.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          href={`/companies/${company.companyId}`}
+                          className="text-sm font-medium text-slate-900 hover:text-[#2563EB] transition-colors truncate block"
+                        >
+                          {company.companyName}
+                        </Link>
+                        <p className="text-xs text-slate-400">
+                          {company.industry || "Unspecified"} · Not active in
+                          selected season
+                        </p>
+                      </div>
+                      <div className="hidden w-24 shrink-0 items-center justify-center sm:flex">
+                        <Badge
+                          variant={
+                            priorityLabel(company.priority) === "high"
+                              ? "danger"
+                              : priorityLabel(company.priority) === "medium"
+                                ? "warning"
+                                : "gray"
+                          }
+                          size="sm"
+                        >
+                          {priorityLabel(company.priority)}
+                        </Badge>
+                      </div>
+                      <button
+                        className="btn btn-primary btn-sm gap-1 shrink-0"
+                        disabled={
+                          !selectedSeasonId ||
+                          isBulkActivateSubmitting ||
+                          activatingCompanyIds.has(company.companyId)
+                        }
+                        onClick={() =>
+                          void handleActivate([company.companyId], "single")
+                        }
+                      >
+                        <Power size={13} />
+                        <span className="hidden sm:inline">
+                          {activatingCompanyIds.has(company.companyId)
+                            ? "Activating..."
+                            : "Activate"}
+                        </span>
                       </button>
                     </div>
                   ))
@@ -1146,7 +1511,7 @@ export default function AssignmentsPage() {
                 <div className="shimmer h-12 w-full rounded-lg" />
                 <div className="shimmer h-12 w-full rounded-lg" />
               </div>
-            ) : totalCycles === 0 ? (
+            ) : totalItems === 0 ? (
               <div className="px-4 py-6 text-center text-sm font-medium text-slate-500">
                 No assignments yet
               </div>
