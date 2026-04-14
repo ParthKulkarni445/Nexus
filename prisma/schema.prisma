@@ -656,6 +656,18 @@ model MailboxSyncState {
   @@map("mailbox_sync_states")
 }
 
+model OtpToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String   @db.VarChar(255)
+  code      String   @db.VarChar(10)
+  purpose   String   @db.VarChar(50)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email, purpose])
+  @@map("otp_tokens")
+}
+
 enum UserRole {
   tpo_admin
   coordinator

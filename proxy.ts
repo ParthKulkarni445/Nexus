@@ -10,11 +10,24 @@ import { verifySessionToken } from "@/lib/auth/session-edge";
 const SESSION_COOKIE = "nexus_session";
 
 function isAuthPage(pathname: string) {
-  return pathname === "/login" || pathname === "/signup";
+  return (
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/forgot-password"
+  );
 }
 
 function isOpenAuthApi(pathname: string) {
-  return pathname === "/api/v1/auth/login" || pathname === "/api/v1/auth/signup";
+  const openPaths = [
+    "/api/v1/auth/login",
+    "/api/v1/auth/signup",
+    "/api/v1/auth/signup/request-otp",
+    "/api/v1/auth/google",
+    "/api/v1/auth/google/callback",
+    "/api/v1/auth/forgot-password/request-otp",
+    "/api/v1/auth/forgot-password/reset",
+  ];
+  return openPaths.some((p) => pathname === p || pathname.startsWith(p));
 }
 
 function loginRedirect(request: NextRequest) {

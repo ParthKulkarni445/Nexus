@@ -4,19 +4,19 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { error } from "@/lib/api/response";
 import { respondWithSession, hashPassword } from "@/lib/api/session";
+import { isEmailAllowed, domainErrorMessage } from "@/lib/api/domain";
+
 
 const signupSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(255),
   email: z.string().email("Please enter a valid email address"),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(128),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128),
+  otp: z.string().length(6, "OTP must be 6 digits"),
 });
 
 /**
  * POST /api/v1/auth/signup
- * Creates a new student account with credentials and sets a session cookie.
+ * Verifies the OTP and creates a new student account.
  */
 export async function POST(request: NextRequest) {
   let body: unknown;
@@ -35,20 +35,36 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { name, email, password } = parsed.data;
+  const { name, email: rawEmail, password, otp } = parsed.data;
+  const email = rawEmail.toLowerCase().trim();
+
+  if (!isEmailAllowed(email)) {
+    return error(domainErrorMessage(), "DOMAIN_RESTRICTED", 403);
+  }
 
   // Check for existing email
-  const existing = await db.user.findUnique({
-    where: { email: email.toLowerCase() },
+  const existing = await db.user.findUnique({ where: { email } });
+  if (existing) {
+    return error("An account with this email already exists", "EMAIL_TAKEN", 409);
+  }
+
+  // Verify OTP
+  const token = await db.otpToken.findFirst({
+    where: { email, purpose: "signup" },
+    orderBy: { createdAt: "desc" },
   });
 
-  if (existing) {
-    return error(
-      "An account with this email already exists",
-      "EMAIL_TAKEN",
-      409
-    );
+  if (!token || token.code !== otp) {
+    return error("Invalid OTP. Please check and try again.", "INVALID_OTP", 400);
   }
+
+  if (token.expiresAt < new Date()) {
+    await db.otpToken.delete({ where: { id: token.id } });
+    return error("OTP has expired. Please request a new one.", "OTP_EXPIRED", 400);
+  }
+
+  // Delete used OTP
+  await db.otpToken.delete({ where: { id: token.id } });
 
   const passwordHash = hashPassword(password);
 
@@ -56,7 +72,7 @@ export async function POST(request: NextRequest) {
     const user = await db.user.create({
       data: {
         name: name.trim(),
-        email: email.toLowerCase(),
+        email,
         role: "student",
         authProvider: "credentials",
         profileMeta: { passwordHash } as Prisma.InputJsonValue,

@@ -14,11 +14,8 @@ import {
   BookOpen,
   Menu,
   X,
-  Search,
   ChevronDown,
   LogOut,
-  Settings,
-  User,
   OrbitIcon,
   Shield,
 } from "lucide-react";
@@ -62,9 +59,18 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [changeUsernameOpen, setChangeUsernameOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [usernameLoading, setUsernameLoading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
 
   const displayName = currentUser.name || "User";
   const displayEmail = currentUser.email || "";
@@ -93,6 +99,105 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
     router.refresh();
   }
 
+  async function handleChangeUsername() {
+    setUsernameError(null);
+
+    if (!newUsername.trim()) {
+      setUsernameError("Username cannot be empty");
+      return;
+    }
+
+    if (newUsername.length < 3) {
+      setUsernameError("Username must be at least 3 characters");
+      return;
+    }
+
+    setUsernameLoading(true);
+    try {
+      const res = await fetch("/api/v1/auth/update-profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newUsername }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || "Failed to update username");
+      }
+
+      setSuccessMessage("Username updated successfully!");
+      setNewUsername("");
+      setChangeUsernameOpen(false);
+      setTimeout(() => {
+        setSuccessMessage(null);
+        router.refresh();
+      }, 1500);
+    } catch (error) {
+      setUsernameError(
+        error instanceof Error ? error.message : "An error occurred"
+      );
+    } finally {
+      setUsernameLoading(false);
+    }
+  }
+
+  async function handleChangePassword() {
+    setPasswordError(null);
+
+    if (!currentPassword.trim()) {
+      setPasswordError("Current password is required");
+      return;
+    }
+
+    if (!newPassword.trim()) {
+      setPasswordError("New password is required");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match");
+      return;
+    }
+
+    setPasswordLoading(true);
+    try {
+      const res = await fetch("/api/v1/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error?.message || "Failed to change password");
+      }
+
+      setSuccessMessage("Password changed successfully!");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setChangePasswordOpen(false);
+      setTimeout(() => {
+        setSuccessMessage(null);
+        router.refresh();
+      }, 1500);
+    } catch (error) {
+      setPasswordError(
+        error instanceof Error ? error.message : "An error occurred"
+      );
+    } finally {
+      setPasswordLoading(false);
+    }
+  }
+
   // Close user menu on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -106,11 +211,6 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
-  // Focus search input when opened
-  useEffect(() => {
-    if (searchOpen) searchRef.current?.focus();
-  }, [searchOpen]);
 
   return (
     <>
@@ -166,15 +266,6 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
 
             {/* Right slot */}
             <div className="flex items-center gap-1 ml-auto">
-              {/* Search toggle */}
-              <button
-                onClick={() => setSearchOpen((v) => !v)}
-                className="p-2 rounded-lg text-[#93C5FD] hover:text-white hover:bg-white/8 transition-all"
-                aria-label="Search"
-              >
-                <Search size={17} />
-              </button>
-
               {/* Notification bell */}
               <Link
                 href="/notifications"
@@ -235,18 +326,24 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
                       </p>
                     </div>
                     <div className="py-1">
-                      {[
-                        { label: "Profile", icon: User },
-                        { label: "Settings", icon: Settings },
-                      ].map(({ label, icon: Icon }) => (
-                        <button
-                          key={label}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[#0F172A] hover:bg-[#EFF6FF] hover:text-[#2563EB] transition-colors"
-                        >
-                          <Icon size={14} />
-                          {label}
-                        </button>
-                      ))}
+                      <button
+                        onClick={() => {
+                          setChangeUsernameOpen(true);
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-[#0F172A] hover:bg-[#EFF6FF] hover:text-[#2563EB] transition-colors"
+                      >
+                        Change username
+                      </button>
+                      <button
+                        onClick={() => {
+                          setChangePasswordOpen(true);
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-[#0F172A] hover:bg-[#EFF6FF] hover:text-[#2563EB] transition-colors"
+                      >
+                        Change password
+                      </button>
                     </div>
                     <div className="border-t border-[#E2E8F0] py-1">
                       <button
@@ -262,30 +359,6 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
               </div>
             </div>
           </div>
-
-          {/* Inline search bar (slides in below nav) */}
-          {searchOpen && (
-            <div className="pb-3 animate-slide-down">
-              <div className="relative">
-                <Search
-                  size={14}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B] pointer-events-none"
-                />
-                <input
-                  ref={searchRef}
-                  type="text"
-                  placeholder="Search companies, contacts, drives..."
-                  className="w-full pl-9 pr-4 py-2.5 rounded-lg text-sm bg-white/10 text-white placeholder:text-[#93C5FD] border border-white/15 focus:outline-none focus:ring-2 focus:border-transparent"
-                  style={
-                    { "--tw-ring-color": "#2563EB" } as React.CSSProperties
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === "Escape") setSearchOpen(false);
-                  }}
-                />
-              </div>
-            </div>
-          )}
         </div>
 
         {/* ── Mobile side drawer ──────────────────────────────────── */}
@@ -401,6 +474,132 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
           </button>
         </div>
       </div>
+
+      {/* Success message */}
+      {successMessage && (
+        <div
+          className="fixed top-4 right-4 px-4 py-2 rounded-lg text-white text-sm font-medium z-50 animate-pulse"
+          style={{ background: "#10B981" }}
+        >
+          {successMessage}
+        </div>
+      )}
+
+      {/* Change Username Modal */}
+      {changeUsernameOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in"
+          onClick={() => setChangeUsernameOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-96 border border-[#E2E8F0] animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[#E2E8F0]">
+              <h3 className="text-lg font-semibold text-[#0F172A]">
+                Change username
+              </h3>
+            </div>
+            <div className="px-6 py-4 space-y-3">
+              <input
+                type="text"
+                placeholder="New username"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
+              />
+              {usernameError && (
+                <p className="text-sm text-red-600">{usernameError}</p>
+              )}
+            </div>
+            <div className="px-6 py-4 flex gap-2 border-t border-[#E2E8F0]">
+              <button
+                onClick={() => {
+                  setChangeUsernameOpen(false);
+                  setNewUsername("");
+                  setUsernameError(null);
+                }}
+                className="flex-1 px-4 py-2 rounded-lg text-[#0F172A] hover:bg-[#F1F5F9] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleChangeUsername}
+                disabled={usernameLoading}
+                className="flex-1 px-4 py-2 rounded-lg bg-[#2563EB] text-white hover:bg-[#1D4ED8] transition-colors disabled:opacity-50"
+              >
+                {usernameLoading ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {changePasswordOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in"
+          onClick={() => setChangePasswordOpen(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-96 border border-[#E2E8F0] animate-scale-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[#E2E8F0]">
+              <h3 className="text-lg font-semibold text-[#0F172A]">
+                Change password
+              </h3>
+            </div>
+            <div className="px-6 py-4 space-y-3">
+              <input
+                type="password"
+                placeholder="Current password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
+              />
+              <input
+                type="password"
+                placeholder="New password (min. 6 characters)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
+              />
+              <input
+                type="password"
+                placeholder="Confirm password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-[#0F172A] placeholder-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]"
+              />
+              {passwordError && (
+                <p className="text-sm text-red-600">{passwordError}</p>
+              )}
+            </div>
+            <div className="px-6 py-4 flex gap-2 border-t border-[#E2E8F0]">
+              <button
+                onClick={() => {
+                  setChangePasswordOpen(false);
+                  setCurrentPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                  setPasswordError(null);
+                }}
+                className="flex-1 px-4 py-2 rounded-lg text-[#0F172A] hover:bg-[#F1F5F9] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleChangePassword}
+                disabled={passwordLoading}
+                className="flex-1 px-4 py-2 rounded-lg bg-[#2563EB] text-white hover:bg-[#1D4ED8] transition-colors disabled:opacity-50"
+              >
+                {passwordLoading ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

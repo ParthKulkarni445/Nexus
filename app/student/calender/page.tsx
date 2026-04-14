@@ -43,33 +43,39 @@ export default function StudentCalenderPage() {
   const embedUrl = resolveEmbedUrl();
 
   return (
-    <div className="pb-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6 shadow-sm space-y-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Calender</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Student view of placement schedule synced with Google Calender.
-          </p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-900">Calendar</h1>
+        <p className="text-sm text-slate-500 mt-2">
+          View your personalized placement schedule synced with Google Calendar
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-[#E2E8F0] bg-white shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-[#E2E8F0]">
+          <h2 className="text-lg font-semibold text-slate-900">Schedule</h2>
         </div>
 
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 sm:p-4">
+        <div className="p-6">
           {embedUrl ? (
-            <iframe
-              src={embedUrl}
-              title="Student Google Calender"
-              className="w-full h-[72vh] rounded-xl border border-slate-200 bg-white"
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            />
+            <div className="rounded-xl overflow-hidden border border-[#E2E8F0] bg-white">
+              <iframe
+                src={embedUrl}
+                title="Student Google Calendar"
+                className="w-full h-[70vh]"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
           ) : (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              Google Calendar embed URL is missing. Set one of these env variables
-              and reload: GOOGLE_CALENDAR_EMBED_URL,
-              NEXT_PUBLIC_GOOGLE_CALENDAR_EMBED_URL, or GOOGLE_CALENDAR_IFRAME.
+            <div className="rounded-lg border border-[#FCD34D] bg-[#FFFBEB] px-4 py-3 text-sm text-[#92400E]">
+              <p className="font-medium">Calendar not configured</p>
+              <p className="text-xs mt-1">
+                Google Calendar embed URL is missing. Please contact your administrator to set the configuration.
+              </p>
             </div>
           )}
         </div>
-
       </div>
     </div>
   );
