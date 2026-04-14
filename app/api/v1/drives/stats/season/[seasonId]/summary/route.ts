@@ -3,6 +3,38 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/api/auth";
 import { success, unauthorized, notFound, serverError } from "@/lib/api/response";
 
+function branchFromEntryNumber(entryNumber: string | null | undefined) {
+  const normalized = (entryNumber ?? "").trim().toUpperCase();
+  if (normalized.length < 6) {
+    return null;
+  }
+
+  const branchCode = normalized.slice(4, 6);
+
+  switch (branchCode) {
+    case "CS":
+      return "Computer Science and Engineering";
+    case "MC":
+      return "Mathematics and Computing";
+    case "CE":
+      return "Civil Engineering";
+    case "CH":
+      return "Chemical Engineering";
+    case "AI":
+      return "Artificial Intelligence";
+    case "MM":
+      return "Metallurgy and Materials";
+    case "ME":
+      return "Mechanical Engineering";
+    case "EE":
+      return "Electrical Engineering";
+    case "EP":
+      return "Engineering Physics";
+    default:
+      return null;
+  }
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ seasonId: string }> }
@@ -126,19 +158,20 @@ export async function GET(
     placements.forEach((placement) => {
       const packageAmount = Number(placement.packageAmount);
       const profileMeta =
-        placement.student.profileMeta &&
+        placement.student?.profileMeta &&
         typeof placement.student.profileMeta === "object" &&
         !Array.isArray(placement.student.profileMeta)
           ? (placement.student.profileMeta as Record<string, unknown>)
           : null;
       const branch =
-        typeof profileMeta?.branch === "string"
+        branchFromEntryNumber(placement.studentEntryNumber) ??
+        (typeof profileMeta?.branch === "string"
           ? profileMeta.branch.trim()
           : typeof profileMeta?.department === "string"
             ? profileMeta.department.trim()
             : typeof profileMeta?.program === "string"
               ? profileMeta.program.trim()
-              : "Unknown";
+              : "Unknown");
 
       const branchEntry = branchMap.get(branch) ?? {
         offers: 0,

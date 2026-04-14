@@ -60,3 +60,48 @@ export function parseWorkbookBuffer(buffer: Buffer): {
 
   return { headers, records };
 }
+
+export function parseWorkbookSheetsBuffer(buffer: Buffer): Array<{
+  sheetName: string;
+  headers: string[];
+  records: TabularRecord[];
+}> {
+  const workbook = XLSX.read(buffer, { type: "buffer" });
+
+  return workbook.SheetNames.map((sheetName) => {
+    const worksheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json<string[]>(worksheet, {
+      header: 1,
+      blankrows: false,
+      defval: "",
+      raw: false,
+    });
+
+    if (rows.length === 0) {
+      return {
+        sheetName,
+        headers: [],
+        records: [],
+      };
+    }
+
+    const headers = rows[0].map((header, index) => {
+      const trimmed = String(header).trim();
+      return index === 0 ? trimmed.replace(/^\ufeff/, "") : trimmed;
+    });
+
+    const records = rows.slice(1).map((row) => {
+      const record: TabularRecord = {};
+      for (let i = 0; i < headers.length; i += 1) {
+        record[headers[i]] = String(row[i] ?? "").trim();
+      }
+      return record;
+    });
+
+    return {
+      sheetName,
+      headers,
+      records,
+    };
+  });
+}

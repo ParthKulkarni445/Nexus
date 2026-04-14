@@ -52,6 +52,32 @@ interface ApiResponse<T> {
   };
 }
 
+type ImportMatchSuggestion = {
+  companyId: string;
+  companyName: string;
+  slug: string;
+  score: number;
+  reason: string;
+};
+
+type CompanyImportPreviewRow = {
+  companyName: string;
+  industry: string;
+  priority: "low" | "medium" | "high";
+  domains: string[];
+  duplicateCandidate: ImportMatchSuggestion | null;
+  suggestions: ImportMatchSuggestion[];
+  normalizedName: string;
+};
+
+type CompanyImportPreviewResponse = {
+  fileName: string;
+  totalRows: number;
+  duplicateRows: number;
+  newRows: number;
+  rows: CompanyImportPreviewRow[];
+};
+
 interface CompanyRecord {
   id: string;
   name: string;
@@ -501,6 +527,12 @@ export default function CompaniesPage() {
   const [exportingCompanies, setExportingCompanies] = useState(false);
   const [downloadingImportFormat, setDownloadingImportFormat] = useState(false);
   const [importingCompanies, setImportingCompanies] = useState(false);
+  const [companyImportFile, setCompanyImportFile] = useState<File | null>(null);
+  const [companyImportPreview, setCompanyImportPreview] =
+    useState<CompanyImportPreviewResponse | null>(null);
+  const [companyImportMatches, setCompanyImportMatches] = useState<
+    Record<string, string>
+  >({});
   const [showFilters, setShowFilters] = useState(false);
   const [updateDetails, setUpdateDetails] = useState<{
     company: Company;
@@ -785,6 +817,33 @@ export default function CompaniesPage() {
     importFileInputRef.current?.click();
   };
 
+  const closeCompanyImportPreview = () => {
+    if (importingCompanies) {
+      return;
+    }
+    setCompanyImportPreview(null);
+    setCompanyImportFile(null);
+    setCompanyImportMatches({});
+  };
+
+  const updateCompanyImportMatch = (companyName: string, companyId: string) => {
+    setCompanyImportMatches((current) => ({
+      ...current,
+      [companyName]: companyId,
+    }));
+  };
+
+  const unresolvedImportDuplicates = useMemo(() => {
+    if (!companyImportPreview) {
+      return [];
+    }
+
+    return companyImportPreview.rows.filter(
+      (row) =>
+        row.suggestions.length > 0 && !companyImportMatches[row.companyName],
+    );
+  }, [companyImportMatches, companyImportPreview]);
+
   const handleImportFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -802,6 +861,61 @@ export default function CompaniesPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+
+      const response = await fetch("/api/v1/companies/import-preview", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      const bodyText = await response.text();
+      let body: ApiResponse<CompanyImportPreviewResponse> = {};
+
+      if (bodyText) {
+        try {
+          body = JSON.parse(
+            bodyText,
+          ) as ApiResponse<CompanyImportPreviewResponse>;
+        } catch {
+          body = {};
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(body.error?.message ?? "Failed to import companies");
+      }
+
+      setCompanyImportFile(file);
+      setCompanyImportPreview(body.data ?? null);
+      setCompanyImportMatches(
+        Object.fromEntries(
+          (body.data?.rows ?? [])
+            .filter((row) => row.duplicateCandidate?.companyId)
+            .map((row) => [row.companyName, row.duplicateCandidate!.companyId]),
+        ),
+      );
+    } catch (error) {
+      setToolbarError(
+        error instanceof Error ? error.message : "Failed to import companies",
+      );
+    } finally {
+      setImportingCompanies(false);
+    }
+  };
+
+  const handleConfirmCompanyImport = async () => {
+    if (!companyImportFile || !companyImportPreview) {
+      return;
+    }
+
+    setToolbarMessage(null);
+    setToolbarError(null);
+    setImportingCompanies(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", companyImportFile);
+      formData.append("resolvedMatches", JSON.stringify(companyImportMatches));
 
       const response = await fetch("/api/v1/companies/import", {
         method: "POST",
@@ -838,6 +952,7 @@ export default function CompaniesPage() {
           ? `Import completed: ${summary.total} rows (${summary.created} created, ${summary.updated} updated)`
           : "Import completed successfully",
       );
+      closeCompanyImportPreview();
       setImportModalOpen(false);
       await fetchCompanies();
     } catch (error) {
@@ -1492,6 +1607,161 @@ export default function CompaniesPage() {
             </p>
           </div>
         </div>
+      </Modal>
+      <Modal
+        isOpen={Boolean(companyImportPreview)}
+        onClose={closeCompanyImportPreview}
+        title={
+          companyImportPreview
+            ? `Review Company Import - ${companyImportPreview.fileName}`
+            : "Review Company Import"
+        }
+        size="lg"
+        footer={
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={closeCompanyImportPreview}
+              disabled={importingCompanies}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => void handleConfirmCompanyImport()}
+              disabled={importingCompanies}
+            >
+              {importingCompanies ? "Importing..." : "Confirm import"}
+            </button>
+          </>
+        }
+      >
+        {companyImportPreview ? (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+              <p>
+                Total rows:{" "}
+                <span className="font-semibold">
+                  {companyImportPreview.totalRows}
+                </span>{" "}
+                | Possible duplicates:{" "}
+                <span className="font-semibold text-amber-700">
+                  {companyImportPreview.duplicateRows}
+                </span>{" "}
+                | New companies:{" "}
+                <span className="font-semibold text-emerald-700">
+                  {companyImportPreview.newRows}
+                </span>
+              </p>
+            </div>
+
+            <div className="max-h-128 space-y-3 overflow-auto pr-1">
+              {companyImportPreview.rows.map((row) => {
+                const selectedMatchId =
+                  companyImportMatches[row.companyName] ?? "";
+                const hasSuggestions = row.suggestions.length > 0;
+
+                return (
+                  <div
+                    key={`${row.companyName}-${row.industry}`}
+                    className="rounded-xl border border-slate-200 bg-white p-4"
+                  >
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {row.companyName}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {row.industry} | {row.priority} priority
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Domains:{" "}
+                          {row.domains.length > 0
+                            ? row.domains.join(", ")
+                            : "-"}
+                        </p>
+                        {!hasSuggestions ? (
+                          <p className="mt-2 text-xs font-semibold text-emerald-700">
+                            No close duplicate found. This row will create a new
+                            company.
+                          </p>
+                        ) : row.duplicateCandidate ? (
+                          <p className="mt-2 text-xs font-semibold text-amber-700">
+                            Suggested duplicate:{" "}
+                            {row.duplicateCandidate.companyName} (
+                            {Math.round(row.duplicateCandidate.score * 100)}%)
+                          </p>
+                        ) : null}
+                      </div>
+
+                      {hasSuggestions ? (
+                        <div className="w-full lg:w-72">
+                          <label className="mb-1 block text-xs font-semibold text-slate-600">
+                            Use existing company
+                          </label>
+                          <select
+                            value={selectedMatchId}
+                            onChange={(event) =>
+                              updateCompanyImportMatch(
+                                row.companyName,
+                                event.target.value,
+                              )
+                            }
+                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-[#4A86E8] focus:ring-2 focus:ring-[#4A86E8]/20"
+                          >
+                            <option value="">Create as new company</option>
+                            {row.suggestions.map((suggestion) => (
+                              <option
+                                key={`${row.companyName}-${suggestion.companyId}`}
+                                value={suggestion.companyId}
+                              >
+                                {suggestion.companyName} (
+                                {Math.round(suggestion.score * 100)}%)
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {hasSuggestions ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {row.suggestions.map((suggestion) => (
+                          <button
+                            key={`${row.companyName}-${suggestion.companyId}-chip`}
+                            type="button"
+                            onClick={() =>
+                              updateCompanyImportMatch(
+                                row.companyName,
+                                suggestion.companyId,
+                              )
+                            }
+                            className={`rounded-full border px-3 py-1 text-xs transition ${
+                              selectedMatchId === suggestion.companyId
+                                ? "border-[#4A86E8] bg-[#EAF2FF] text-[#1D4ED8]"
+                                : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300"
+                            }`}
+                            title={suggestion.reason}
+                          >
+                            {suggestion.companyName} (
+                            {Math.round(suggestion.score * 100)}%)
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+
+            {unresolvedImportDuplicates.length > 0 ? (
+              <p className="text-xs text-slate-500">
+                Suggested duplicate matches are pre-selected. Change any row to
+                “Create as new company” if you want to keep it separate.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </Modal>
       <ContactModal
         isOpen={contactModalOpen}

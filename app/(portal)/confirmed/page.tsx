@@ -104,6 +104,45 @@ type ConfirmedPayload = {
   acceptedCompanies: ConfirmedCompany[];
 };
 
+type UploadMatchSuggestion = {
+  companyId: string;
+  companyName: string;
+  score: number;
+  reason: string;
+};
+
+type UploadedCompanyPreviewItem = {
+  uploadedCompanyName: string;
+  rowCount: number;
+  uniqueEntryCount: number;
+  sheets: string[];
+  roles: string[];
+  matchedCompany: UploadMatchSuggestion | null;
+  suggestions: UploadMatchSuggestion[];
+};
+
+type CompanyUploadPreviewResponse = {
+  fileName: string;
+  matchedSheetNames: string[];
+  parsedStudentRows: number;
+  skippedStudentRows: number;
+  uploadedCompanyCount: number;
+  autoMatchedCount: number;
+  matchedCompanies: UploadedCompanyPreviewItem[];
+  unmatchedCompanies: UploadedCompanyPreviewItem[];
+};
+
+type CompanyUploadProcessResponse = {
+  seasonId: string;
+  seasonType: "intern" | "placement";
+  processedRowCount: number;
+  createdPlacements: number;
+  updatedPlacements: number;
+  linkedStudentEntries: number;
+  unmatchedStudentEntryNumbers: string[];
+  manualMatchCount: number;
+};
+
 type SeasonRecord = {
   id: string;
   name: string;
@@ -469,6 +508,15 @@ export default function ConfirmedPage() {
     useState<CompareAttendanceResponse | null>(null);
   const [studentUploadPreview, setStudentUploadPreview] =
     useState<StudentUploadPreview | null>(null);
+  const [companyUploadSubmitting, setCompanyUploadSubmitting] = useState(false);
+  const [companyUploadInstructionOpen, setCompanyUploadInstructionOpen] =
+    useState(false);
+  const [companyUploadPreview, setCompanyUploadPreview] =
+    useState<CompanyUploadPreviewResponse | null>(null);
+  const [companyUploadFile, setCompanyUploadFile] = useState<File | null>(null);
+  const [manualCompanyMatches, setManualCompanyMatches] = useState<
+    Record<string, string>
+  >({});
 
   const [uploadingStudentByDrive, setUploadingStudentByDrive] = useState<
     Record<string, boolean>
@@ -483,6 +531,7 @@ export default function ConfirmedPage() {
     null,
   );
   const [loggedInUserEmail, setLoggedInUserEmail] = useState("");
+  const companyUploadInputRef = useRef<HTMLInputElement | null>(null);
   const actionFlushbarProgressTimerRef = useRef<number | null>(null);
   const actionFlushbarHideTimerRef = useRef<number | null>(null);
 
@@ -694,6 +743,24 @@ export default function ConfirmedPage() {
       );
     });
   }, [acceptedCompanies, query]);
+
+  const confirmedCompanyOptions = useMemo(
+    () =>
+      [...acceptedCompanies].sort((left, right) =>
+        left.companyName.localeCompare(right.companyName),
+      ),
+    [acceptedCompanies],
+  );
+
+  const unresolvedUploadedCompanies = useMemo(() => {
+    if (!companyUploadPreview) {
+      return [];
+    }
+
+    return companyUploadPreview.unmatchedCompanies.filter(
+      (company) => !manualCompanyMatches[company.uploadedCompanyName],
+    );
+  }, [companyUploadPreview, manualCompanyMatches]);
 
   const callCompany = useMemo(
     () =>
@@ -1541,6 +1608,191 @@ export default function ConfirmedPage() {
     setInstructionModalDriveId("");
   }
 
+  function openCompanyUploadPicker() {
+    if (!selectedSeasonId) {
+      showActionWarning("Pick a season before uploading confirmed company data.");
+      return;
+    }
+
+    setCompanyUploadInstructionOpen(true);
+  }
+
+  function closeCompanyUploadInstruction() {
+    if (companyUploadSubmitting) {
+      return;
+    }
+
+    setCompanyUploadInstructionOpen(false);
+  }
+
+  async function downloadCompanyUploadTemplate() {
+    try {
+      const response = await fetch("/api/v1/confirmed/company-upload-template", {
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to download upload template");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "confirmed-company-upload-template.xlsx";
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      showActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to download upload template",
+      );
+    }
+  }
+
+  function continueToCompanyUpload() {
+    setCompanyUploadInstructionOpen(false);
+    companyUploadInputRef.current?.click();
+  }
+
+  function closeCompanyUploadPreview(force = false) {
+    if (companyUploadSubmitting && !force) {
+      return;
+    }
+
+    setCompanyUploadPreview(null);
+    setCompanyUploadFile(null);
+    setManualCompanyMatches({});
+
+    if (companyUploadInputRef.current) {
+      companyUploadInputRef.current.value = "";
+    }
+  }
+
+  async function proceedCompanyUploadPreview() {
+    if (!companyUploadPreview || !companyUploadFile || !selectedSeasonId) {
+      return;
+    }
+
+    if (unresolvedUploadedCompanies.length > 0) {
+      showActionWarning(
+        "Match all unmatched uploaded company names before proceeding.",
+      );
+      return;
+    }
+
+    const previewPayload = companyUploadPreview;
+    const uploadFile = companyUploadFile;
+    const seasonId = selectedSeasonId;
+    const resolvedCompanyMatches: Record<string, string> = {
+      ...Object.fromEntries(
+        (previewPayload.matchedCompanies ?? [])
+          .filter((company) => company.matchedCompany?.companyId)
+          .map((company) => [
+            company.uploadedCompanyName,
+            company.matchedCompany!.companyId,
+          ]),
+      ),
+      ...manualCompanyMatches,
+    };
+
+    setCompanyUploadSubmitting(true);
+    dismissActionFlushbar();
+    closeCompanyUploadPreview(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("seasonId", seasonId);
+      formData.append("file", uploadFile);
+      formData.append(
+        "manualMatches",
+        JSON.stringify(resolvedCompanyMatches),
+      );
+
+      const payload = await requestJson<CompanyUploadProcessResponse>(
+        "/api/v1/confirmed/company-upload-process",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      await fetchConfirmedData(seasonId);
+
+      const unmatchedText =
+        payload.unmatchedStudentEntryNumbers.length > 0
+          ? ` ${payload.unmatchedStudentEntryNumbers.length} student entries could not be matched to users.`
+          : "";
+
+      showActionSuccess(
+        `Processed ${payload.processedRowCount} rows: ${payload.createdPlacements} placements created, ${payload.updatedPlacements} updated, and ${payload.linkedStudentEntries} student entries linked.${unmatchedText}`,
+      );
+    } catch (error) {
+      showActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to process confirmed company upload",
+      );
+    } finally {
+      setCompanyUploadSubmitting(false);
+    }
+  }
+
+  function updateManualCompanyMatch(uploadedCompanyName: string, companyId: string) {
+    setManualCompanyMatches((current) => ({
+      ...current,
+      [uploadedCompanyName]: companyId,
+    }));
+  }
+
+  async function handleCompanyUploadFileChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    if (!selectedSeasonId) {
+      showActionWarning("Pick a season before uploading confirmed company data.");
+      event.target.value = "";
+      return;
+    }
+
+    setCompanyUploadSubmitting(true);
+    dismissActionFlushbar();
+
+    try {
+      const formData = new FormData();
+      formData.append("seasonId", selectedSeasonId);
+      formData.append("file", file);
+
+      const payload = await requestJson<CompanyUploadPreviewResponse>(
+        "/api/v1/confirmed/company-upload-preview",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      setCompanyUploadPreview(payload);
+      setCompanyUploadFile(file);
+      setManualCompanyMatches({});
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to process confirmed company upload",
+      );
+    } finally {
+      setCompanyUploadSubmitting(false);
+      event.target.value = "";
+    }
+  }
+
   function downloadTemplateCsv(task: InstructionTask) {
     const csv =
       task === "upload"
@@ -1684,16 +1936,45 @@ export default function ConfirmedPage() {
       </section>
 
       <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_42%)] p-4 shadow-sm md:p-5">
-        <div className="rounded-2xl border border-slate-200 bg-white p-3">
-          <p className="mb-1 text-xs font-semibold text-slate-600">
-            Search companies
-          </p>
-          <SearchBar
-            value={query}
-            onChange={setQuery}
-            placeholder="Search company or drive title"
-            className="w-full"
-          />
+        <input
+          ref={companyUploadInputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          className="hidden"
+          onChange={(event) => void handleCompanyUploadFileChange(event)}
+        />
+
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+          <div className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white p-3">
+            <p className="mb-1 text-xs font-semibold text-slate-600">
+              Search companies
+            </p>
+            <SearchBar
+              value={query}
+              onChange={setQuery}
+              placeholder="Search company or drive title"
+              className="w-full"
+            />
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-3 lg:w-[18rem]">
+            <p className="mb-1 text-xs font-semibold text-slate-600">
+              Upload placement data
+            </p>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm w-full justify-center"
+              onClick={openCompanyUploadPicker}
+              disabled={companyUploadSubmitting || !selectedSeasonId}
+            >
+              {companyUploadSubmitting ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Upload size={15} />
+              )}
+              {companyUploadSubmitting ? "Processing file..." : "Upload file"}
+            </button>
+          </div>
         </div>
 
         <div className="mt-4">
@@ -2971,6 +3252,297 @@ export default function ConfirmedPage() {
             <p className="text-sm text-slate-500">No records to display.</p>
           )}
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={companyUploadInstructionOpen}
+        onClose={closeCompanyUploadInstruction}
+        title="Confirmed Company Upload"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={closeCompanyUploadInstruction}
+              disabled={companyUploadSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => void downloadCompanyUploadTemplate()}
+              disabled={companyUploadSubmitting}
+            >
+              <FileSpreadsheet size={15} />
+              Download template
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={continueToCompanyUpload}
+              disabled={companyUploadSubmitting}
+            >
+              Continue to upload
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3 text-sm text-slate-700">
+          <p>
+            Download the template first if you want a clean file with the
+            supported columns for confirmed-company processing.
+          </p>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="font-semibold text-slate-900">Supported columns</p>
+            <p className="mt-1 text-xs text-slate-600">
+              Required: <span className="font-semibold">Roll Number</span> and{" "}
+              <span className="font-semibold">Placed in Company</span>
+            </p>
+            <p className="mt-1 text-xs text-slate-600">
+              Optional but recommended:{" "}
+              <span className="font-semibold">Job Profile Title</span>,{" "}
+              <span className="font-semibold">CTC</span>, and{" "}
+              <span className="font-semibold">Placement Status</span>
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(companyUploadPreview)}
+        onClose={closeCompanyUploadPreview}
+        title={
+          companyUploadPreview
+            ? `Confirmed Company Upload Review - ${companyUploadPreview.fileName}`
+            : "Confirmed Company Upload Review"
+        }
+        size="lg"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => closeCompanyUploadPreview()}
+              disabled={companyUploadSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={proceedCompanyUploadPreview}
+              disabled={
+                companyUploadSubmitting ||
+                unresolvedUploadedCompanies.length > 0
+              }
+            >
+              Proceed
+            </button>
+          </>
+        }
+      >
+        {companyUploadPreview ? (
+          <div className="space-y-4">
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+              <p>
+                Sheets parsed:{" "}
+                <span className="font-semibold">
+                  {companyUploadPreview.matchedSheetNames.join(", ")}
+                </span>
+              </p>
+              <p>
+                Student rows used:{" "}
+                <span className="font-semibold text-emerald-700">
+                  {companyUploadPreview.parsedStudentRows}
+                </span>{" "}
+                | Skipped rows:{" "}
+                <span className="font-semibold text-amber-700">
+                  {companyUploadPreview.skippedStudentRows}
+                </span>
+              </p>
+              <p>
+                Uploaded companies:{" "}
+                <span className="font-semibold">
+                  {companyUploadPreview.uploadedCompanyCount}
+                </span>{" "}
+                | Auto-matched:{" "}
+                <span className="font-semibold text-emerald-700">
+                  {companyUploadPreview.autoMatchedCount}
+                </span>{" "}
+                | Needs review:{" "}
+                <span className="font-semibold text-rose-700">
+                  {companyUploadPreview.unmatchedCompanies.length}
+                </span>
+              </p>
+              <p>
+                Proceed status:{" "}
+                <span
+                  className={`font-semibold ${
+                    unresolvedUploadedCompanies.length === 0
+                      ? "text-emerald-700"
+                      : "text-amber-700"
+                  }`}
+                >
+                  {unresolvedUploadedCompanies.length === 0
+                    ? "Ready to proceed"
+                    : `${unresolvedUploadedCompanies.length} companies still need matching`}
+                </span>
+              </p>
+            </div>
+
+            {companyUploadPreview.unmatchedCompanies.length > 0 ? (
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Unmatched company names
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Review these names and map them to an existing confirmed
+                    company before proceeding. Nothing is written yet.
+                  </p>
+                </div>
+
+                <div className="max-h-[26rem] space-y-3 overflow-auto pr-1">
+                  {companyUploadPreview.unmatchedCompanies.map((company) => {
+                    const selectedCompanyId =
+                      manualCompanyMatches[company.uploadedCompanyName] ?? "";
+
+                    return (
+                      <div
+                        key={company.uploadedCompanyName}
+                        className="rounded-2xl border border-slate-200 bg-white p-4"
+                      >
+                        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900">
+                              {company.uploadedCompanyName}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {company.uniqueEntryCount} students across{" "}
+                              {company.rowCount} rows
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500">
+                              Sheets: {company.sheets.join(", ")}
+                            </p>
+                            {company.roles.length > 0 ? (
+                              <p className="mt-1 text-xs text-slate-500">
+                                Roles: {company.roles.slice(0, 4).join(", ")}
+                                {company.roles.length > 4 ? "..." : ""}
+                              </p>
+                            ) : null}
+                          </div>
+
+                          <div className="w-full lg:w-72">
+                            <label className="mb-1 block text-xs font-semibold text-slate-600">
+                              Match to confirmed company
+                            </label>
+                            <select
+                              value={selectedCompanyId}
+                              onChange={(event) =>
+                                updateManualCompanyMatch(
+                                  company.uploadedCompanyName,
+                                  event.target.value,
+                                )
+                              }
+                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-[#4A86E8] focus:ring-2 focus:ring-[#4A86E8]/20"
+                            >
+                              <option value="">Select company</option>
+                              {confirmedCompanyOptions.map((option) => (
+                                <option
+                                  key={option.companyId}
+                                  value={option.companyId}
+                                >
+                                  {option.companyName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {company.suggestions.length > 0 ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {company.suggestions.map((suggestion) => (
+                              <button
+                                key={`${company.uploadedCompanyName}-${suggestion.companyId}`}
+                                type="button"
+                                onClick={() =>
+                                  updateManualCompanyMatch(
+                                    company.uploadedCompanyName,
+                                    suggestion.companyId,
+                                  )
+                                }
+                                className={`rounded-full border px-3 py-1 text-xs transition ${
+                                  selectedCompanyId === suggestion.companyId
+                                    ? "border-[#4A86E8] bg-[#EAF2FF] text-[#1D4ED8]"
+                                    : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300"
+                                }`}
+                                title={suggestion.reason}
+                              >
+                                {suggestion.companyName}{" "}
+                                {`(${Math.round(suggestion.score * 100)}%)`}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                All uploaded company names were auto-matched to existing
+                confirmed companies.
+              </div>
+            )}
+
+            {companyUploadPreview.matchedCompanies.length > 0 ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Auto-matched companies
+                </h3>
+                <div className="mt-3 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white">
+                  <table className="w-full text-xs">
+                    <thead className="border-b border-slate-200 bg-slate-50">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                          Uploaded Name
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                          Matched Company
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-700">
+                          Confidence
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {companyUploadPreview.matchedCompanies.map((company) => (
+                        <tr
+                          key={company.uploadedCompanyName}
+                          className="border-b border-slate-100 last:border-b-0"
+                        >
+                          <td className="px-3 py-2 text-slate-900">
+                            {company.uploadedCompanyName}
+                          </td>
+                          <td className="px-3 py-2 text-slate-700">
+                            {company.matchedCompany?.companyName ?? "-"}
+                          </td>
+                          <td className="px-3 py-2 text-slate-700">
+                            {company.matchedCompany
+                              ? `${Math.round(company.matchedCompany.score * 100)}%`
+                              : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </Modal>
 
       <Modal
