@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Users,
@@ -11,7 +11,6 @@ import {
   UserPlus,
   RefreshCw,
 } from "lucide-react";
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
@@ -85,8 +84,6 @@ const STATUS_OPTIONS = [
   { value: "accepted", label: "Accepted" },
   { value: "rejected", label: "Rejected" },
 ];
-
-const PIE_COLORS = ["#2563EB", "#DBEAFE"];
 
 function getInitials(name: string): string {
   return name
@@ -455,6 +452,10 @@ export default function AssignmentsPage() {
   );
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
+  /* ── Sticky stats-card ── */
+  const statsCardRef = useRef<HTMLDivElement>(null);
+  const [stickyTop, setStickyTop] = useState(16);
+
   const loadAssignmentsData = useCallback(async () => {
     setIsLoading(true);
     setLoadError(null);
@@ -557,12 +558,39 @@ export default function AssignmentsPage() {
     };
   }, [coordinators, assignments, unassignedCycles, selectedSeasonId]);
 
-  const pieData = [
-    { name: "Assigned", value: stats.assigned },
-    { name: "Unassigned", value: stats.unassigned },
-  ];
-
   const totalCycles = stats.assigned + stats.unassigned;
+
+  /* ── Recalc sticky top when content changes ── */
+  useEffect(() => {
+    const el = statsCardRef.current;
+    if (!el) return;
+
+    const recalc = () => {
+      // Measure the actual card content, not the flex-stretched container
+      const child = el.firstElementChild as HTMLElement | null;
+      const cardH = child ? child.getBoundingClientRect().height : el.scrollHeight;
+      const vh = window.innerHeight;
+      // Stick so the card's bottom edge aligns with the viewport bottom.
+      // When card is shorter than viewport, stick near the top (16px gap).
+      // When card is taller, top goes negative so the card scrolls up first.
+      const computed = vh - cardH - 24;
+      const top = cardH < vh - 40 ? 16 : computed;
+      setStickyTop(top);
+    };
+
+    recalc();
+
+    const ro = new ResizeObserver(recalc);
+    ro.observe(el);
+    const child = el.firstElementChild;
+    if (child) ro.observe(child);
+    window.addEventListener("resize", recalc);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", recalc);
+    };
+  }, [isLoading, totalCycles]);
   const assignedRatio =
     totalCycles > 0 ? Math.round((stats.assigned / totalCycles) * 100) : 0;
   const seasonAssignments = assignments.filter(
@@ -583,10 +611,6 @@ export default function AssignmentsPage() {
   ).length;
   const acceptedRatio =
     totalCycles > 0 ? Math.round((acceptedCount / totalCycles) * 100) : 0;
-  const acceptedPieData = [
-    { name: "Accepted", value: acceptedCount },
-    { name: "Other", value: Math.max(totalCycles - acceptedCount, 0) },
-  ];
   const statsCardItems = [
     {
       label: "Total",
@@ -609,6 +633,12 @@ export default function AssignmentsPage() {
       sub: "Not contacted",
     },
   ];
+  const r = 46;
+  const circ = 2 * Math.PI * r;
+  const assignedFilled =
+    totalCycles > 0 ? (stats.assigned / totalCycles) * circ : 0;
+  const acceptedFilled =
+    totalCycles > 0 ? (acceptedCount / totalCycles) * circ : 0;
 
   const filteredAssigned = useMemo(() => {
     let data = assignments;
@@ -797,7 +827,7 @@ export default function AssignmentsPage() {
       )}
 
       <div className="flex flex-col gap-5 pt-6 xl:flex-row xl:items-start">
-        <div className="min-w-0 flex-1 space-y-5 xl:flex xl:flex-col">
+        <div className="min-w-0 flex-1 space-y-5">
           <div className="card overflow-visible flex flex-col">
             <div className="px-4 py-3 border-b border-(--card-border)">
               <div
@@ -887,7 +917,7 @@ export default function AssignmentsPage() {
             </div>
           </div>
 
-          <div className="card overflow-hidden xl:flex-1">
+          <div className="card overflow-hidden">
             <div className="border-b border-[#DBEAFE] flex items-center justify-between px-4">
               <div className="flex">
                 {tabs.map((tabItem) => (
@@ -1087,8 +1117,12 @@ export default function AssignmentsPage() {
           </div>
         </div>
 
-        <div className="w-full xl:w-80 xl:self-start">
-          <div className="card overflow-hidden border border-(--card-border) xl:sticky xl:top-4">
+        <div
+          ref={statsCardRef}
+          className="w-full xl:w-80 xl:self-start xl:sticky"
+          style={{ top: `${stickyTop}px` }}
+        >
+          <div className="card overflow-hidden border border-(--card-border)">
             <div
               className="px-4 py-3 border-b"
               style={{
@@ -1096,142 +1130,287 @@ export default function AssignmentsPage() {
                 background: "#2563EB",
               }}
             >
-              <p className="text-xs text-center font-semibold uppercase tracking-widest text-white">
+              <p
+                className="text-xs text-center font-semibold uppercase tracking-widest"
+                style={{ color: "#FFFFFF" }}
+              >
                 Statistics
               </p>
             </div>
 
-            <div className="p-3 border-b border-(--card-border)">
-              {isLoading ? (
-                <div className="space-y-3">
-                  <div className="shimmer mx-auto h-44 w-44 rounded-full" />
-                  <div className="shimmer mx-auto h-3 w-44 rounded-full" />
-                </div>
-              ) : totalCycles === 0 ? (
-                <div className="px-2 py-2 text-center text-sm font-medium text-slate-500">
-                  No assignments yet
-                </div>
-              ) : (
-                <>
-                  <div className="relative mx-auto h-44 w-full max-w-56">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={pieData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={58}
-                          paddingAngle={4}
-                          dataKey="value"
-                        >
-                          {pieData.map((_, index) => (
-                            <Cell key={index} fill={PIE_COLORS[index]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: "8px",
-                            border: "1px solid #DBEAFE",
-                            fontSize: "12px",
-                          }}
+            {isLoading ? (
+              <div className="space-y-3 p-3">
+                <div className="shimmer mx-auto h-44 w-44 rounded-full" />
+                <div className="shimmer h-12 w-full rounded-lg" />
+                <div className="shimmer h-12 w-full rounded-lg" />
+                <div className="shimmer h-12 w-full rounded-lg" />
+                <div className="shimmer h-12 w-full rounded-lg" />
+              </div>
+            ) : totalCycles === 0 ? (
+              <div className="px-4 py-6 text-center text-sm font-medium text-slate-500">
+                No assignments yet
+              </div>
+            ) : (
+              <>
+                <div className="xl:hidden">
+                  <div className="grid grid-cols-1 divide-y divide-(--card-border)">
+                    <div className="flex flex-col items-center justify-center gap-2 py-4">
+                      <div className="relative flex items-center justify-center">
+                        <svg width="116" height="116" viewBox="0 0 116 116">
+                          <circle cx="58" cy="58" r={r + 6} fill="#EFF6FF" />
+                          <circle
+                            cx="58"
+                            cy="58"
+                            r={r}
+                            fill="white"
+                            stroke="#DBEAFE"
+                            strokeWidth="8"
+                          />
+                          <circle
+                            cx="58"
+                            cy="58"
+                            r={r}
+                            fill="none"
+                            stroke="#2563EB"
+                            strokeWidth="8"
+                            strokeLinecap="round"
+                            strokeDasharray={`${assignedFilled} ${circ - assignedFilled}`}
+                            strokeDashoffset={circ * 0.25}
+                            style={{ transition: "stroke-dasharray 0.6s ease" }}
+                          />
+                        </svg>
+                        <div className="absolute flex flex-col items-center">
+                          <span
+                            className="text-2xl font-extrabold leading-none"
+                            style={{ color: "#2563EB" }}
+                          >
+                            {assignedRatio}%
+                          </span>
+                          <span
+                            className="text-[11px] font-medium mt-0.5"
+                            style={{ color: "var(--muted)" }}
+                          >
+                            assigned
+                          </span>
+                        </div>
+                      </div>
+                      <p
+                        className="text-[11px] font-semibold uppercase tracking-widest"
+                        style={{ color: "var(--muted)" }}
+                      >
+                        Assigned / Total
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-center justify-center gap-2 py-4">
+                      <div className="relative flex items-center justify-center">
+                        <svg width="116" height="116" viewBox="0 0 116 116">
+                          <circle cx="58" cy="58" r={r + 6} fill="#EFF6FF" />
+                          <circle
+                            cx="58"
+                            cy="58"
+                            r={r}
+                            fill="white"
+                            stroke="#DBEAFE"
+                            strokeWidth="8"
+                          />
+                          <circle
+                            cx="58"
+                            cy="58"
+                            r={r}
+                            fill="none"
+                            stroke="#2563EB"
+                            strokeWidth="8"
+                            strokeLinecap="round"
+                            strokeDasharray={`${acceptedFilled} ${circ - acceptedFilled}`}
+                            strokeDashoffset={circ * 0.25}
+                            style={{ transition: "stroke-dasharray 0.6s ease" }}
+                          />
+                        </svg>
+                        <div className="absolute flex flex-col items-center">
+                          <span
+                            className="text-2xl font-extrabold leading-none"
+                            style={{ color: "#2563EB" }}
+                          >
+                            {acceptedRatio}%
+                          </span>
+                          <span
+                            className="text-[11px] font-medium mt-0.5"
+                            style={{ color: "var(--muted)" }}
+                          >
+                            accepted
+                          </span>
+                        </div>
+                      </div>
+                      <p
+                        className="text-[11px] font-semibold uppercase tracking-widest"
+                        style={{ color: "var(--muted)" }}
+                      >
+                        Accepted / Total
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col divide-y divide-(--card-border)">
+                    {statsCardItems.map(({ label, value }) => (
+                      <div
+                        key={`${label}-mobile`}
+                        className="flex items-center gap-2 px-3 py-2.5 flex-1"
+                      >
+                        <div
+                          className="w-1 self-stretch rounded-full shrink-0 my-0.5"
+                          style={{ background: "#2563EB" }}
                         />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-extrabold leading-none text-[#2563EB]">
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className="text-[12px] font-bold uppercase tracking-wider leading-none"
+                            style={{ color: "#2563EB" }}
+                          >
+                            {label}
+                          </p>
+                        </div>
+                        <span
+                          className="text-xl font-extrabold shrink-0"
+                          style={{ color: "#2563EB" }}
+                        >
+                          {value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="hidden xl:flex flex-col items-center pt-6 pb-5 px-4 gap-1 border-b border-(--card-border)">
+                  <div className="relative flex items-center justify-center">
+                    <svg width="116" height="116" viewBox="0 0 116 116">
+                      <circle cx="58" cy="58" r={r + 6} fill="#EFF6FF" />
+                      <circle
+                        cx="58"
+                        cy="58"
+                        r={r}
+                        fill="white"
+                        stroke="#DBEAFE"
+                        strokeWidth="8"
+                      />
+                      <circle
+                        cx="58"
+                        cy="58"
+                        r={r}
+                        fill="none"
+                        stroke="#2563EB"
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeDasharray={`${assignedFilled} ${circ - assignedFilled}`}
+                        strokeDashoffset={circ * 0.25}
+                        style={{ transition: "stroke-dasharray 0.6s ease" }}
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center">
+                      <span
+                        className="text-2xl font-extrabold leading-none"
+                        style={{ color: "#2563EB" }}
+                      >
                         {assignedRatio}%
                       </span>
-                      <span className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-[#2563EB]">
+                      <span
+                        className="text-[11px] font-medium mt-0.5"
+                        style={{ color: "var(--muted)" }}
+                      >
                         assigned
                       </span>
                     </div>
                   </div>
-                  <p className="mt-1 text-center text-xs text-slate-500">
-                    {stats.assigned} assigned | {stats.unassigned} unassigned
+                  <p
+                    className="text-[11px] font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--muted)" }}
+                  >
+                    Assigned / Total
                   </p>
-                </>
-              )}
-            </div>
+                </div>
 
-            <div className="p-3 border-b border-(--card-border)">
-              {isLoading ? (
-                <div className="space-y-3">
-                  <div className="shimmer mx-auto h-44 w-44 rounded-full" />
-                  <div className="shimmer mx-auto h-3 w-44 rounded-full" />
-                </div>
-              ) : totalCycles === 0 ? (
-                <div className="px-2 py-6 text-center text-sm font-medium text-slate-500">
-                  No companies yet
-                </div>
-              ) : (
-                <>
-                  <div className="relative mx-auto h-44 w-full max-w-56">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={acceptedPieData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={40}
-                          outerRadius={58}
-                          paddingAngle={4}
-                          dataKey="value"
-                        >
-                          <Cell fill="#2563EB" />
-                          <Cell fill="#DBEAFE" />
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: "8px",
-                            border: "1px solid #DBEAFE",
-                            fontSize: "12px",
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-extrabold leading-none text-[#2563EB]">
+                <div className="hidden xl:flex flex-col items-center pt-6 pb-5 px-4 gap-1">
+                  <div className="relative flex items-center justify-center">
+                    <svg width="116" height="116" viewBox="0 0 116 116">
+                      <circle cx="58" cy="58" r={r + 6} fill="#EFF6FF" />
+                      <circle
+                        cx="58"
+                        cy="58"
+                        r={r}
+                        fill="white"
+                        stroke="#DBEAFE"
+                        strokeWidth="8"
+                      />
+                      <circle
+                        cx="58"
+                        cy="58"
+                        r={r}
+                        fill="none"
+                        stroke="#2563EB"
+                        strokeWidth="8"
+                        strokeLinecap="round"
+                        strokeDasharray={`${acceptedFilled} ${circ - acceptedFilled}`}
+                        strokeDashoffset={circ * 0.25}
+                        style={{ transition: "stroke-dasharray 0.6s ease" }}
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center">
+                      <span
+                        className="text-2xl font-extrabold leading-none"
+                        style={{ color: "#2563EB" }}
+                      >
                         {acceptedRatio}%
                       </span>
-                      <span className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-[#2563EB]">
+                      <span
+                        className="text-[11px] font-medium mt-0.5"
+                        style={{ color: "var(--muted)" }}
+                      >
                         accepted
                       </span>
                     </div>
                   </div>
-                  <p className="mt-1 text-center text-xs text-slate-500">
-                    {acceptedCount} accepted |{" "}
-                    {Math.max(totalCycles - acceptedCount, 0)} others
+                  <p
+                    className="text-[11px] font-semibold uppercase tracking-widest"
+                    style={{ color: "var(--muted)" }}
+                  >
+                    Accepted / Total
                   </p>
-                </>
-              )}
-            </div>
-
-            <div className="space-y-3 p-3">
-              {statsCardItems.map((item) => (
-                <div
-                  key={item.label}
-                  className="flex items-center gap-3 rounded-lg px-3"
-                  style={{ background: "#3B82F6" }}
-                >
-                  <div
-                    className="w-1 self-stretch rounded-full shrink-0 my-3"
-                    style={{ background: "#FFFFFF" }}
-                  />
-                  <div className="flex-1 min-w-0 py-3">
-                    <p className="text-[14px] font-bold uppercase tracking-wider leading-none text-white">
-                      {item.label}
-                    </p>
-                    <p className="mt-0.5 text-[12px] font-semibold text-black">
-                      {item.sub}
-                    </p>
-                  </div>
-                  <span className="text-2xl font-extrabold shrink-0 text-white">
-                    {item.value}
-                  </span>
                 </div>
-              ))}
-            </div>
+
+                <div className="hidden xl:flex xl:flex-col xl:flex-1 gap-5 px-3 pb-3">
+                  {statsCardItems.map(({ label, value, sub }) => (
+                    <div
+                      key={label}
+                      className="flex items-center gap-3 px-3 flex-1 rounded-lg"
+                      style={{ background: "#3B82F6" }}
+                    >
+                      <div
+                        className="w-1 self-stretch rounded-full shrink-0 my-3"
+                        style={{ background: "#FFFFFF" }}
+                      />
+                      <div className="flex-1 min-w-0 py-3">
+                        <p
+                          className="text-[18px] font-bold uppercase tracking-wider leading-none"
+                          style={{ color: "#FFFFFF" }}
+                        >
+                          {label}
+                        </p>
+                        <p
+                          className="text-[13px] font-bold mt-0.5"
+                          style={{ color: "#000000" }}
+                        >
+                          {sub}
+                        </p>
+                      </div>
+                      <span
+                        className="text-2xl font-extrabold shrink-0"
+                        style={{ color: "#FFFFFF" }}
+                      >
+                        {value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -232,32 +232,53 @@ const PRIORITY_BADGE: Record<string, React.ReactNode> = {
 
 function CompaniesTableSkeleton() {
   return (
-    <div className="p-4 space-y-3 min-w-160">
-      {Array.from({ length: 7 }, (_, index) => (
-        <div
-          key={index}
-          className="grid grid-cols-[minmax(0,2.2fr)_1fr_0.8fr_1fr_1.1fr_0.9fr] items-center gap-3 rounded-xl border border-slate-100 bg-white px-4 py-3"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="shimmer h-8 w-8 rounded-lg shrink-0" />
-            <div className="min-w-0 space-y-2">
-              <div className="shimmer h-4 w-32 rounded-full" />
-              <div className="shimmer h-3 w-20 rounded-full" />
-            </div>
-          </div>
-          <div className="shimmer h-4 w-20 rounded-full" />
-          <div className="shimmer h-6 w-16 rounded-full" />
-          <div className="shimmer h-4 w-24 rounded-full" />
-          <div className="flex justify-center">
-            <div className="shimmer h-4 w-24 rounded-full" />
-          </div>
-          <div className="flex justify-center gap-2">
-            <div className="shimmer h-8 w-8 rounded-lg" />
-            <div className="shimmer h-8 w-8 rounded-lg" />
-            <div className="shimmer h-8 w-8 rounded-lg" />
-          </div>
+    <div className="min-w-160 p-4">
+      <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
+        <div className="grid grid-cols-[minmax(0,2.4fr)_1fr_0.9fr_1.1fr_1.2fr_0.9fr] gap-3 border-b border-slate-100 bg-slate-50 px-4 py-3">
+          {Array.from({ length: 6 }, (_, index) => (
+            <div
+              key={index}
+              className={`shimmer h-3 rounded-full ${
+                index === 0
+                  ? "w-20"
+                  : index === 4
+                    ? "w-24 justify-self-center"
+                    : index === 5
+                      ? "w-16 justify-self-center"
+                      : "w-14"
+              }`}
+            />
+          ))}
         </div>
-      ))}
+        <div className="space-y-0">
+          {Array.from({ length: 7 }, (_, index) => (
+            <div
+              key={index}
+              className="grid grid-cols-[minmax(0,2.4fr)_1fr_0.9fr_1.1fr_1.2fr_0.9fr] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="shimmer h-8 w-8 rounded-lg shrink-0" />
+                <div className="min-w-0 space-y-2">
+                  <div className="shimmer h-4 w-36 rounded-full" />
+                  <div className="shimmer h-3 w-20 rounded-full" />
+                </div>
+              </div>
+              <div className="shimmer h-4 w-20 rounded-full" />
+              <div className="shimmer h-6 w-16 rounded-full" />
+              <div className="shimmer h-4 w-24 rounded-full" />
+              <div className="flex justify-center">
+                <div className="shimmer h-4 w-28 rounded-full" />
+              </div>
+              <div className="flex justify-center gap-2">
+                <div className="shimmer h-8 w-8 rounded-lg" />
+                <div className="shimmer h-8 w-8 rounded-lg" />
+                <div className="shimmer h-8 w-8 rounded-lg" />
+                <div className="shimmer h-8 w-8 rounded-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -462,7 +483,6 @@ export default function CompaniesPage() {
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [industryFilter, setIndustryFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
@@ -844,8 +864,6 @@ export default function CompaniesPage() {
           (c.website ?? "").toLowerCase().includes(q),
       );
     }
-    if (statusFilter.length > 0)
-      data = data.filter((c) => statusFilter.includes(c.status));
     if (industryFilter.length > 0)
       data = data.filter((c) => industryFilter.includes(c.industry));
     if (priorityFilter.length > 0)
@@ -865,7 +883,6 @@ export default function CompaniesPage() {
     return data;
   }, [
     search,
-    statusFilter,
     industryFilter,
     priorityFilter,
     assigneeFilter,
@@ -894,19 +911,6 @@ export default function CompaniesPage() {
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
   const paginated = filtered.slice((page - 1) * PER_PAGE, page * PER_PAGE);
-
-  const stats = useMemo(
-    () => ({
-      total: companies.length,
-      accepted: companies.filter((c) => c.status === "accepted").length,
-      positive: companies.filter(
-        (c) => c.status === "positive" || c.status === "accepted",
-      ).length,
-      notContacted: companies.filter((c) => c.status === "not_contacted")
-        .length,
-    }),
-    [companies],
-  );
 
   const handleSort = (field: keyof Company) => {
     if (sortField !== field) {
@@ -957,248 +961,11 @@ export default function CompaniesPage() {
   };
 
   const activeFilterCount =
-    statusFilter.length +
-    industryFilter.length +
-    priorityFilter.length +
-    assigneeFilter.length;
+    industryFilter.length + priorityFilter.length + assigneeFilter.length;
 
   return (
     <div className="animate-fade-in xl:h-full pb-6 pt-6">
-      <div className="flex flex-col xl:flex-row gap-5 xl:items-start xl:h-full">
-        {/* -- Left: Statistics card --------------------------- */}
-        {(() => {
-          const statItems = [
-            {
-              label: "Total",
-              value: stats.total,
-              sub: "Companies",
-              accent: "#2563EB",
-            },
-            {
-              label: "Accepted",
-              value: stats.accepted,
-              sub: "Confirmed JD",
-              accent: "#2563EB",
-            },
-            {
-              label: "Positive",
-              value: stats.positive,
-              sub: "Responded well",
-              accent: "#2563EB",
-            },
-            {
-              label: "Pending",
-              value: stats.notContacted,
-              sub: "Not contacted",
-              accent: "#2563EB",
-            },
-          ];
-          const r = 46,
-            circ = 2 * Math.PI * r;
-          const filled =
-            stats.total > 0 ? (stats.accepted / stats.total) * circ : 0;
-          return (
-            <div className="card w-full xl:w-56 xl:shrink-0 xl:h-full xl:flex xl:flex-col overflow-hidden">
-              {/* Header */}
-              <div
-                className="px-4 py-3 border-b"
-                style={{
-                  borderColor: "var(--card-border)",
-                  background: "#2563EB",
-                }}
-              >
-                <p
-                  className="text-xs text-center font-semibold uppercase tracking-widest"
-                  style={{ color: "#FFFFFF" }}
-                >
-                  Statistics
-                </p>
-              </div>
-
-              {/* -- Mobile: ring left + compact rows right (hidden on xl) -- */}
-              <div className="xl:hidden flex items-stretch">
-                {/* Left: circular progress ring (matches xl params) */}
-                <div
-                  className="flex flex-col items-center justify-center gap-2 py-4 shrink-0 w-60"
-                  style={{ borderRight: "1px solid var(--card-border)" }}
-                >
-                  <div className="relative flex items-center justify-center">
-                    <svg width="116" height="116" viewBox="0 0 116 116">
-                      <circle cx="58" cy="58" r={r + 6} fill="#EFF6FF" />
-                      <circle
-                        cx="58"
-                        cy="58"
-                        r={r}
-                        fill="white"
-                        stroke="#DBEAFE"
-                        strokeWidth="8"
-                      />
-                      <circle
-                        cx="58"
-                        cy="58"
-                        r={r}
-                        fill="none"
-                        stroke="#2563EB"
-                        strokeWidth="8"
-                        strokeLinecap="round"
-                        strokeDasharray={`${filled} ${circ - filled}`}
-                        strokeDashoffset={circ * 0.25}
-                        style={{ transition: "stroke-dasharray 0.6s ease" }}
-                      />
-                    </svg>
-                    <div className="absolute flex flex-col items-center">
-                      <span
-                        className="text-2xl font-extrabold leading-none"
-                        style={{ color: "#2563EB" }}
-                      >
-                        {stats.total > 0
-                          ? Math.round((stats.accepted / stats.total) * 100)
-                          : 0}
-                        %
-                      </span>
-                      <span
-                        className="text-[11px] font-medium mt-0.5"
-                        style={{ color: "var(--muted)" }}
-                      >
-                        accepted
-                      </span>
-                    </div>
-                  </div>
-                  <p
-                    className="text-[11px] font-semibold uppercase tracking-widest"
-                    style={{ color: "var(--muted)" }}
-                  >
-                    Accepted / Total
-                  </p>
-                </div>
-                {/* Right: compact rows */}
-                <div className="flex flex-col flex-1 divide-y divide-(--card-border)">
-                  {statItems.map(({ label, value, sub, accent }) => (
-                    <div
-                      key={label}
-                      className="flex items-center gap-2 px-3 py-2.5 flex-1"
-                    >
-                      <div
-                        className="w-1 self-stretch rounded-full shrink-0 my-0.5"
-                        style={{ background: accent }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p
-                          className="text-[12px] font-bold uppercase tracking-wider leading-none"
-                          style={{ color: "#2563EB" }}
-                        >
-                          {label}
-                        </p>
-                        {/* <p
-                          className="text-[10px] mt-0.5"
-                          style={{ color: "var(--muted)" }}
-                        >
-                          {sub}
-                        </p> */}
-                      </div>
-                      <span
-                        className="text-xl font-extrabold shrink-0"
-                        style={{ color: accent }}
-                      >
-                        {value}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* -- xl: ring + vertical rows (hidden below xl) -- */}
-              <div className="hidden xl:flex flex-col items-center pt-6 pb-5 px-4 gap-1">
-                <div className="relative flex items-center justify-center">
-                  <svg width="116" height="116" viewBox="0 0 116 116">
-                    <circle cx="58" cy="58" r={r + 6} fill="#EFF6FF" />
-                    <circle
-                      cx="58"
-                      cy="58"
-                      r={r}
-                      fill="white"
-                      stroke="#DBEAFE"
-                      strokeWidth="8"
-                    />
-                    <circle
-                      cx="58"
-                      cy="58"
-                      r={r}
-                      fill="none"
-                      stroke="#2563EB"
-                      strokeWidth="8"
-                      strokeLinecap="round"
-                      strokeDasharray={`${filled} ${circ - filled}`}
-                      strokeDashoffset={circ * 0.25}
-                      style={{ transition: "stroke-dasharray 0.6s ease" }}
-                    />
-                  </svg>
-                  <div className="absolute flex flex-col items-center">
-                    <span
-                      className="text-2xl font-extrabold leading-none"
-                      style={{ color: "#2563EB" }}
-                    >
-                      {stats.total > 0
-                        ? Math.round((stats.accepted / stats.total) * 100)
-                        : 0}
-                      %
-                    </span>
-                    <span
-                      className="text-[11px] font-medium mt-0.5"
-                      style={{ color: "var(--muted)" }}
-                    >
-                      accepted
-                    </span>
-                  </div>
-                </div>
-                <p
-                  className="text-[11px] font-semibold uppercase tracking-widest"
-                  style={{ color: "var(--muted)" }}
-                >
-                  Accepted / Total
-                </p>
-              </div>
-
-              <div className="hidden xl:flex xl:flex-col  xl:flex-1 gap-5 px-3 pb-3">
-                {statItems.map(({ label, value, sub }) => (
-                  <div
-                    key={label}
-                    className="flex items-center gap-3 px-3 flex-1 rounded-lg"
-                    style={{ background: "#3B82F6" }}
-                  >
-                    <div
-                      className="w-1 self-stretch rounded-full shrink-0 my-3"
-                      style={{ background: "#FFFFFF" }}
-                    />
-                    <div className="flex-1 min-w-0 py-3">
-                      <p
-                        className="text-[18px] font-bold uppercase tracking-wider leading-none"
-                        style={{ color: "#FFFFFF" }}
-                      >
-                        {label}
-                      </p>
-                      <p
-                        className="text-[13px] font-bold mt-0.5"
-                        style={{ color: "#000000" }}
-                      >
-                        {sub}
-                      </p>
-                    </div>
-                    <span
-                      className="text-2xl font-extrabold shrink-0"
-                      style={{ color: "#FFFFFF" }}
-                    >
-                      {value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* -- Right: Table card ------------------------------- */}
-        <div className="card overflow-hidden flex-1 min-w-0 xl:h-full flex flex-col">
+      <div className="card overflow-hidden min-w-0 xl:h-full flex flex-col">
           {/* Toolbar */}
           <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
             {(toolbarMessage || toolbarError) && (
@@ -1288,17 +1055,6 @@ export default function CompaniesPage() {
               <div className="flex items-center gap-2 pt-1 pb-0.5 w-full">
                 <FilterSelect
                   multiple
-                  value={statusFilter}
-                  onChange={(v) => {
-                    setStatusFilter(v);
-                    setPage(1);
-                  }}
-                  options={STATUS_OPTIONS}
-                  placeholder="Status"
-                  className="flex-1 min-w-0"
-                />
-                <FilterSelect
-                  multiple
                   value={industryFilter}
                   onChange={(v) => {
                     setIndustryFilter(v);
@@ -1334,7 +1090,6 @@ export default function CompaniesPage() {
                   <button
                     className="btn btn-ghost btn-sm text-slate-500 hover:text-slate-700 shrink-0"
                     onClick={() => {
-                      setStatusFilter([]);
                       setIndustryFilter([]);
                       setPriorityFilter([]);
                       setAssigneeFilter([]);
@@ -1569,10 +1324,7 @@ export default function CompaniesPage() {
               </div>
             )}
           </div>
-        </div>
-        {/* end table card */}
       </div>
-      {/* end two-column */}
 
       {updateDetails && (
         <>
