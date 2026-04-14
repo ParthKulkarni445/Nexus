@@ -16,6 +16,7 @@ export interface AuthUser {
   role: UserRole;
   coordinatorType?: CoordinatorType;
   isActive: boolean;
+  lastNotificationsViewedAt?: Date | null;
 }
 
 const TRANSIENT_DB_ERROR_CODES = new Set(["P5010", "P5000"]);
@@ -83,6 +84,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     role: user.role as UserRole,
     coordinatorType: user.coordinatorType as CoordinatorType | undefined,
     isActive: user.isActive,
+    lastNotificationsViewedAt: user.lastNotificationsViewedAt,
   };
 }
 

@@ -10,7 +10,6 @@ import {
   PhoneCall,
   Mail,
   Users,
-  Bell,
   BookOpen,
   Menu,
   X,
@@ -20,6 +19,7 @@ import {
   Shield,
 } from "lucide-react";
 import { canAccessAppPath } from "@/lib/auth/rbac";
+import NotificationWidget from "@/components/ui/NotificationWidget";
 
 const navItems = [
   { label: "Companies", href: "/companies", icon: Building2 },
@@ -266,20 +266,8 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
 
             {/* Right slot */}
             <div className="flex items-center gap-1 ml-auto">
-              {/* Notification bell */}
-              <Link
-                href="/notifications"
-                className="relative p-2 rounded-lg text-[#93C5FD] hover:text-white hover:bg-white/8 transition-all"
-              >
-                <Bell size={17} />
-                <span
-                  className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full"
-                  style={{
-                    background: "#FFFFFF",
-                    boxShadow: "0 0 4px rgba(255,255,255,0.6)",
-                  }}
-                />
-              </Link>
+              {/* Notification widget */}
+              <NotificationWidget />
 
               {/* User menu */}
               <div className="relative" ref={userMenuRef}>

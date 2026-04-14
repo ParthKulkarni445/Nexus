@@ -1,18 +1,20 @@
 ﻿"use client";
 
-import EmptyState from "@/components/ui/EmptyState";
-import { Bell } from "lucide-react";
+import { redirect } from "next/navigation";
+import { useEffect } from "react";
+import { getCurrentUser } from "@/lib/api/auth";
 
+/**
+ * Notifications page - redirects to most relevant section
+ * Users typically access notifications via the widget popup that routes to specific pages
+ */
 export default function NotificationsPage() {
-  return (
-    <div className="p-4 lg:p-6 animate-fade-in">
-      <div className="card">
-        <EmptyState
-          icon={Bell}
-          title="Notifications"
-          description="Your system notifications will appear here."
-        />
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    // Redirect to mailing as default for coordinators
+    redirect("/mailing");
+  }, []);
+
+  return null;
 }
+
+

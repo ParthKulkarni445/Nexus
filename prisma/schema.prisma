@@ -20,6 +20,7 @@ model User {
   createdAt                DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                DateTime                     @default(now()) @map("updated_at") @db.Timestamptz(6)
   phone                    String?                      @db.VarChar(30)
+  lastNotificationsViewedAt DateTime?                  @map("last_notifications_viewed_at") @db.Timestamptz(6)
   auditLogs                AuditLog[]
   blogVotes                BlogVote[]
   approvedBlogs            Blog[]                       @relation("BlogApprover")
