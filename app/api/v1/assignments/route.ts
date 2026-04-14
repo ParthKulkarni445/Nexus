@@ -85,6 +85,7 @@ export async function GET() {
               id: true,
               name: true,
               industry: true,
+              priority: true,
             },
           },
           season: {
