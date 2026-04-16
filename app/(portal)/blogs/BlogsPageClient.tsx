@@ -119,7 +119,6 @@ export default function BlogsPageClient({
   const [createTitle, setCreateTitle] = useState("");
   const [createBody, setCreateBody] = useState("<p></p>");
   const [createTags, setCreateTags] = useState("");
-  const [createAiAssisted, setCreateAiAssisted] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
@@ -414,7 +413,6 @@ export default function BlogsPageClient({
           title: createTitle.trim(),
           body: createBody,
           tags,
-          isAiAssisted: createAiAssisted,
         }),
       });
 
@@ -451,7 +449,6 @@ export default function BlogsPageClient({
       setCreateTitle("");
       setCreateBody("<p></p>");
       setCreateTags("");
-      setCreateAiAssisted(false);
     } catch (error) {
       console.error("Error creating blog:", error);
       setCreateError(
@@ -652,9 +649,16 @@ export default function BlogsPageClient({
               {filteredBlogs.length > 0 && (
                 <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-4">
                   <div className="text-xs text-slate-600">
-                    Showing <span className="font-semibold">{startIndex + 1}</span> to{" "}
-                    <span className="font-semibold">{Math.min(endIndex, filteredBlogs.length)}</span> of{" "}
-                    <span className="font-semibold">{filteredBlogs.length}</span> blogs
+                    Showing{" "}
+                    <span className="font-semibold">{startIndex + 1}</span> to{" "}
+                    <span className="font-semibold">
+                      {Math.min(endIndex, filteredBlogs.length)}
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-semibold">
+                      {filteredBlogs.length}
+                    </span>{" "}
+                    blogs
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -665,22 +669,26 @@ export default function BlogsPageClient({
                       ← Previous
                     </button>
                     <div className="flex items-center gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                            currentPage === page
-                              ? "bg-[#2563EB] text-white"
-                              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                        (page) => (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`inline-flex items-center justify-center w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                              currentPage === page
+                                ? "bg-[#2563EB] text-white"
+                                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ),
+                      )}
                     </div>
                     <button
-                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
                       disabled={currentPage === totalPages}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -793,9 +801,14 @@ export default function BlogsPageClient({
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Full Blog Content
               </p>
-              <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                {selectedBlog.content || "No content available."}
-              </div>
+              <RichTextEditor
+                className="mt-2"
+                value={selectedBlog.content || "<p>No content available.</p>"}
+                onChange={() => {
+                  // Read-only viewer mode.
+                }}
+                readOnly
+              />
             </div>
           </div>
         )}
@@ -890,16 +903,6 @@ export default function BlogsPageClient({
               />
             </div>
 
-            <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={createAiAssisted}
-                onChange={(event) => setCreateAiAssisted(event.target.checked)}
-                disabled={isCreating}
-              />
-              AI-assisted content
-            </label>
-
             {createError && (
               <p className="text-xs font-medium text-red-600">{createError}</p>
             )}
@@ -973,9 +976,16 @@ export default function BlogsPageClient({
                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Blog Content
                 </p>
-                <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">
-                  {reviewingBlog.content || "No content available."}
-                </div>
+                <RichTextEditor
+                  className="mt-2"
+                  value={
+                    reviewingBlog.content || "<p>No content available.</p>"
+                  }
+                  onChange={() => {
+                    // Read-only viewer mode.
+                  }}
+                  readOnly
+                />
               </div>
 
               <div>

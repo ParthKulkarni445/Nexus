@@ -1129,23 +1129,23 @@ function ThreadCompanyMappingModal({
                 No company matches found.
               </p>
             ) : (
-            <div className="max-h-64 overflow-y-auto p-2">
-              {options.map((company) => {
-                return (
-                  <button
-                    key={company.id}
-                    type="button"
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-white"
-                    onClick={() => onSelectCompany(company)}
-                  >
-                    <span className="font-medium">{company.name}</span>
-                    <span className="text-xs text-slate-500">
-                      {company.domain || ""}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+              <div className="max-h-64 overflow-y-auto p-2">
+                {options.map((company) => {
+                  return (
+                    <button
+                      key={company.id}
+                      type="button"
+                      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-slate-700 hover:bg-white"
+                      onClick={() => onSelectCompany(company)}
+                    >
+                      <span className="font-medium">{company.name}</span>
+                      <span className="text-xs text-slate-500">
+                        {company.domain || ""}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
         ) : null}
@@ -3022,14 +3022,28 @@ export default function MailingPage() {
                   <span>Mailbox</span>
                 </div>
               </div>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm gap-1 self-start"
-                onClick={() => setMailboxComposeOpen(true)}
-              >
-                <Plus size={14} />
-                Compose
-              </button>
+              <div className="flex flex-wrap items-center gap-2 self-start">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm gap-1"
+                  onClick={() => void handleSyncInbound()}
+                  disabled={mailboxSyncing}
+                >
+                  <RefreshCw
+                    size={14}
+                    className={mailboxSyncing ? "animate-spin" : undefined}
+                  />
+                  {mailboxSyncing ? "Syncing..." : "Sync"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm gap-1"
+                  onClick={() => setMailboxComposeOpen(true)}
+                >
+                  <Plus size={14} />
+                  Compose
+                </button>
+              </div>
             </div>
 
             {mailboxLoading ? (
@@ -3073,7 +3087,9 @@ export default function MailingPage() {
                     onClick={openThreadCompanyModal}
                   >
                     <Building2 size={14} />
-                    <span>{selectedMailboxCompany?.name ?? "Map to Company"}</span>
+                    <span>
+                      {selectedMailboxCompany?.name ?? "Map to Company"}
+                    </span>
                     <span aria-hidden="true" className="text-white/70">
                       |
                     </span>
@@ -3347,7 +3363,9 @@ export default function MailingPage() {
         open={mailboxComposeOpen || Boolean(replyMailboxEmail)}
         key={
           replyMailboxEmail?.id ??
-          (mailboxComposeOpen ? "mailbox-compose-open" : "mailbox-compose-closed")
+          (mailboxComposeOpen
+            ? "mailbox-compose-open"
+            : "mailbox-compose-closed")
         }
         email={replyMailboxEmail}
         submitting={mailboxReplySubmitting}

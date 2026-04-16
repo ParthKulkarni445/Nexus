@@ -839,10 +839,17 @@ export default function CompaniesPage() {
     }
 
     return companyImportPreview.rows.filter(
-      (row) =>
-        row.suggestions.length > 0 && !companyImportMatches[row.companyName],
+      (row) => row.duplicateCandidate && !companyImportMatches[row.companyName],
     );
   }, [companyImportMatches, companyImportPreview]);
+
+  const duplicateRowsForReview = useMemo(() => {
+    if (!companyImportPreview) {
+      return [];
+    }
+
+    return companyImportPreview.rows.filter((row) => row.duplicateCandidate);
+  }, [companyImportPreview]);
 
   const handleImportFileChange = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -1656,7 +1663,7 @@ export default function CompaniesPage() {
             </div>
 
             <div className="max-h-128 space-y-3 overflow-auto pr-1">
-              {companyImportPreview.rows.map((row) => {
+              {duplicateRowsForReview.map((row) => {
                 const selectedMatchId =
                   companyImportMatches[row.companyName] ?? "";
                 const hasSuggestions = row.suggestions.length > 0;
@@ -1752,6 +1759,13 @@ export default function CompaniesPage() {
                   </div>
                 );
               })}
+
+              {duplicateRowsForReview.length === 0 ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                  No duplicate companies detected. All rows will be imported as
+                  new companies.
+                </div>
+              ) : null}
             </div>
 
             {unresolvedImportDuplicates.length > 0 ? (

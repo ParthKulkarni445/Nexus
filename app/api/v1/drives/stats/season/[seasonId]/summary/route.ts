@@ -148,12 +148,25 @@ export async function GET(
       { offers: number; totalPackage: number; highestPackage: number }
     >();
     const companyHiringMap = new Map<string, { name: string; offers: number }>();
-    const packageBands = [
-      { label: "< 5", min: 0, max: 5, count: 0 },
-      { label: "5 - 10", min: 5, max: 10, count: 0 },
-      { label: "10 - 20", min: 10, max: 20, count: 0 },
-      { label: "20+", min: 20, max: Number.POSITIVE_INFINITY, count: 0 },
-    ];
+    const packageBands =
+      season.seasonType === "intern"
+        ? [
+            { label: "<50k", min: 0, max: 50000, count: 0 },
+            { label: "50k-1 lakh", min: 50000, max: 100000, count: 0 },
+            { label: "1 lakh-1.5 lakh", min: 100000, max: 150000, count: 0 },
+            {
+              label: "1.5 lakh+",
+              min: 150000,
+              max: Number.POSITIVE_INFINITY,
+              count: 0,
+            },
+          ]
+        : [
+            { label: "< 5", min: 0, max: 5, count: 0 },
+            { label: "5 - 10", min: 5, max: 10, count: 0 },
+            { label: "10 - 20", min: 10, max: 20, count: 0 },
+            { label: "20+", min: 20, max: Number.POSITIVE_INFINITY, count: 0 },
+          ];
 
     placements.forEach((placement) => {
       const packageAmount = Number(placement.packageAmount);

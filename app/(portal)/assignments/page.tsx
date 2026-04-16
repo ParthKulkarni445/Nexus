@@ -800,6 +800,40 @@ export default function AssignmentsPage() {
     return data;
   }, [inactiveCompanies, search, priorityFilter]);
 
+  const allVisibleUnassignedSelected =
+    filteredUnassigned.length > 0 &&
+    filteredUnassigned.every((company) =>
+      selectedUnassigned.has(company.companySeasonCycleId),
+    );
+
+  const allVisibleInactiveSelected =
+    filteredInactive.length > 0 &&
+    filteredInactive.every((company) =>
+      selectedInactive.has(company.companyId),
+    );
+
+  const toggleSelectAllUnassigned = () => {
+    setSelectedUnassigned((previous) => {
+      if (allVisibleUnassignedSelected) {
+        return new Set();
+      }
+
+      return new Set(
+        filteredUnassigned.map((item) => item.companySeasonCycleId),
+      );
+    });
+  };
+
+  const toggleSelectAllInactive = () => {
+    setSelectedInactive((previous) => {
+      if (allVisibleInactiveSelected) {
+        return new Set();
+      }
+
+      return new Set(filteredInactive.map((item) => item.companyId));
+    });
+  };
+
   useEffect(() => {
     if (isLoading || hasAutoSelectedInitialTab.current) {
       return;
@@ -1123,7 +1157,7 @@ export default function AssignmentsPage() {
 
                 {tab === "unassigned" && selectedUnassigned.size > 0 && (
                   <button
-                    className="btn btn-primary btn-sm gap-1 shrink-0"
+                    className="btn btn-secondary btn-sm gap-1 shrink-0"
                     onClick={() =>
                       setAssignModal({
                         companies: unassignedCycles.filter((company) =>
@@ -1140,7 +1174,7 @@ export default function AssignmentsPage() {
 
                 {tab === "inactive" && selectedInactive.size > 0 && (
                   <button
-                    className="btn btn-primary btn-sm gap-1 shrink-0"
+                    className="btn btn-secondary btn-sm gap-1 shrink-0"
                     disabled={!selectedSeasonId || isBulkActivateSubmitting}
                     onClick={() =>
                       void handleActivate(Array.from(selectedInactive), "bulk")
@@ -1183,6 +1217,26 @@ export default function AssignmentsPage() {
                     </span>
                   </button>
                 ))}
+              </div>
+              <div className="flex items-center gap-2">
+                {tab === "unassigned" && filteredUnassigned.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm text-slate-500 hover:text-[#2563EB]"
+                    onClick={toggleSelectAllUnassigned}
+                  >
+                    {allVisibleUnassignedSelected ? "Clear All" : "Select All"}
+                  </button>
+                )}
+                {tab === "inactive" && filteredInactive.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm text-slate-500 hover:text-[#2563EB]"
+                    onClick={toggleSelectAllInactive}
+                  >
+                    {allVisibleInactiveSelected ? "Clear All" : "Select All"}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -1381,7 +1435,7 @@ export default function AssignmentsPage() {
                         </Badge>
                       </div>
                       <button
-                        className="btn btn-primary btn-sm gap-1 shrink-0"
+                        className="btn btn-ghost btn-sm gap-1 shrink-0 text-slate-500 hover:text-[#2563EB]"
                         onClick={() =>
                           setAssignModal({ companies: [company], bulk: false })
                         }
@@ -1457,7 +1511,7 @@ export default function AssignmentsPage() {
                         </Badge>
                       </div>
                       <button
-                        className="btn btn-primary btn-sm gap-1 shrink-0"
+                        className="btn btn-ghost btn-sm gap-1 shrink-0 text-slate-500 hover:text-[#2563EB]"
                         disabled={
                           !selectedSeasonId ||
                           isBulkActivateSubmitting ||

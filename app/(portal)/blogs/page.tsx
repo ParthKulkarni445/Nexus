@@ -44,23 +44,7 @@ function buildExcerpt(content: string) {
   return `${plain.slice(0, 177)}...`;
 }
 
-function buildContent(content: string) {
-  return content
-    .replace(/<br\s*\/?\s*>/gi, "\n")
-    .replace(/<\/p>/gi, "\n\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/\n[ \t]+/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-function mapBlog(
-  blog: BlogRecord,
-  currentUserId?: string,
-): BlogPost {
+function mapBlog(blog: BlogRecord, currentUserId?: string): BlogPost {
   const source = blog.author.role === "student" ? "student" : "tpo";
   const upvoteCount =
     blog.votes?.filter((vote) => vote.voteType === "upvote").length ?? 0;
@@ -78,7 +62,7 @@ function mapBlog(
     date: blog.createdAt.toISOString(),
     tags: blog.tags,
     excerpt: buildExcerpt(blog.body),
-    content: buildContent(blog.body),
+    content: blog.body,
     moderation: blog.moderationStatus,
     moderationNote: blog.moderationNote,
     upvoteCount,
