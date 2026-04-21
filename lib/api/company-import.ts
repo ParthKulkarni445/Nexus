@@ -1,18 +1,38 @@
 import { z } from "zod";
 import { parseWorkbookBuffer } from "@/lib/api/excel";
 
-export const IMPORT_HEADERS = [
+export const IMPORT_REQUIRED_HEADERS = [
   "company name",
   "industry",
   "priority",
   "domain",
 ] as const;
 
+export const IMPORT_OPTIONAL_HEADERS = [
+  "contact name",
+  "contact emails",
+  "contact phones",
+] as const;
+
+export const IMPORT_HEADERS = [
+  ...IMPORT_REQUIRED_HEADERS,
+  ...IMPORT_OPTIONAL_HEADERS,
+] as const;
+
+const importContactSchema = z.object({
+  name: z.string().min(1).max(255),
+  emails: z.array(z.string().email()).default([]),
+  phones: z.array(z.string().min(1).max(30)).default([]),
+});
+
 export const importRowSchema = z.object({
+  rowKey: z.string().min(1),
+  rowNumber: z.number().int().positive(),
   companyName: z.string().min(1).max(255),
   industry: z.string().min(1).max(100),
   priority: z.enum(["low", "medium", "high"]),
   domains: z.array(z.string().min(1).max(255)),
+  contacts: z.array(importContactSchema),
 });
 
 const COMPANY_STOP_WORDS = new Set([
@@ -106,6 +126,25 @@ export function parseDomainValues(rawValue: string | undefined) {
   }
 
   return { domains: Array.from(uniqueDomains), invalidTokens };
+}
+
+function parseMultiValueField(rawValue: string | undefined) {
+  if (!rawValue || !rawValue.trim()) {
+    return [] as string[];
+  }
+
+  return Array.from(
+    new Set(
+      rawValue
+        .split(/[\n,;|]+/)
+        .map((value) => value.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function hasAnyValue(values: Array<string | undefined>) {
+  return values.some((value) => Boolean(value && value.trim()));
 }
 
 export function normalizeCompanyName(value: string) {
@@ -206,7 +245,9 @@ export function parseCompanyImportBuffer(buffer: Buffer) {
     };
   }
 
-  const missingHeaders = IMPORT_HEADERS.filter((header) => !headers.includes(header));
+  const missingHeaders = IMPORT_REQUIRED_HEADERS.filter(
+    (header) => !headers.includes(header),
+  );
   const validationErrors: Array<{ row: number; message: string }> = [];
 
   const normalizedRows = records.map((record, index) => {
@@ -214,6 +255,17 @@ export function parseCompanyImportBuffer(buffer: Buffer) {
     const companyName = (record["company name"] ?? "").trim();
     const priority = parsePriority(record.priority);
     const { domains, invalidTokens } = parseDomainValues(record.domain);
+    const contactName = (record["contact name"] ?? "").trim();
+    const contactEmailsRaw = (record["contact emails"] ?? "").trim();
+    const contactPhonesRaw = (record["contact phones"] ?? "").trim();
+
+    const parsedContactNames = parseMultiValueField(contactName);
+    const parsedContactEmails = parseMultiValueField(contactEmailsRaw);
+    const parsedContactPhones = parseMultiValueField(contactPhonesRaw);
+    const hasContactData =
+      parsedContactNames.length > 0 ||
+      parsedContactEmails.length > 0 ||
+      parsedContactPhones.length > 0;
 
     if (!priority) {
       validationErrors.push({
@@ -231,11 +283,82 @@ export function parseCompanyImportBuffer(buffer: Buffer) {
       return null;
     }
 
+    if (hasContactData && parsedContactNames.length === 0) {
+      validationErrors.push({
+        row: rowNumber,
+        message: "contact name is required when contact columns are provided",
+      });
+      return null;
+    }
+
+    const contactCount = Math.max(
+      parsedContactNames.length,
+      parsedContactEmails.length,
+      parsedContactPhones.length,
+      0,
+    );
+
+    const contacts: Array<z.infer<typeof importContactSchema>> = [];
+
+    for (let contactIndex = 0; contactIndex < contactCount; contactIndex += 1) {
+      const nameToken = parsedContactNames[contactIndex]?.trim() ?? "";
+      const emailToken = parsedContactEmails[contactIndex]?.trim() ?? "";
+      const phoneToken = parsedContactPhones[contactIndex]?.trim() ?? "";
+
+      const hasTokenData = hasAnyValue([
+        nameToken,
+        emailToken,
+        phoneToken,
+      ]);
+
+      if (!hasTokenData) {
+        continue;
+      }
+
+      if (!nameToken) {
+        validationErrors.push({
+          row: rowNumber,
+          message:
+            "contact name is required for each comma-separated contact entry",
+        });
+        return null;
+      }
+
+      if (emailToken && !z.string().email().safeParse(emailToken).success) {
+        validationErrors.push({
+          row: rowNumber,
+          message: `invalid contact email: ${emailToken}`,
+        });
+        return null;
+      }
+
+      const parsedContact = importContactSchema.safeParse({
+        name: nameToken,
+        emails: emailToken ? [emailToken] : [],
+        phones: phoneToken ? [phoneToken] : [],
+      });
+
+      if (!parsedContact.success) {
+        validationErrors.push({
+          row: rowNumber,
+          message: parsedContact.error.issues
+            .map((issue) => issue.message)
+            .join(", "),
+        });
+        return null;
+      }
+
+      contacts.push(parsedContact.data);
+    }
+
     const parsed = importRowSchema.safeParse({
+      rowKey: `row-${rowNumber}`,
+      rowNumber,
       companyName,
       industry: (record.industry ?? "").trim(),
       priority,
       domains,
+      contacts,
     });
 
     if (!parsed.success) {

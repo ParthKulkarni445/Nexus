@@ -134,7 +134,7 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
       }, 1500);
     } catch (error) {
       setUsernameError(
-        error instanceof Error ? error.message : "An error occurred"
+        error instanceof Error ? error.message : "An error occurred",
       );
     } finally {
       setUsernameLoading(false);
@@ -191,7 +191,7 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
       }, 1500);
     } catch (error) {
       setPasswordError(
-        error instanceof Error ? error.message : "An error occurred"
+        error instanceof Error ? error.message : "An error occurred",
       );
     } finally {
       setPasswordLoading(false);
@@ -231,7 +231,10 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
               href="/companies"
               className="flex items-center gap-1.5 shrink-0 select-none"
             >
-              <OrbitIcon size={24} className="text-black" />
+              <OrbitIcon
+                size={24}
+                className="text-black motion-safe:animate-[spin_6s_linear_infinite]"
+              />
               <span className="text-white font-black ">
                 <span className="text-2xl  leading-none">N</span>
                 <span className="text-lg leading-none">EXUS</span>
@@ -383,7 +386,10 @@ export default function TopNav({ currentUser }: { currentUser: NavUser }) {
             className="flex items-center gap-1.5 select-none"
             onClick={() => setMobileOpen(false)}
           >
-            <OrbitIcon size={22} className="text-white" />
+            <OrbitIcon
+              size={22}
+              className="text-white motion-safe:animate-[spin_6s_linear_infinite]"
+            />
             <span className="text-white font-black">
               <span className="text-xl leading-none">N</span>
               <span className="text-base leading-none">EXUS</span>

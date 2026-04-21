@@ -124,10 +124,12 @@ type UiHistory = {
 
 type UiAssignment = {
   id: string;
+  assigneeUserId: string;
   assignee: string;
   email: string;
   phone: string;
   season: string;
+  seasons: string[];
   assignedAt: string;
   notes: string;
 };
@@ -404,55 +406,55 @@ function DetailPageSkeleton() {
         </div>
       </div>
 
-        <div className="card p-5 sm:p-6">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-            <div className="shimmer h-14 w-14 rounded-2xl" />
-            <div className="flex-1 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="shimmer h-8 w-56 rounded-full" />
-                <div className="shimmer h-8 w-28 rounded-full" />
-                <div className="shimmer h-8 w-24 rounded-full" />
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <div className="shimmer h-5 w-20 rounded-full" />
-                <div className="shimmer h-5 w-40 rounded-full" />
-                <div className="shimmer h-5 w-28 rounded-full" />
-              </div>
-              <div className="shimmer h-18 w-full rounded-2xl" />
+      <div className="card p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="shimmer h-14 w-14 rounded-2xl" />
+          <div className="flex-1 space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="shimmer h-8 w-56 rounded-full" />
+              <div className="shimmer h-8 w-28 rounded-full" />
+              <div className="shimmer h-8 w-24 rounded-full" />
             </div>
-            <div className="shimmer h-9 w-24 rounded-xl" />
+            <div className="flex flex-wrap gap-3">
+              <div className="shimmer h-5 w-20 rounded-full" />
+              <div className="shimmer h-5 w-40 rounded-full" />
+              <div className="shimmer h-5 w-28 rounded-full" />
+            </div>
+            <div className="shimmer h-18 w-full rounded-2xl" />
           </div>
+          <div className="shimmer h-9 w-24 rounded-xl" />
         </div>
+      </div>
 
-        <div className="card overflow-hidden">
-          <div className="flex gap-4 border-b border-slate-100 px-5 py-4">
-            <div className="shimmer h-5 w-24 rounded-full" />
-            <div className="shimmer h-5 w-28 rounded-full" />
-            <div className="shimmer h-5 w-24 rounded-full" />
-          </div>
-          <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3 sm:p-5">
-            {Array.from({ length: 6 }, (_, index) => (
-              <div key={index} className="card p-4 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="shimmer h-10 w-10 rounded-full" />
-                    <div className="space-y-2">
-                      <div className="shimmer h-4 w-28 rounded-full" />
-                      <div className="shimmer h-3 w-20 rounded-full" />
-                    </div>
-                  </div>
-                  <div className="shimmer h-7 w-14 rounded-lg" />
-                </div>
-                <div className="space-y-2">
-                  <div className="shimmer h-4 w-40 rounded-full" />
-                  <div className="shimmer h-4 w-32 rounded-full" />
-                  <div className="shimmer h-4 w-36 rounded-full" />
-                </div>
-                <div className="shimmer h-12 w-full rounded-xl" />
-              </div>
-            ))}
-          </div>
+      <div className="card overflow-hidden">
+        <div className="flex gap-4 border-b border-slate-100 px-5 py-4">
+          <div className="shimmer h-5 w-24 rounded-full" />
+          <div className="shimmer h-5 w-28 rounded-full" />
+          <div className="shimmer h-5 w-24 rounded-full" />
         </div>
+        <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3 sm:p-5">
+          {Array.from({ length: 6 }, (_, index) => (
+            <div key={index} className="card p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="shimmer h-10 w-10 rounded-full" />
+                  <div className="space-y-2">
+                    <div className="shimmer h-4 w-28 rounded-full" />
+                    <div className="shimmer h-3 w-20 rounded-full" />
+                  </div>
+                </div>
+                <div className="shimmer h-7 w-14 rounded-lg" />
+              </div>
+              <div className="space-y-2">
+                <div className="shimmer h-4 w-40 rounded-full" />
+                <div className="shimmer h-4 w-32 rounded-full" />
+                <div className="shimmer h-4 w-36 rounded-full" />
+              </div>
+              <div className="shimmer h-12 w-full rounded-xl" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -548,25 +550,73 @@ export default function CompanyDetailPage() {
         }),
       );
 
-      const mappedAssignments: UiAssignment[] = (
-        detail.data.assignments ?? []
-      ).map((assignment) => {
+      const rawAssignments = detail.data.assignments ?? [];
+      const assignmentsByCoordinator = new Map<string, UiAssignment>();
+
+      for (const assignment of rawAssignments) {
         const assigneeName =
           assignment.assigneeName ??
           (assignment.assigneeUserId
             ? `User ${String(assignment.assigneeUserId).slice(0, 8)}`
             : "Unassigned");
 
-        return {
-          id: assignment.id,
-          assignee: assigneeName,
-          email: assignment.assigneeEmail ?? "",
-          phone: assignment.assigneePhone ?? "",
-          season: assignment.seasonName || "Season",
-          assignedAt: assignment.assignedAt,
-          notes: assignment.notes ?? "",
-        };
-      });
+        const seasonName = assignment.seasonName || "Season";
+        const coordinatorKey =
+          assignment.assigneeUserId ||
+          assignment.assigneeEmail ||
+          assigneeName.toLowerCase();
+
+        const existing = assignmentsByCoordinator.get(coordinatorKey);
+        if (!existing) {
+          assignmentsByCoordinator.set(coordinatorKey, {
+            id: assignment.id,
+            assigneeUserId: assignment.assigneeUserId,
+            assignee: assigneeName,
+            email: assignment.assigneeEmail ?? "",
+            phone: assignment.assigneePhone ?? "",
+            season: seasonName,
+            seasons: [seasonName],
+            assignedAt: assignment.assignedAt,
+            notes: assignment.notes ?? "",
+          });
+          continue;
+        }
+
+        if (!existing.seasons.includes(seasonName)) {
+          existing.seasons.push(seasonName);
+        }
+
+        if (!existing.email && assignment.assigneeEmail) {
+          existing.email = assignment.assigneeEmail;
+        }
+        if (!existing.phone && assignment.assigneePhone) {
+          existing.phone = assignment.assigneePhone;
+        }
+
+        const currentAssignedAt = new Date(existing.assignedAt).getTime();
+        const incomingAssignedAt = new Date(assignment.assignedAt).getTime();
+        if (
+          Number.isFinite(incomingAssignedAt) &&
+          (!Number.isFinite(currentAssignedAt) ||
+            incomingAssignedAt < currentAssignedAt)
+        ) {
+          existing.assignedAt = assignment.assignedAt;
+        }
+
+        if (!existing.notes && assignment.notes) {
+          existing.notes = assignment.notes;
+        }
+      }
+
+      const mappedAssignments = Array.from(assignmentsByCoordinator.values())
+        .map((assignment) => ({
+          ...assignment,
+          seasons: [...assignment.seasons].sort((a, b) => a.localeCompare(b)),
+          season:
+            [...assignment.seasons].sort((a, b) => a.localeCompare(b))[0] ??
+            "Season",
+        }))
+        .sort((a, b) => a.assignee.localeCompare(b.assignee));
 
       const mappedCompany: UiCompany = {
         id: baseCompany.id,
@@ -644,49 +694,54 @@ export default function CompanyDetailPage() {
     rejected: AlertTriangle,
   };
 
-  const handleCopyAssignmentInfo = useCallback(async (assignment: UiAssignment) => {
-    const lines = [assignment.assignee];
+  const handleCopyAssignmentInfo = useCallback(
+    async (assignment: UiAssignment) => {
+      const lines = [assignment.assignee];
 
-    if (assignment.email) {
-      lines.push(`Email: ${assignment.email}`);
-    }
-    if (assignment.phone) {
-      lines.push(`Phone: ${assignment.phone}`);
-    }
-    lines.push(`Season: ${assignment.season}`);
+      if (assignment.email) {
+        lines.push(`Email: ${assignment.email}`);
+      }
+      if (assignment.phone) {
+        lines.push(`Phone: ${assignment.phone}`);
+      }
+      lines.push(
+        `Seasons: ${(assignment.seasons.length ? assignment.seasons : [assignment.season]).join(", ")}`,
+      );
 
-    try {
-      await copyToClipboard(lines.join("\n"));
-      setCopiedAssignmentId(assignment.id);
-      window.setTimeout(() => {
-        setCopiedAssignmentId((current) =>
-          current === assignment.id ? null : current,
-        );
-      }, 1800);
-    } catch {
-      setCopiedAssignmentId(null);
-    }
-  }, []);
+      try {
+        await copyToClipboard(lines.join("\n"));
+        setCopiedAssignmentId(assignment.id);
+        window.setTimeout(() => {
+          setCopiedAssignmentId((current) =>
+            current === assignment.id ? null : current,
+          );
+        }, 1800);
+      } catch {
+        setCopiedAssignmentId(null);
+      }
+    },
+    [],
+  );
 
-    const handleCopySingleField = useCallback(
-      async (assignmentId: string, field: "email" | "phone", value: string) => {
-        if (!value) {
-          return;
-        }
+  const handleCopySingleField = useCallback(
+    async (assignmentId: string, field: "email" | "phone", value: string) => {
+      if (!value) {
+        return;
+      }
 
-        const key = `${assignmentId}:${field}`;
-        try {
-          await copyToClipboard(value);
-          setCopiedFieldKey(key);
-          window.setTimeout(() => {
-            setCopiedFieldKey((current) => (current === key ? null : current));
-          }, 1500);
-        } catch {
-          setCopiedFieldKey(null);
-        }
-      },
-      [],
-    );
+      const key = `${assignmentId}:${field}`;
+      try {
+        await copyToClipboard(value);
+        setCopiedFieldKey(key);
+        window.setTimeout(() => {
+          setCopiedFieldKey((current) => (current === key ? null : current));
+        }, 1500);
+      } catch {
+        setCopiedFieldKey(null);
+      }
+    },
+    [],
+  );
 
   const handleContactSubmit = async (form: CompanyContact) => {
     if (!company) {
@@ -846,88 +901,88 @@ export default function CompanyDetailPage() {
         </div>
       </div>
 
-        <div className="card p-5 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-bold text-xl shrink-0">
-              {company.name.charAt(0)}
-            </div>
+      <div className="card p-5 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-bold text-xl shrink-0">
+            {company.name.charAt(0)}
+          </div>
 
-            <div className="flex-1 min-w-0">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold text-slate-900">
-                  {company.name}
-                </h2>
-                <StatusBadge status={company.status} />
-                <Badge
-                  variant={
-                    company.priority === "high"
-                      ? "danger"
-                      : company.priority === "medium"
-                        ? "warning"
-                        : "gray"
-                  }
-                  size="sm"
-                >
-                  {company.priority.charAt(0).toUpperCase() +
-                    company.priority.slice(1)}{" "}
-                  Priority
-                </Badge>
-              </div>
-
-              <div className="flex flex-wrap gap-4 mt-3">
-                <div className="flex items-center gap-1.5 text-sm text-slate-500">
-                  <Tag size={13} />
-                  <span>{company.industry}</span>
-                </div>
-                {company.website && (
-                  <a
-                    href={normalizeWebsite(company.website)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-sm text-[#2563EB] hover:underline"
-                  >
-                    <Globe size={13} />
-                    {company.website.replace(/^https?:\/\//i, "")}
-                    <ExternalLink size={11} />
-                  </a>
-                )}
-                <div className="flex items-center gap-1.5 text-sm text-slate-500">
-                  <CalendarDays size={13} />
-                  <span>
-                    Added{" "}
-                    {new Date(company.createdAt).toLocaleDateString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
-                </div>
-              </div>
-
-              {company.notes && (
-                <p className="mt-3 text-sm text-slate-600 bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
-                  {company.notes}
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-2 sm:shrink-0">
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => {
-                  setCompanyMutationError(null);
-                  setEditCompanyModal(true);
-                }}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
+              <h2 className="text-xl font-bold text-slate-900">
+                {company.name}
+              </h2>
+              <StatusBadge status={company.status} />
+              <Badge
+                variant={
+                  company.priority === "high"
+                    ? "danger"
+                    : company.priority === "medium"
+                      ? "warning"
+                      : "gray"
+                }
+                size="sm"
               >
-                <Pencil size={14} />
-                Edit
-              </button>
+                {company.priority.charAt(0).toUpperCase() +
+                  company.priority.slice(1)}{" "}
+                Priority
+              </Badge>
             </div>
+
+            <div className="flex flex-wrap gap-4 mt-3">
+              <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                <Tag size={13} />
+                <span>{company.industry}</span>
+              </div>
+              {company.website && (
+                <a
+                  href={normalizeWebsite(company.website)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-sm text-[#2563EB] hover:underline"
+                >
+                  <Globe size={13} />
+                  {company.website.replace(/^https?:\/\//i, "")}
+                  <ExternalLink size={11} />
+                </a>
+              )}
+              <div className="flex items-center gap-1.5 text-sm text-slate-500">
+                <CalendarDays size={13} />
+                <span>
+                  Added{" "}
+                  {new Date(company.createdAt).toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
+              </div>
+            </div>
+
+            {company.notes && (
+              <p className="mt-3 text-sm text-slate-600 bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
+                {company.notes}
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-2 sm:shrink-0">
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setCompanyMutationError(null);
+                setEditCompanyModal(true);
+              }}
+            >
+              <Pencil size={14} />
+              Edit
+            </button>
           </div>
         </div>
+      </div>
 
-        <div className="card overflow-hidden">
-          <div className="border-b border-slate-100 flex overflow-x-auto">
+      <div className="card overflow-hidden">
+        <div className="border-b border-slate-100 flex overflow-x-auto">
           {TABS.map((item) => (
             <button
               key={item.key}
@@ -950,281 +1005,313 @@ export default function CompanyDetailPage() {
           ))}
         </div>
 
-          {tab === "contacts" && (
-            <div className="p-4 sm:p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-700">
-                  HR & Recruitment Contacts
-                </p>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => {
-                    setContactMutationError(null);
-                    setSelectedContact(null);
-                    setContactModal(true);
-                  }}
-                >
-                  <Plus size={14} />
-                  Add Contact
-                </button>
-              </div>
-
-              {contacts.length === 0 ? (
-                <EmptyState
-                  icon={Users}
-                  title="No contacts yet"
-                  description="Add the first recruiter contact for this company"
-                />
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {contacts.map((contact) => (
-                    <ContactCard
-                      key={contact.id}
-                      contact={contact}
-                      onEdit={() => {
-                        setContactMutationError(null);
-                        setSelectedContact(contact);
-                        setContactModal(true);
-                      }}
-                      onDelete={() => {
-                        setContactMutationError(null);
-                        setSelectedContact(contact);
-                        setDeleteContactModal(true);
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
+        {tab === "contacts" && (
+          <div className="p-4 sm:p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-slate-700">
+                HR & Recruitment Contacts
+              </p>
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  setContactMutationError(null);
+                  setSelectedContact(null);
+                  setContactModal(true);
+                }}
+              >
+                <Plus size={14} />
+                Add Contact
+              </button>
             </div>
-          )}
 
-          {tab === "history" && (
-            <div className="p-4 sm:p-5">
-              {statusHistory.length === 0 ? (
-                <EmptyState
-                  icon={Clock}
-                  title="No status history"
-                  description="Status transitions will appear here"
-                />
-              ) : (
-                <div className="space-y-0">
-                  {statusHistory.map((history, index) => {
-                    const Icon = ICON_MAP[history.status] ?? Clock;
-                    const isLast = index === statusHistory.length - 1;
-                    return (
-                      <div key={history.id} className="flex gap-4">
-                        <div className="flex flex-col items-center shrink-0">
-                          <div
-                            className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${index === 0 ? "border-[#2563EB] bg-[#EFF6FF]" : "border-slate-200 bg-white"}`}
-                          >
-                            <Icon
-                              size={14}
-                              className={
-                                index === 0 ? "text-[#2563EB]" : "text-slate-400"
-                              }
-                            />
-                          </div>
-                          {!isLast && (
-                            <div className="w-0.5 flex-1 bg-slate-100 my-1" />
-                          )}
-                        </div>
+            {contacts.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="No contacts yet"
+                description="Add the first recruiter contact for this company"
+              />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {contacts.map((contact) => (
+                  <ContactCard
+                    key={contact.id}
+                    contact={contact}
+                    onEdit={() => {
+                      setContactMutationError(null);
+                      setSelectedContact(contact);
+                      setContactModal(true);
+                    }}
+                    onDelete={() => {
+                      setContactMutationError(null);
+                      setSelectedContact(contact);
+                      setDeleteContactModal(true);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
+        {tab === "history" && (
+          <div className="p-4 sm:p-5">
+            {statusHistory.length === 0 ? (
+              <EmptyState
+                icon={Clock}
+                title="No status history"
+                description="Status transitions will appear here"
+              />
+            ) : (
+              <div className="space-y-0">
+                {statusHistory.map((history, index) => {
+                  const Icon = ICON_MAP[history.status] ?? Clock;
+                  const isLast = index === statusHistory.length - 1;
+                  return (
+                    <div key={history.id} className="flex gap-4">
+                      <div className="flex flex-col items-center shrink-0">
                         <div
-                          className={`${isLast ? "pb-0" : "pb-5"} flex-1 min-w-0`}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${index === 0 ? "border-[#2563EB] bg-[#EFF6FF]" : "border-slate-200 bg-white"}`}
                         >
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <StatusBadge status={history.status} size="sm" />
-                            <span className="text-xs text-slate-400">
-                              {new Date(history.changedAt).toLocaleDateString(
-                                "en-IN",
-                                {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )}
-                            </span>
-                          </div>
-                          {history.note && (
-                            <p className="text-sm text-slate-600 mt-1">
-                              <MessageSquare
-                                size={12}
-                                className="inline mr-1 text-slate-400"
-                              />
-                              {history.note}
-                            </p>
-                          )}
-                          <p className="text-xs text-slate-400 mt-1">
-                            by {history.changedBy}
-                          </p>
+                          <Icon
+                            size={14}
+                            className={
+                              index === 0 ? "text-[#2563EB]" : "text-slate-400"
+                            }
+                          />
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {tab === "assignments" && (
-            <div className="p-4 sm:p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-slate-700">
-                  Season Owners
-                </p>
-              </div>
-
-              {assignments.length === 0 ? (
-                <EmptyState
-                  icon={Users}
-                  title="No season owners"
-                  description="Season-cycle ownership will appear here"
-                />
-              ) : (
-                <div className="space-y-3">
-                  <div className="hidden md:grid md:grid-cols-[minmax(180px,1.25fr)_minmax(220px,1fr)_minmax(180px,0.9fr)_auto] md:px-4 md:text-xs md:font-semibold md:uppercase md:tracking-wide md:text-slate-500">
-                    <span>Coordinator</span>
-                    <span>Email</span>
-                    <span>Phone</span>
-                    <span className="text-right">Actions</span>
-                  </div>
-                  {assignments.map((assignment) => (
-                    <div
-                      key={assignment.id}
-                      className="card p-4 grid grid-cols-1 md:grid-cols-[minmax(180px,1.25fr)_minmax(220px,1fr)_minmax(180px,0.9fr)_auto] gap-4 items-start md:items-center"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-semibold text-sm shrink-0">
-                            {assignment.assignee
-                              .split(" ")
-                              .map((name) => name[0])
-                              .join("")
-                              .slice(0, 2)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-slate-900 truncate">
-                              {assignment.assignee}
-                            </p>
-                          </div>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-2">
-                          Assigned since{" "}
-                          {new Date(assignment.assignedAt).toLocaleDateString(
-                            "en-IN",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            },
-                          )}
-                        </p>
-                        {assignment.notes && (
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {assignment.notes}
-                          </p>
+                        {!isLast && (
+                          <div className="w-0.5 flex-1 bg-slate-100 my-1" />
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 min-w-0">
-                        <a
-                          href={`mailto:${assignment.email}`}
-                          className={`min-w-0 flex items-center gap-1.5 text-xs ${assignment.email ? "text-slate-500 hover:text-[#2563EB]" : "text-slate-400 pointer-events-none"}`}
-                        >
-                          <Mail size={12} className="shrink-0" />
-                          <span className="truncate">
-                            {assignment.email || "Email not available"}
+                      <div
+                        className={`${isLast ? "pb-0" : "pb-5"} flex-1 min-w-0`}
+                      >
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <StatusBadge status={history.status} size="sm" />
+                          <span className="text-xs text-slate-400">
+                            {new Date(history.changedAt).toLocaleDateString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              },
+                            )}
                           </span>
-                        </a>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm shrink-0"
-                          disabled={!assignment.email}
-                          onClick={() =>
-                            void handleCopySingleField(
-                              assignment.id,
-                              "email",
-                              assignment.email,
-                            )
-                          }
-                        >
-                          {copiedFieldKey === `${assignment.id}:email` ? (
-                            <>
-                              <Check size={12} />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={12} />
-                              Copy
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="flex items-center gap-2 min-w-0">
-                        <a
-                          href={`callto:${assignment.phone}`}
-                          className={`min-w-0 flex items-center gap-1.5 text-xs ${assignment.phone ? "text-slate-500 hover:text-[#2563EB]" : "text-slate-400 pointer-events-none"}`}
-                        >
-                          <Phone size={12} className="shrink-0" />
-                          <span className="truncate">
-                            {assignment.phone || "Phone not available"}
-                          </span>
-                        </a>
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm shrink-0"
-                          disabled={!assignment.phone}
-                          onClick={() =>
-                            void handleCopySingleField(
-                              assignment.id,
-                              "phone",
-                              assignment.phone,
-                            )
-                          }
-                        >
-                          {copiedFieldKey === `${assignment.id}:phone` ? (
-                            <>
-                              <Check size={12} />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={12} />
-                              Copy
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                      <div className="shrink-0 flex md:flex-col items-end gap-2 justify-end">
-                        <button
-                          type="button"
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => void handleCopyAssignmentInfo(assignment)}
-                        >
-                          {copiedAssignmentId === assignment.id ? (
-                            <>
-                              <Check size={12} />
-                              Copied
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={12} />
-                              Copy
-                            </>
-                          )}
-                        </button>
-                        <Badge variant="purple">{assignment.season}</Badge>
+                        </div>
+                        {history.note && (
+                          <p className="text-sm text-slate-600 mt-1">
+                            <MessageSquare
+                              size={12}
+                              className="inline mr-1 text-slate-400"
+                            />
+                            {history.note}
+                          </p>
+                        )}
+                        <p className="text-xs text-slate-400 mt-1">
+                          by {history.changedBy}
+                        </p>
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === "assignments" && (
+          <div className="p-4 sm:p-5 space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+              <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-100">
+                <p className="text-sm font-medium text-slate-700">
+                  Season Owners
+                </p>
+                <span className="text-xs text-slate-500">
+                  {assignments.length} coordinator
+                  {assignments.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              {assignments.length === 0 ? (
+                <div className="px-4 sm:px-6 py-4 sm:py-5">
+                  <EmptyState
+                    icon={Users}
+                    title="No season owners"
+                    description="Season-cycle ownership will appear here"
+                  />
                 </div>
+              ) : (
+                <>
+                  <div className="hidden xl:grid xl:grid-cols-[minmax(230px,1.15fr)_minmax(190px,0.95fr)_minmax(260px,1.15fr)_minmax(230px,1fr)_minmax(120px,0.6fr)] xl:gap-6 xl:px-6 xl:py-3 xl:text-xs xl:font-semibold xl:uppercase xl:tracking-wide xl:text-slate-500 border-b border-slate-100">
+                    <span>Coordinator</span>
+                    <span className="justify-self-center text-center">
+                      Seasons
+                    </span>
+                    <span className="justify-self-center text-center">
+                      Email
+                    </span>
+                    <span className="justify-self-center text-center">
+                      Phone
+                    </span>
+                    <span className="justify-self-center text-center">
+                      Actions
+                    </span>
+                  </div>
+
+                  <div className="px-4 sm:px-6 pb-2 sm:pb-3">
+                    {assignments.map((assignment, index) => (
+                      <div
+                        key={assignment.id}
+                        className={`grid grid-cols-1 xl:grid-cols-[minmax(230px,1.15fr)_minmax(190px,0.95fr)_minmax(260px,1.15fr)_minmax(230px,1fr)_minmax(120px,0.6fr)] gap-4 xl:gap-6 items-start xl:items-center py-4 ${index === 0 ? "" : "border-t border-slate-100"}`}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-semibold text-sm shrink-0">
+                              {assignment.assignee
+                                .split(" ")
+                                .map((name) => name[0])
+                                .join("")
+                                .slice(0, 2)}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900 truncate">
+                                {assignment.assignee}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-2">
+                            Assigned since{" "}
+                            {new Date(assignment.assignedAt).toLocaleDateString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              },
+                            )}
+                          </p>
+                          {assignment.notes && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {assignment.notes}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap justify-start xl:justify-center gap-1.5">
+                          {assignment.seasons.map((season) => (
+                            <Badge
+                              key={`${assignment.id}-${season}`}
+                              variant="purple"
+                            >
+                              {season}
+                            </Badge>
+                          ))}
+                        </div>
+
+                        <div className="flex items-center gap-2 min-w-0 xl:justify-center">
+                          <a
+                            href={`mailto:${assignment.email}`}
+                            className={`min-w-0 flex items-center gap-1.5 text-xs xl:max-w-65 ${assignment.email ? "text-slate-500 hover:text-[#2563EB]" : "text-slate-400 pointer-events-none"}`}
+                          >
+                            <Mail size={12} className="shrink-0" />
+                            <span className="truncate">
+                              {assignment.email || "Email not available"}
+                            </span>
+                          </a>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm shrink-0"
+                            disabled={!assignment.email}
+                            onClick={() =>
+                              void handleCopySingleField(
+                                assignment.id,
+                                "email",
+                                assignment.email,
+                              )
+                            }
+                          >
+                            {copiedFieldKey === `${assignment.id}:email` ? (
+                              <>
+                                <Check size={12} />
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={12} />
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2 min-w-0 xl:justify-center">
+                          <a
+                            href={`callto:${assignment.phone}`}
+                            className={`min-w-0 flex items-center gap-1.5 text-xs xl:max-w-58 ${assignment.phone ? "text-slate-500 hover:text-[#2563EB]" : "text-slate-400 pointer-events-none"}`}
+                          >
+                            <Phone size={12} className="shrink-0" />
+                            <span className="truncate">
+                              {assignment.phone || "Phone not available"}
+                            </span>
+                          </a>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm shrink-0"
+                            disabled={!assignment.phone}
+                            onClick={() =>
+                              void handleCopySingleField(
+                                assignment.id,
+                                "phone",
+                                assignment.phone,
+                              )
+                            }
+                          >
+                            {copiedFieldKey === `${assignment.id}:phone` ? (
+                              <>
+                                <Check size={12} />
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={12} />
+                                Copy
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        <div className="shrink-0 flex items-end xl:items-center gap-2 justify-end xl:justify-center">
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() =>
+                              void handleCopyAssignmentInfo(assignment)
+                            }
+                          >
+                            {copiedAssignmentId === assignment.id ? (
+                              <>
+                                <Check size={12} />
+                                Copied
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={12} />
+                                Copy Details
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
       <ContactModal
         isOpen={contactModal}
         onClose={() => {

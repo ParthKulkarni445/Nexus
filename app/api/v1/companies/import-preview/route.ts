@@ -7,6 +7,7 @@ import {
   unauthorized,
 } from "@/lib/api/response";
 import {
+  IMPORT_REQUIRED_HEADERS,
   normalizeCompanyName,
   parseCompanyImportBuffer,
   scoreCompanyNameMatch,
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
     if (parsed.missingHeaders.length > 0) {
       return badRequest("Excel headers are invalid", {
         missingHeaders: parsed.missingHeaders,
-        requiredHeaders: ["company name", "industry", "priority", "domain"],
+        requiredHeaders: [...IMPORT_REQUIRED_HEADERS],
       });
     }
 
@@ -118,10 +119,13 @@ export async function POST(request: Request) {
           : null;
 
       return {
+        rowKey: row.rowKey,
+        rowNumber: row.rowNumber,
         companyName: row.companyName,
         industry: row.industry,
         priority: row.priority,
         domains: row.domains,
+        contacts: row.contacts,
         duplicateCandidate: duplicateCandidate
           ? {
               companyId: duplicateCandidate.companyId,

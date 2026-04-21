@@ -1,0 +1,32 @@
+# ===== CONFIG =====
+SERVER = nexus@172.30.8.178
+APP_DIR = /home/Nexus/app
+
+# ===== BUILD =====
+build:
+	npm run build
+
+# ===== DEPLOY =====
+deploy: build
+	scp -r .next/standalone $(SERVER):$(APP_DIR)
+	scp -r .next/static $(SERVER):$(APP_DIR)/.next
+	scp -r public $(SERVER):$(APP_DIR) || true
+
+	ssh $(SERVER) "cd $(APP_DIR) && pm2 delete nexus-app || true"
+	ssh $(SERVER) "cd $(APP_DIR) && PORT=3001 pm2 start server.js --name nexus-app"
+	ssh $(SERVER) "pm2 save"
+
+# ===== FIRST TIME SETUP (optional) =====
+setup:
+	scp -r .next/standalone $(SERVER):$(APP_DIR)
+	scp -r .next/static $(SERVER):$(APP_DIR)/.next
+	scp -r public $(SERVER):$(APP_DIR) || true
+	scp -r prisma $(SERVER):$(APP_DIR)
+
+# ===== LOGS =====
+logs:
+	ssh $(SERVER) "pm2 logs nexus-app"
+
+# ===== STATUS =====
+status:
+	ssh $(SERVER) "pm2 status"

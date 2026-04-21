@@ -9,11 +9,71 @@ import {
 } from "@/lib/api/response";
 import { createAuditLog } from "@/lib/api/audit";
 import {
+  IMPORT_REQUIRED_HEADERS,
   parseCompanyImportBuffer,
   priorityToNumber,
   slugify,
 } from "@/lib/api/company-import";
 import { db } from "@/lib/db";
+
+async function upsertImportedContact(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  contact: {
+    name: string;
+    designation?: string;
+    emails: string[];
+    phones: string[];
+    preferredContactMethod?: "email" | "phone" | "linkedin";
+    notes?: string;
+  },
+) {
+  const existing = await tx.companyContact.findFirst({
+    where: {
+      companyId,
+      OR:
+        contact.emails.length > 0
+          ? [
+              { emails: { hasSome: contact.emails } },
+              { name: { equals: contact.name, mode: "insensitive" } },
+            ]
+          : [{ name: { equals: contact.name, mode: "insensitive" } }],
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  if (!existing) {
+    await tx.companyContact.create({
+      data: {
+        companyId,
+        name: contact.name,
+        designation: contact.designation,
+        emails: contact.emails,
+        phones: contact.phones,
+        preferredContactMethod: contact.preferredContactMethod,
+        notes: contact.notes,
+      },
+    });
+
+    return { created: 1, updated: 0 };
+  }
+
+  await tx.companyContact.update({
+    where: { id: existing.id },
+    data: {
+      name: contact.name,
+      designation: contact.designation ?? existing.designation,
+      emails: Array.from(new Set([...(existing.emails ?? []), ...contact.emails])),
+      phones: Array.from(new Set([...(existing.phones ?? []), ...contact.phones])),
+      preferredContactMethod:
+        contact.preferredContactMethod ?? existing.preferredContactMethod,
+      notes: contact.notes ?? existing.notes,
+      updatedAt: new Date(),
+    },
+  });
+
+  return { created: 0, updated: 1 };
+}
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -63,7 +123,7 @@ export async function POST(request: Request) {
   if (parsed.missingHeaders.length > 0) {
     return badRequest("Excel headers are invalid", {
       missingHeaders: parsed.missingHeaders,
-      requiredHeaders: ["company name", "industry", "priority", "domain"],
+      requiredHeaders: [...IMPORT_REQUIRED_HEADERS],
     });
   }
 
@@ -83,11 +143,13 @@ export async function POST(request: Request) {
     const result = await db.$transaction(async (tx) => {
       let created = 0;
       let updated = 0;
+      let contactsCreated = 0;
+      let contactsUpdated = 0;
 
       for (const row of rowsToUpsert) {
         const slug = slugify(row.companyName);
         const primaryDomain = row.domains[0] ?? null;
-        const reviewedMatchId = resolvedMatches[row.companyName];
+        const reviewedMatchId = resolvedMatches[row.rowKey];
         const existing = reviewedMatchId
           ? await tx.company.findUnique({
               where: { id: reviewedMatchId },
@@ -129,6 +191,19 @@ export async function POST(request: Request) {
           }
 
           updated += 1;
+
+          if (row.contacts.length > 0) {
+            for (const contact of row.contacts) {
+              const contactResult = await upsertImportedContact(
+                tx,
+                existing.id,
+                contact,
+              );
+              contactsCreated += contactResult.created;
+              contactsUpdated += contactResult.updated;
+            }
+          }
+
           continue;
         }
 
@@ -159,12 +234,26 @@ export async function POST(request: Request) {
         }
 
         created += 1;
+
+        if (row.contacts.length > 0) {
+          for (const contact of row.contacts) {
+            const contactResult = await upsertImportedContact(
+              tx,
+              createdCompany.id,
+              contact,
+            );
+            contactsCreated += contactResult.created;
+            contactsUpdated += contactResult.updated;
+          }
+        }
       }
 
       return {
         total: rowsToUpsert.length,
         created,
         updated,
+        contactsCreated,
+        contactsUpdated,
       };
     });
 

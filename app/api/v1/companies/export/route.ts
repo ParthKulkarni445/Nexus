@@ -14,6 +14,13 @@ const EXPORT_HEADERS = [
   "company name",
   "industry",
   "priority",
+  "domain",
+  "contact name",
+  "contact designation",
+  "contact emails",
+  "contact phones",
+  "contact preferred method",
+  "contact notes",
 ] as const;
 
 function priorityToLabel(priority: number | null) {
@@ -79,17 +86,78 @@ export async function GET(request: NextRequest) {
         name: true,
         industry: true,
         priority: true,
+        domain: true,
+        domains: {
+          select: {
+            domain: true,
+          },
+          orderBy: {
+            domain: "asc",
+          },
+        },
+        contacts: {
+          select: {
+            name: true,
+            designation: true,
+            emails: true,
+            phones: true,
+            preferredContactMethod: true,
+            notes: true,
+          },
+          orderBy: {
+            createdAt: "asc",
+          },
+        },
       },
     });
+
+    const rows: Array<Record<(typeof EXPORT_HEADERS)[number], string>> = [];
+
+    for (const company of companies) {
+      const domainValues = Array.from(
+        new Set([
+          ...(company.domain ? [company.domain] : []),
+          ...company.domains.map((entry) => entry.domain),
+        ]),
+      );
+      const domainCell = domainValues.join(", ");
+
+      if (company.contacts.length === 0) {
+        rows.push({
+          "company name": company.name,
+          industry: company.industry ?? "",
+          priority: priorityToLabel(company.priority),
+          domain: domainCell,
+          "contact name": "",
+          "contact designation": "",
+          "contact emails": "",
+          "contact phones": "",
+          "contact preferred method": "",
+          "contact notes": "",
+        });
+        continue;
+      }
+
+      for (const contact of company.contacts) {
+        rows.push({
+          "company name": company.name,
+          industry: company.industry ?? "",
+          priority: priorityToLabel(company.priority),
+          domain: domainCell,
+          "contact name": contact.name,
+          "contact designation": contact.designation ?? "",
+          "contact emails": contact.emails.join(", "),
+          "contact phones": contact.phones.join(", "),
+          "contact preferred method": contact.preferredContactMethod ?? "",
+          "contact notes": contact.notes ?? "",
+        });
+      }
+    }
 
     const workbookBuffer = createWorkbookBuffer(
       "Companies",
       [...EXPORT_HEADERS],
-      companies.map((company) => ({
-        "company name": company.name,
-        industry: company.industry ?? "",
-        priority: priorityToLabel(company.priority),
-      })),
+      rows,
     );
 
     const dateStamp = new Date().toISOString().slice(0, 10);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -21,6 +21,8 @@ import {
   Trash2,
   Eye,
   PhoneCall,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
@@ -37,6 +39,15 @@ type CycleStatus =
   | "accepted"
   | "rejected";
 type CompanyPriority = "high" | "medium" | "low";
+
+type ActionFlushbar = {
+  id: number;
+  tone: "warning" | "error" | "success";
+  message: string;
+  progress: number;
+};
+
+const WARNING_FLUSHBAR_DURATION_MS = 3500;
 
 interface ApiResponse<T> {
   data?: T;
@@ -61,10 +72,17 @@ type ImportMatchSuggestion = {
 };
 
 type CompanyImportPreviewRow = {
+  rowKey: string;
+  rowNumber: number;
   companyName: string;
   industry: string;
   priority: "low" | "medium" | "high";
   domains: string[];
+  contacts: Array<{
+    name: string;
+    emails: string[];
+    phones: string[];
+  }>;
   duplicateCandidate: ImportMatchSuggestion | null;
   suggestions: ImportMatchSuggestion[];
   normalizedName: string;
@@ -260,7 +278,7 @@ function CompaniesTableSkeleton() {
   return (
     <div className="min-w-160 p-4">
       <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
-        <div className="grid grid-cols-[minmax(0,2.4fr)_1fr_0.9fr_1.2fr_auto] gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
+        <div className="grid grid-cols-[minmax(0,2.4fr)_1fr_0.9fr_1.2fr_auto] gap-2 border-b border-slate-100 bg-white px-4 py-3">
           {Array.from({ length: 5 }, (_, index) => (
             <div
               key={index}
@@ -522,8 +540,9 @@ export default function CompaniesPage() {
   const [contactTargetCompany, setContactTargetCompany] =
     useState<Company | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
-  const [toolbarMessage, setToolbarMessage] = useState<string | null>(null);
-  const [toolbarError, setToolbarError] = useState<string | null>(null);
+  const [actionFlushbar, setActionFlushbar] = useState<ActionFlushbar | null>(
+    null,
+  );
   const [exportingCompanies, setExportingCompanies] = useState(false);
   const [downloadingImportFormat, setDownloadingImportFormat] = useState(false);
   const [importingCompanies, setImportingCompanies] = useState(false);
@@ -534,6 +553,8 @@ export default function CompaniesPage() {
     Record<string, string>
   >({});
   const [showFilters, setShowFilters] = useState(false);
+  const actionFlushbarProgressTimerRef = useRef<number | null>(null);
+  const actionFlushbarHideTimerRef = useRef<number | null>(null);
   const [updateDetails, setUpdateDetails] = useState<{
     company: Company;
     position: { left: number; top: number };
@@ -541,6 +562,62 @@ export default function CompaniesPage() {
 
   const PER_PAGE = 10;
   const API_LIMIT = 100;
+
+  const clearActionFlushbarTimers = useCallback(() => {
+    if (actionFlushbarProgressTimerRef.current !== null) {
+      window.clearTimeout(actionFlushbarProgressTimerRef.current);
+      actionFlushbarProgressTimerRef.current = null;
+    }
+
+    if (actionFlushbarHideTimerRef.current !== null) {
+      window.clearTimeout(actionFlushbarHideTimerRef.current);
+      actionFlushbarHideTimerRef.current = null;
+    }
+  }, []);
+
+  const dismissActionFlushbar = useCallback(() => {
+    clearActionFlushbarTimers();
+    setActionFlushbar(null);
+  }, [clearActionFlushbarTimers]);
+
+  const showActionFlushbar = useCallback(
+    (tone: "warning" | "error" | "success", message: string) => {
+      dismissActionFlushbar();
+
+      const id = Date.now() + Math.floor(Math.random() * 1000);
+      setActionFlushbar({ id, tone, message, progress: 100 });
+
+      actionFlushbarProgressTimerRef.current = window.setTimeout(() => {
+        setActionFlushbar((current) =>
+          current?.id === id ? { ...current, progress: 0 } : current,
+        );
+      }, 30);
+
+      actionFlushbarHideTimerRef.current = window.setTimeout(() => {
+        setActionFlushbar((current) => (current?.id === id ? null : current));
+      }, WARNING_FLUSHBAR_DURATION_MS + 30);
+    },
+    [dismissActionFlushbar],
+  );
+
+  const showActionError = useCallback(
+    (message: string) => {
+      showActionFlushbar("error", message);
+    },
+    [showActionFlushbar],
+  );
+
+  const showActionSuccess = useCallback(
+    (message: string) => {
+      showActionFlushbar("success", message);
+    },
+    [showActionFlushbar],
+  );
+
+  useEffect(
+    () => () => clearActionFlushbarTimers(),
+    [clearActionFlushbarTimers],
+  );
 
   const fetchCompanies = async () => {
     setLoading(true);
@@ -584,7 +661,11 @@ export default function CompaniesPage() {
   }, []);
 
   const handleAddOrEditCompany = async (values: CompanyFormValues) => {
+    const targetCompany = selectedCompany;
+
     setModalError(null);
+    setAddEditOpen(false);
+    setSelectedCompany(null);
     setUpsertingCompany(true);
     try {
       const website = normalizeWebsite(values.website);
@@ -602,8 +683,8 @@ export default function CompaniesPage() {
         throw new Error("Company name is required");
       }
 
-      if (selectedCompany) {
-        await requestJson(`/api/v1/companies/${selectedCompany.id}`, {
+      if (targetCompany) {
+        await requestJson(`/api/v1/companies/${targetCompany.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -616,36 +697,36 @@ export default function CompaniesPage() {
         });
       }
 
-      setAddEditOpen(false);
-      setSelectedCompany(null);
       await fetchCompanies();
     } catch (error) {
-      setModalError(
-        error instanceof Error ? error.message : "Unable to save company",
-      );
+      const message =
+        error instanceof Error ? error.message : "Unable to save company";
+      showActionError(message);
     } finally {
       setUpsertingCompany(false);
     }
   };
 
   const handleDeleteCompany = async () => {
-    if (!selectedCompany) {
+    const targetCompany = selectedCompany;
+
+    if (!targetCompany) {
       return;
     }
 
     setModalError(null);
+    setDeleteOpen(false);
+    setSelectedCompany(null);
     setDeletingCompany(true);
     try {
-      await requestJson(`/api/v1/companies/${selectedCompany.id}`, {
+      await requestJson(`/api/v1/companies/${targetCompany.id}`, {
         method: "DELETE",
       });
-      setDeleteOpen(false);
-      setSelectedCompany(null);
       await fetchCompanies();
     } catch (error) {
-      setModalError(
-        error instanceof Error ? error.message : "Unable to delete company",
-      );
+      const message =
+        error instanceof Error ? error.message : "Unable to delete company";
+      showActionError(message);
     } finally {
       setDeletingCompany(false);
     }
@@ -660,11 +741,15 @@ export default function CompaniesPage() {
     preferredMethod?: "email" | "phone" | "linkedin";
     notes?: string;
   }) => {
-    if (!contactTargetCompany) {
+    const targetCompany = contactTargetCompany;
+
+    if (!targetCompany) {
       return;
     }
 
     setModalError(null);
+    setContactModalOpen(false);
+    setContactTargetCompany(null);
     setCreatingContact(true);
     try {
       const noteParts = [contact.notes?.trim() ?? ""];
@@ -672,37 +757,30 @@ export default function CompaniesPage() {
         noteParts.push(`LinkedIn: ${contact.linkedin.trim()}`);
       }
 
-      await requestJson(
-        `/api/v1/companies/${contactTargetCompany.id}/contacts`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: (contact.name ?? "").trim(),
-            designation: contact.designation?.trim() || undefined,
-            emails: contact.email?.trim() ? [contact.email.trim()] : undefined,
-            phones: contact.phone?.trim() ? [contact.phone.trim()] : undefined,
-            preferredContactMethod: contact.preferredMethod || undefined,
-            notes: noteParts.filter(Boolean).join("\n") || undefined,
-          }),
-        },
-      );
+      await requestJson(`/api/v1/companies/${targetCompany.id}/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: (contact.name ?? "").trim(),
+          designation: contact.designation?.trim() || undefined,
+          emails: contact.email?.trim() ? [contact.email.trim()] : undefined,
+          phones: contact.phone?.trim() ? [contact.phone.trim()] : undefined,
+          preferredContactMethod: contact.preferredMethod || undefined,
+          notes: noteParts.filter(Boolean).join("\n") || undefined,
+        }),
+      });
 
-      setContactModalOpen(false);
-      setContactTargetCompany(null);
       await fetchCompanies();
     } catch (error) {
-      setModalError(
-        error instanceof Error ? error.message : "Unable to add contact",
-      );
+      const message =
+        error instanceof Error ? error.message : "Unable to add contact";
+      showActionError(message);
     } finally {
       setCreatingContact(false);
     }
   };
 
   const handleExportCompanies = async () => {
-    setToolbarMessage(null);
-    setToolbarError(null);
     setExportingCompanies(true);
 
     try {
@@ -748,9 +826,9 @@ export default function CompaniesPage() {
       anchor.remove();
       URL.revokeObjectURL(url);
 
-      setToolbarMessage("Companies exported successfully");
+      showActionSuccess("Companies and contacts exported successfully");
     } catch (error) {
-      setToolbarError(
+      showActionError(
         error instanceof Error ? error.message : "Failed to export companies",
       );
     } finally {
@@ -759,14 +837,10 @@ export default function CompaniesPage() {
   };
 
   const handleImportCompaniesClick = () => {
-    setToolbarMessage(null);
-    setToolbarError(null);
     setImportModalOpen(true);
   };
 
   const handleDownloadImportFormat = async () => {
-    setToolbarMessage(null);
-    setToolbarError(null);
     setDownloadingImportFormat(true);
 
     try {
@@ -801,9 +875,9 @@ export default function CompaniesPage() {
       anchor.remove();
       URL.revokeObjectURL(url);
 
-      setToolbarMessage("Import format downloaded");
+      showActionSuccess("Import format downloaded");
     } catch (error) {
-      setToolbarError(
+      showActionError(
         error instanceof Error
           ? error.message
           : "Failed to download import format",
@@ -818,18 +892,15 @@ export default function CompaniesPage() {
   };
 
   const closeCompanyImportPreview = () => {
-    if (importingCompanies) {
-      return;
-    }
     setCompanyImportPreview(null);
     setCompanyImportFile(null);
     setCompanyImportMatches({});
   };
 
-  const updateCompanyImportMatch = (companyName: string, companyId: string) => {
+  const updateCompanyImportMatch = (rowKey: string, companyId: string) => {
     setCompanyImportMatches((current) => ({
       ...current,
-      [companyName]: companyId,
+      [rowKey]: companyId,
     }));
   };
 
@@ -839,7 +910,7 @@ export default function CompaniesPage() {
     }
 
     return companyImportPreview.rows.filter(
-      (row) => row.duplicateCandidate && !companyImportMatches[row.companyName],
+      (row) => row.duplicateCandidate && !companyImportMatches[row.rowKey],
     );
   }, [companyImportMatches, companyImportPreview]);
 
@@ -861,8 +932,6 @@ export default function CompaniesPage() {
       return;
     }
 
-    setToolbarMessage(null);
-    setToolbarError(null);
     setImportingCompanies(true);
 
     try {
@@ -898,11 +967,11 @@ export default function CompaniesPage() {
         Object.fromEntries(
           (body.data?.rows ?? [])
             .filter((row) => row.duplicateCandidate?.companyId)
-            .map((row) => [row.companyName, row.duplicateCandidate!.companyId]),
+            .map((row) => [row.rowKey, row.duplicateCandidate!.companyId]),
         ),
       );
     } catch (error) {
-      setToolbarError(
+      showActionError(
         error instanceof Error ? error.message : "Failed to import companies",
       );
     } finally {
@@ -911,18 +980,22 @@ export default function CompaniesPage() {
   };
 
   const handleConfirmCompanyImport = async () => {
-    if (!companyImportFile || !companyImportPreview) {
+    const fileToImport = companyImportFile;
+    const previewToImport = companyImportPreview;
+    const matchesToImport = { ...companyImportMatches };
+
+    if (!fileToImport || !previewToImport) {
       return;
     }
 
-    setToolbarMessage(null);
-    setToolbarError(null);
+    closeCompanyImportPreview();
+    setImportModalOpen(false);
     setImportingCompanies(true);
 
     try {
       const formData = new FormData();
-      formData.append("file", companyImportFile);
-      formData.append("resolvedMatches", JSON.stringify(companyImportMatches));
+      formData.append("file", fileToImport);
+      formData.append("resolvedMatches", JSON.stringify(matchesToImport));
 
       const response = await fetch("/api/v1/companies/import", {
         method: "POST",
@@ -935,6 +1008,8 @@ export default function CompaniesPage() {
         total: number;
         created: number;
         updated: number;
+        contactsCreated: number;
+        contactsUpdated: number;
       }> = {};
 
       if (bodyText) {
@@ -943,6 +1018,8 @@ export default function CompaniesPage() {
             total: number;
             created: number;
             updated: number;
+            contactsCreated: number;
+            contactsUpdated: number;
           }>;
         } catch {
           body = {};
@@ -954,16 +1031,14 @@ export default function CompaniesPage() {
       }
 
       const summary = body.data;
-      setToolbarMessage(
+      showActionSuccess(
         summary
-          ? `Import completed: ${summary.total} rows (${summary.created} created, ${summary.updated} updated)`
+          ? `Import completed: ${summary.total} rows (${summary.created} created, ${summary.updated} updated, ${summary.contactsCreated} contacts added, ${summary.contactsUpdated} contacts merged)`
           : "Import completed successfully",
       );
-      closeCompanyImportPreview();
-      setImportModalOpen(false);
       await fetchCompanies();
     } catch (error) {
-      setToolbarError(
+      showActionError(
         error instanceof Error ? error.message : "Failed to import companies",
       );
     } finally {
@@ -1053,22 +1128,53 @@ export default function CompaniesPage() {
   const activeFilterCount = industryFilter.length + priorityFilter.length;
 
   return (
-    <div className="animate-fade-in xl:h-full pb-6 pt-6">
-      <div className="card overflow-hidden min-w-0 xl:h-full flex flex-col">
-        {/* Toolbar */}
-        <div className="px-4 py-3 border-b border-(--card-border) space-y-3">
-          {(toolbarMessage || toolbarError) && (
-            <div
-              className={`rounded-lg px-3 py-2 text-sm ${
-                toolbarError
-                  ? "border border-red-200 bg-red-50 text-red-700"
-                  : "border border-emerald-200 bg-emerald-50 text-emerald-700"
-              }`}
-            >
-              {toolbarError ?? toolbarMessage}
+    <div className="animate-fade-in xl:h-full pb-6 pt-3 bg-white -mx-4 lg:-mx-6">
+      {actionFlushbar ? (
+        <div className="flushbar-stack fixed right-4 bottom-4 z-50 w-[min(92vw,600px)] pointer-events-none">
+          <div
+            className={`flushbar flushbar-${actionFlushbar.tone} rounded-xl border shadow-lg`}
+          >
+            <div className="flushbar-progress-track h-1 w-full">
+              <div
+                className="flushbar-progress h-full"
+                style={{
+                  width: `${actionFlushbar.progress}%`,
+                  transition: `width ${WARNING_FLUSHBAR_DURATION_MS}ms linear`,
+                }}
+              />
             </div>
-          )}
-          <div className="flex items-center gap-2">
+            <div className="flushbar-body flex items-start gap-2.5 px-3.5 py-3">
+              {actionFlushbar.tone === "success" ? (
+                <CheckCircle2
+                  size={36}
+                  className="flushbar-icon shrink-0 mt-0.5"
+                />
+              ) : (
+                <AlertCircle
+                  size={36}
+                  className="flushbar-icon shrink-0 mt-0.5"
+                />
+              )}
+              <div className="flex-1 space-y-0.5 min-w-0">
+                <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                  {actionFlushbar.tone === "error"
+                    ? "ERROR"
+                    : actionFlushbar.tone === "warning"
+                      ? "WARNING"
+                      : "SUCCESS"}
+                </p>
+                <p className="flushbar-message m-0 text-[14px] font-medium leading-[1.45] whitespace-normal wrap-break-word">
+                  {actionFlushbar.message}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      <div className="overflow-hidden min-w-0 xl:h-full flex flex-col bg-white">
+        {/* Toolbar */}
+        <div className="px-4 pt-2 pb-3">
+          <div className="flex items-center gap-2 pb-3 border-b border-(--card-border)">
             <SearchBar
               value={search}
               onChange={(v) => {
@@ -1086,8 +1192,6 @@ export default function CompaniesPage() {
                     : ""
                 }`}
                 onClick={() => {
-                  setToolbarMessage(null);
-                  setToolbarError(null);
                   setShowFilters((v) => !v);
                 }}
               >
@@ -1141,7 +1245,7 @@ export default function CompaniesPage() {
 
           {/* Filter row */}
           {showFilters && (
-            <div className="flex items-center gap-2 pt-1 pb-0.5 w-full">
+            <div className="flex items-center gap-2 pt-3 pb-0.5 w-full">
               <FilterSelect
                 multiple
                 value={industryFilter}
@@ -1197,192 +1301,194 @@ export default function CompaniesPage() {
               description="Try adjusting your search or filters"
             />
           ) : (
-            <table className="w-full text-sm min-w-160">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-100">
-                  {(
-                    [
-                      "name",
-                      "industry",
-                      "priority",
-                      "lastUpdated",
-                    ] as (keyof Company)[]
-                  ).map((f) => (
-                    <th
-                      key={f}
-                      className={`px-4 py-3 ${f === "lastUpdated" ? "text-center" : "text-left"} text-xs font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap group cursor-pointer select-none`}
-                      onClick={() => handleSort(f)}
-                    >
-                      <span
-                        className={`flex items-center ${f === "lastUpdated" ? "justify-center" : "justify-left"} gap-1`}
+            <div className="m-4 overflow-hidden rounded-xl border-2 border-slate-300 bg-white">
+              <table className="w-full text-sm min-w-160">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-200">
+                    {(
+                      [
+                        "name",
+                        "industry",
+                        "priority",
+                        "lastUpdated",
+                      ] as (keyof Company)[]
+                    ).map((f) => (
+                      <th
+                        key={f}
+                        className={`px-4 py-3 ${f === "lastUpdated" || f === "priority" ? "text-center" : "text-left"} text-xs font-semibold text-slate-600 uppercase tracking-wide whitespace-nowrap group cursor-pointer select-none`}
+                        onClick={() => handleSort(f)}
                       >
-                        {f === "name"
-                          ? "Company"
-                          : f === "lastUpdated"
-                            ? "Last Updated"
-                            : f.charAt(0).toUpperCase() + f.slice(1)}
-                        <SortIcon field={f} />
-                      </span>
-                    </th>
-                  ))}
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wide">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {paginated.map((company) => (
-                  <tr
-                    key={company.id}
-                    className="table-row-hover transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/companies/${company.id}`}
-                        className="flex items-center gap-3 group"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#2563EB] font-semibold text-xs shrink-0">
-                          {company.name.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-900 group-hover:text-[#2563EB] transition-colors truncate">
-                            {company.name}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {company.contacts} contacts
-                          </p>
-                        </div>
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {company.industry}
-                    </td>
-                    <td className="px-4 py-3">
-                      {PRIORITY_BADGE[company.priority]}
-                    </td>
-                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2">
-                        <span>
-                          {new Date(company.lastUpdated).toLocaleString(
-                            "en-IN",
-                            {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            },
-                          )}
-                        </span>
-                        <button
-                          type="button"
-                          className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-200 text-slate-500 hover:text-[#2563EB] hover:border-[#BFDBFE] hover:bg-[#EFF6FF] transition-colors"
-                          aria-label="Show update details"
-                          title="Show update details"
-                          onClick={(event) =>
-                            handleOpenUpdateDetails(company, event)
-                          }
+                        <span
+                          className={`flex items-center ${f === "lastUpdated" || f === "priority" ? "justify-center" : "justify-left"} gap-1`}
                         >
-                          <Info size={12} />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-1 relative">
+                          {f === "name"
+                            ? "Company"
+                            : f === "lastUpdated"
+                              ? "Last Updated"
+                              : f.charAt(0).toUpperCase() + f.slice(1)}
+                          <SortIcon field={f} />
+                        </span>
+                      </th>
+                    ))}
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-slate-600 uppercase tracking-wide">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginated.map((company) => (
+                    <tr
+                      key={company.id}
+                      className="table-row-hover transition-colors"
+                    >
+                      <td className="px-4 py-3">
                         <Link
                           href={`/companies/${company.id}`}
-                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
-                          title="View"
+                          className="flex items-center gap-3 group"
                         >
-                          <Eye size={15} />
+                          <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#2563EB] font-semibold text-xs shrink-0">
+                            {company.name.charAt(0)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-900 group-hover:text-[#2563EB] transition-colors truncate">
+                              {company.name}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {company.contacts} contacts
+                            </p>
+                          </div>
                         </Link>
-                        <button
-                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
-                          title="Edit"
-                          onClick={() => {
-                            setModalError(null);
-                            setSelectedCompany(company);
-                            setAddEditOpen(true);
-                          }}
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
-                          title="Add Contact"
-                          onClick={() => {
-                            setModalError(null);
-                            setContactTargetCompany(company);
-                            setContactModalOpen(true);
-                          }}
-                        >
-                          <span className="relative inline-flex items-center justify-center">
-                            <PhoneCall size={14} />
-                            <Plus
-                              size={9}
-                              className="absolute -right-1 -bottom-1 bg-white rounded-full"
-                            />
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {company.industry}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {PRIORITY_BADGE[company.priority]}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-2">
+                          <span>
+                            {new Date(company.lastUpdated).toLocaleString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )}
                           </span>
-                        </button>
-                        <button
-                          className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
-                          title="Delete"
-                          onClick={() => {
-                            setModalError(null);
-                            setSelectedCompany(company);
-                            setDeleteOpen(true);
-                          }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center w-5 h-5 rounded border border-slate-200 text-slate-500 hover:text-[#2563EB] hover:border-[#BFDBFE] hover:bg-[#EFF6FF] transition-colors"
+                            aria-label="Show update details"
+                            title="Show update details"
+                            onClick={(event) =>
+                              handleOpenUpdateDetails(company, event)
+                            }
+                          >
+                            <Info size={12} />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1 relative">
+                          <Link
+                            href={`/companies/${company.id}`}
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
+                            title="View"
+                          >
+                            <Eye size={15} />
+                          </Link>
+                          <button
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
+                            title="Edit"
+                            onClick={() => {
+                              setModalError(null);
+                              setSelectedCompany(company);
+                              setAddEditOpen(true);
+                            }}
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
+                            title="Add Contact"
+                            onClick={() => {
+                              setModalError(null);
+                              setContactTargetCompany(company);
+                              setContactModalOpen(true);
+                            }}
+                          >
+                            <span className="relative inline-flex items-center justify-center">
+                              <PhoneCall size={14} />
+                              <Plus
+                                size={9}
+                                className="absolute -right-1 -bottom-1 bg-white rounded-full"
+                              />
+                            </span>
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm btn-icon text-slate-500 hover:text-[#2563EB]"
+                            title="Delete"
+                            onClick={() => {
+                              setModalError(null);
+                              setSelectedCompany(company);
+                              setDeleteOpen(true);
+                            }}
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
 
-        {/* Pagination */}
-        <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between gap-4">
-          <p className="text-xs text-slate-500">
-            {filtered.length} {filtered.length === 1 ? "company" : "companies"}
-            {totalPages > 1 && (
-              <>
-                {" "}
-                &mdash; page {page} of {totalPages}
-              </>
-            )}
-          </p>
-          {totalPages > 1 && (
-            <div className="flex items-center gap-1">
-              <button
-                className="btn btn-secondary btn-sm btn-icon"
-                disabled={page === 1}
-                onClick={() => setPage((p) => p - 1)}
-              >
-                <ChevronLeft size={14} />
-              </button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const p = i + 1;
-                return (
-                  <button
-                    key={p}
-                    className={`btn btn-sm w-8 h-8 p-0 justify-center ${page === p ? "btn-primary" : "btn-secondary"}`}
-                    onClick={() => setPage(p)}
-                  >
-                    {p}
-                  </button>
-                );
-              })}
-              <button
-                className="btn btn-secondary btn-sm btn-icon"
-                disabled={page === totalPages}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                <ChevronRight size={14} />
-              </button>
+              <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between gap-4">
+                <p className="text-xs text-slate-500">
+                  {filtered.length}{" "}
+                  {filtered.length === 1 ? "company" : "companies"}
+                  {totalPages > 1 && (
+                    <>
+                      {" "}
+                      &mdash; page {page} of {totalPages}
+                    </>
+                  )}
+                </p>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      className="btn btn-secondary btn-sm btn-icon"
+                      disabled={page === 1}
+                      onClick={() => setPage((p) => p - 1)}
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const p = i + 1;
+                      return (
+                        <button
+                          key={p}
+                          className={`btn btn-sm w-8 h-8 p-0 justify-center ${page === p ? "btn-primary" : "btn-secondary"}`}
+                          onClick={() => setPage(p)}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                    <button
+                      className="btn btn-secondary btn-sm btn-icon"
+                      disabled={page === totalPages}
+                      onClick={() => setPage((p) => p + 1)}
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1503,9 +1609,6 @@ export default function CompaniesPage() {
       <Modal
         isOpen={importModalOpen}
         onClose={() => {
-          if (importingCompanies || downloadingImportFormat) {
-            return;
-          }
           setImportModalOpen(false);
         }}
         title="Import Companies"
@@ -1514,23 +1617,12 @@ export default function CompaniesPage() {
           <button
             className="btn btn-secondary"
             onClick={() => setImportModalOpen(false)}
-            disabled={importingCompanies || downloadingImportFormat}
           >
             Close
           </button>
         }
       >
         <div className="space-y-5">
-          <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3">
-            <p className="text-sm font-semibold text-[#1D4ED8]">
-              2-step import flow
-            </p>
-            <p className="mt-1 text-sm text-slate-700">
-              Download the template, fill the rows, then upload the same Excel
-              file.
-            </p>
-          </div>
-
           <div className="rounded-xl border border-slate-200 bg-white p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -1556,10 +1648,6 @@ export default function CompaniesPage() {
                 ? "Downloading template..."
                 : "Download .xlsx template"}
             </button>
-          </div>
-
-          <div className="flex items-center justify-center text-slate-400">
-            <ArrowRight size={16} />
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -1603,6 +1691,20 @@ export default function CompaniesPage() {
                 domain
               </span>
             </div>
+            <p className="font-semibold text-slate-800 pt-1">
+              Optional contact columns
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                contact name
+              </span>
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                contact emails
+              </span>
+              <span className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                contact phones
+              </span>
+            </div>
             <p className="flex items-center gap-1.5">
               <Globe size={13} className="text-slate-500" />
               Priority values must be exactly: low, medium, high.
@@ -1612,6 +1714,11 @@ export default function CompaniesPage() {
               Domain column accepts email (for example hr@acme.com) or plain
               domain (acme.com).
             </p>
+            <p className="flex items-center gap-1.5">
+              <Mail size={13} className="text-slate-500" />
+              For multiple HRs in one row, separate contact columns by commas in
+              the same order (name 1 to phone 1 to email 1, etc.).
+            </p>
           </div>
         </div>
       </Modal>
@@ -1620,7 +1727,7 @@ export default function CompaniesPage() {
         onClose={closeCompanyImportPreview}
         title={
           companyImportPreview
-            ? `Review Company Import - ${companyImportPreview.fileName}`
+            ? `Rev.w Company Import - ${companyImportPreview.fileName}`
             : "Review Company Import"
         }
         size="lg"
@@ -1629,7 +1736,6 @@ export default function CompaniesPage() {
             <button
               className="btn btn-secondary"
               onClick={closeCompanyImportPreview}
-              disabled={importingCompanies}
             >
               Cancel
             </button>
@@ -1664,13 +1770,12 @@ export default function CompaniesPage() {
 
             <div className="max-h-128 space-y-3 overflow-auto pr-1">
               {duplicateRowsForReview.map((row) => {
-                const selectedMatchId =
-                  companyImportMatches[row.companyName] ?? "";
+                const selectedMatchId = companyImportMatches[row.rowKey] ?? "";
                 const hasSuggestions = row.suggestions.length > 0;
 
                 return (
                   <div
-                    key={`${row.companyName}-${row.industry}`}
+                    key={row.rowKey}
                     className="rounded-xl border border-slate-200 bg-white p-4"
                   >
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1687,6 +1792,15 @@ export default function CompaniesPage() {
                             ? row.domains.join(", ")
                             : "-"}
                         </p>
+                        {row.contacts.length > 0 ? (
+                          <p className="mt-1 text-xs text-slate-500">
+                            Contacts: {row.contacts.length} (
+                            {row.contacts
+                              .map((contact) => contact.name)
+                              .join(", ")}
+                            )
+                          </p>
+                        ) : null}
                         {!hasSuggestions ? (
                           <p className="mt-2 text-xs font-semibold text-emerald-700">
                             No close duplicate found. This row will create a new
@@ -1710,7 +1824,7 @@ export default function CompaniesPage() {
                             value={selectedMatchId}
                             onChange={(event) =>
                               updateCompanyImportMatch(
-                                row.companyName,
+                                row.rowKey,
                                 event.target.value,
                               )
                             }
@@ -1719,7 +1833,7 @@ export default function CompaniesPage() {
                             <option value="">Create as new company</option>
                             {row.suggestions.map((suggestion) => (
                               <option
-                                key={`${row.companyName}-${suggestion.companyId}`}
+                                key={`${row.rowKey}-${suggestion.companyId}`}
                                 value={suggestion.companyId}
                               >
                                 {suggestion.companyName} (
@@ -1735,11 +1849,11 @@ export default function CompaniesPage() {
                       <div className="mt-3 flex flex-wrap gap-2">
                         {row.suggestions.map((suggestion) => (
                           <button
-                            key={`${row.companyName}-${suggestion.companyId}-chip`}
+                            key={`${row.rowKey}-${suggestion.companyId}-chip`}
                             type="button"
                             onClick={() =>
                               updateCompanyImportMatch(
-                                row.companyName,
+                                row.rowKey,
                                 suggestion.companyId,
                               )
                             }

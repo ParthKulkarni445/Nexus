@@ -46,7 +46,7 @@ export default function Modal({
   if (!isOpen || !portalTarget) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-120 overflow-y-auto">
+    <div className="modal-scroll fixed inset-0 z-120 overflow-y-auto">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -69,7 +69,7 @@ export default function Modal({
           </div>
           {/* Body */}
           <div
-            className={`flex-1 overflow-y-auto px-6 py-5 ${bodyClassName ?? ""}`}
+            className={`modal-scroll flex-1 overflow-y-auto px-6 py-5 ${bodyClassName ?? ""}`}
           >
             {children}
           </div>
