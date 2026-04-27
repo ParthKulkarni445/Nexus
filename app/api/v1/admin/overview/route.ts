@@ -23,8 +23,6 @@ export async function GET(request: NextRequest) {
       users,
       seasons,
       activeSeasons,
-      schedules,
-      recentSchedules,
       recentAuditLogs,
       permissionCount,
     ] = await Promise.all([
@@ -34,24 +32,6 @@ export async function GET(request: NextRequest) {
         where: { isActive: true },
         orderBy: [{ academicYear: "desc" }, { createdAt: "desc" }],
         select: { id: true, name: true, seasonType: true, academicYear: true },
-      }),
-      db.schedule.count(),
-      db.schedule.findMany({
-        orderBy: { startTime: "desc" },
-        take: 5,
-        select: {
-          id: true,
-          title: true,
-          startTime: true,
-          endTime: true,
-          status: true,
-          company: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
       }),
       db.auditLog.findMany({
         orderBy: { createdAt: "desc" },
@@ -87,11 +67,9 @@ export async function GET(request: NextRequest) {
         students: roleCounts.student ?? 0,
         seasons,
         activeSeasons: activeSeasons.length,
-        schedules,
         customPermissionOverrides: permissionCount,
       },
       activeSeasons,
-      recentSchedules,
       recentAuditLogs,
     });
   } catch (error) {

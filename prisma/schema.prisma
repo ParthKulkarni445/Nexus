@@ -612,26 +612,26 @@ model AuditLog {
 }
 
 model Placement {
-  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  studentId        String?           @map("student_id") @db.Uuid
-  studentEntryNumber String?         @map("student_entry_number") @db.VarChar(20)
-  companyId        String            @map("company_id") @db.Uuid
-  seasonId         String            @map("season_id") @db.Uuid
-  driveId          String?           @map("drive_id") @db.Uuid
-  role             String            @db.VarChar(255)
-  packageType      String            @map("package_type") @db.VarChar(50)
-  packageAmount    Decimal           @map("package_amount") @db.Decimal(12, 2)
-  packageFrequency String?           @map("package_frequency") @db.VarChar(20)
-  currency         String            @default("INR") @db.VarChar(10)
-  selectionDate    DateTime?         @map("selection_date") @db.Date
-  placementStatus  String            @default("accepted") @map("placement_status") @db.VarChar(50)
-  source           String?           @db.VarChar(100)
-  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
-  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  drive            Drive?            @relation(fields: [driveId], references: [id])
-  season           RecruitmentSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
-  student          User?             @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentId          String?           @map("student_id") @db.Uuid
+  companyId          String            @map("company_id") @db.Uuid
+  seasonId           String            @map("season_id") @db.Uuid
+  driveId            String?           @map("drive_id") @db.Uuid
+  role               String            @db.VarChar(255)
+  packageType        String            @map("package_type") @db.VarChar(50)
+  packageAmount      Decimal           @map("package_amount") @db.Decimal(12, 2)
+  packageFrequency   String?           @map("package_frequency") @db.VarChar(20)
+  currency           String            @default("INR") @db.VarChar(10)
+  selectionDate      DateTime?         @map("selection_date") @db.Date
+  placementStatus    String            @default("accepted") @map("placement_status") @db.VarChar(50)
+  source             String?           @db.VarChar(100)
+  createdAt          DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
+  studentEntryNumber String?           @map("student_entry_number") @db.VarChar(20)
+  company            Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  drive              Drive?            @relation(fields: [driveId], references: [id])
+  season             RecruitmentSeason @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  student            User?             @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([seasonId, companyId], map: "placements_season_company_idx")
   @@index([studentId, seasonId], map: "placements_student_season_idx")

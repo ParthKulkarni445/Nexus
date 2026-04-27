@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const [users, seasons, schedules, permissions] = await Promise.all([
+    const [users, seasons, permissions] = await Promise.all([
       db.user.findMany({
         select: {
           id: true,
@@ -48,19 +48,6 @@ export async function GET(request: NextRequest) {
           updatedAt: true,
         },
       }),
-      db.schedule.findMany({
-        select: {
-          id: true,
-          companyId: true,
-          title: true,
-          description: true,
-          status: true,
-          startTime: true,
-          endTime: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
       db.userPermission.findMany({
         select: {
           id: true,
@@ -82,13 +69,11 @@ export async function GET(request: NextRequest) {
       counts: {
         users: users.length,
         seasons: seasons.length,
-        schedules: schedules.length,
         permissions: permissions.length,
       },
       payload: {
         users,
         seasons,
-        schedules,
         permissions,
       },
     };
@@ -103,7 +88,6 @@ export async function GET(request: NextRequest) {
       meta: {
         users: users.length,
         seasons: seasons.length,
-        schedules: schedules.length,
         permissions: permissions.length,
       },
       ...clientInfo,

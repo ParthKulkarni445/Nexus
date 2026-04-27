@@ -30,7 +30,6 @@ type OverviewResponse = {
     students: number;
     seasons: number;
     activeSeasons: number;
-    schedules: number;
     customPermissionOverrides: number;
   };
   activeSeasons: Array<{
@@ -38,17 +37,6 @@ type OverviewResponse = {
     name: string;
     seasonType: string;
     academicYear: string;
-  }>;
-  recentSchedules: Array<{
-    id: string;
-    title: string;
-    startTime: string;
-    endTime: string;
-    status: string;
-    company: {
-      id: string;
-      name: string;
-    };
   }>;
   recentAuditLogs: Array<{
     id: string;
@@ -644,7 +632,7 @@ export default function AdminDashboardClient() {
     }
   }
 
-  async function handleExport(type: "users" | "seasons" | "schedules") {
+  async function handleExport(type: "users" | "seasons") {
     setError(null);
 
     try {
@@ -765,12 +753,11 @@ export default function AdminDashboardClient() {
       {/* SCHEDULE TAB */}
       {activeTab === "schedule" && (
       <div className="animate-fade-in">
-        {/* Recent Schedules */}
         <section className="overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-50">
           <div className="px-4 py-4 flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">Recent Schedules</h2>
-              <p className="mt-0.5 text-xs text-slate-500">Latest schedule entries and timeline.</p>
+              <h2 className="text-sm font-semibold text-slate-900">Schedule Operations</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Centralized scheduling for placement activities.</p>
             </div>
             <Link href="/calender" className="btn btn-primary btn-sm">
               <CalendarDays className="h-3.5 w-3.5" />
@@ -778,30 +765,21 @@ export default function AdminDashboardClient() {
             </Link>
           </div>
 
-          <div className="px-4 pb-4 space-y-2">
-          {overview?.recentSchedules.length ? (
-              overview.recentSchedules.map((schedule) => (
-                <div key={schedule.id} className="flex items-start gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 transition-colors hover:bg-slate-50">
-                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#EFF6FF]">
-                    <CalendarDays className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-900">{schedule.title}</p>
-                    <p className="text-xs text-slate-500">{schedule.company.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {formatDateTime(schedule.startTime)} â€“ {formatDateTime(schedule.endTime)}
-                    </p>
-                  </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${schedule.status === "scheduled" ? "bg-blue-100 text-blue-700" : schedule.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                    {formatRole(schedule.status)}
-                  </span>
-                </div>
-              ))
-          ) : (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-500">
-              No schedules found.
+          <div className="px-4 pb-4">
+            <div className="rounded-lg border border-slate-300 bg-white px-4 py-4">
+              <p className="text-sm text-slate-700">
+                Create, review, and monitor events through Google Calendar with a consistent workflow for the admin team.
+              </p>
+              <a
+                href={googleCreateUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-800 transition-colors hover:bg-blue-100"
+              >
+                <CalendarDays className="h-4 w-4" />
+                Create Calendar Event
+              </a>
             </div>
-          )}
           </div>
         </section>
       </div>
@@ -1174,7 +1152,7 @@ export default function AdminDashboardClient() {
       <div className="overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-50 p-4 animate-fade-in">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">Export Reports & Backup</h2>
         <p className="mb-4 text-sm text-slate-500">
-          Export users, seasons, and schedules as CSV. Generate a JSON backup snapshot.
+          Export users and seasons as CSV. Generate a JSON backup snapshot.
         </p>
         <div className="flex flex-wrap gap-3">
           <button type="button" onClick={() => void handleExport("users")} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors">
@@ -1182,9 +1160,6 @@ export default function AdminDashboardClient() {
           </button>
           <button type="button" onClick={() => void handleExport("seasons")} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors">
             <Download className="h-4 w-4" /> Export Seasons
-          </button>
-          <button type="button" onClick={() => void handleExport("schedules")} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors">
-            <Download className="h-4 w-4" /> Export Schedules
           </button>
           <button type="button" onClick={() => void handleBackup()} className="btn btn-primary">
             <Shield className="h-4 w-4" /> Generate Backup

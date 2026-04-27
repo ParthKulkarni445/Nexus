@@ -31,9 +31,9 @@ export default function AdminSchedulesPage() {
   return (
     <div className="pb-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
-        <h1 className="text-2xl font-bold text-slate-900">Schedule Management</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Schedule Operations</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Scheduling is handled through Google Calendar pages.
+          Manage placement scheduling through Google Calendar.
         </p>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -43,20 +43,16 @@ export default function AdminSchedulesPage() {
             rel="noopener noreferrer"
             className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800 hover:bg-blue-100"
           >
-            Create Event in Google Calendar
+            Create Calendar Event
           </a>
 
           <Link
             href="/calender"
             className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800 hover:bg-slate-100"
           >
-            View Admin Calendar (Embed)
+            Open Admin Calendar
           </Link>
         </div>
-
-        <p className="mt-4 text-xs text-slate-500">
-          Optional env for create link override: NEXT_PUBLIC_ADMIN_GOOGLE_CALENDAR_CREATE_URL
-        </p>
       </div>
     </div>
   );

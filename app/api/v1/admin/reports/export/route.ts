@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { headers } from "next/headers";
 
 const exportQuerySchema = z.object({
-  type: z.enum(["users", "seasons", "schedules"]),
+  type: z.enum(["users", "seasons"]),
 });
 
 function toCsv(rows: Record<string, unknown>[]): string {
@@ -39,7 +39,7 @@ function toCsv(rows: Record<string, unknown>[]): string {
 }
 
 /**
- * GET /api/v1/admin/reports/export?type=users|seasons|schedules
+ * GET /api/v1/admin/reports/export?type=users|seasons
  */
 export async function GET(request: NextRequest) {
   const user = await getCurrentUser();
@@ -106,39 +106,6 @@ export async function GET(request: NextRequest) {
           ...s,
           startDate: s.startDate ? s.startDate.toISOString().slice(0, 10) : "",
           endDate: s.endDate ? s.endDate.toISOString().slice(0, 10) : "",
-          createdAt: s.createdAt.toISOString(),
-        })),
-      );
-    }
-
-    if (parsed.data.type === "schedules") {
-      const schedules = await db.schedule.findMany({
-        orderBy: { startTime: "desc" },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          status: true,
-          startTime: true,
-          endTime: true,
-          company: {
-            select: {
-              name: true,
-            },
-          },
-          createdAt: true,
-        },
-      });
-
-      csv = toCsv(
-        schedules.map((s) => ({
-          id: s.id,
-          title: s.title,
-          description: s.description,
-          status: s.status,
-          company: s.company.name,
-          startTime: s.startTime.toISOString(),
-          endTime: s.endTime.toISOString(),
           createdAt: s.createdAt.toISOString(),
         })),
       );
