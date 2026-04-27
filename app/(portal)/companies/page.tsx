@@ -276,7 +276,7 @@ const PRIORITY_BADGE: Record<string, React.ReactNode> = {
 
 function CompaniesTableSkeleton() {
   return (
-    <div className="min-w-160 p-4">
+    <div className="min-w-160">
       <div className="overflow-hidden rounded-xl border border-slate-100 bg-white">
         <div className="grid grid-cols-[minmax(0,2.4fr)_1fr_0.9fr_1.2fr_auto] gap-2 border-b border-slate-100 bg-white px-4 py-3">
           {Array.from({ length: 5 }, (_, index) => (
@@ -1128,7 +1128,7 @@ export default function CompaniesPage() {
   const activeFilterCount = industryFilter.length + priorityFilter.length;
 
   return (
-    <div className="animate-fade-in xl:h-full pb-6 pt-3 bg-white -mx-4 lg:-mx-6">
+    <div className="animate-fade-in flex min-w-0 flex-col overflow-x-auto bg-white -mx-4 lg:-mx-6 xl:h-full">
       {actionFlushbar ? (
         <div className="flushbar-stack fixed right-4 bottom-4 z-50 w-[min(92vw,600px)] pointer-events-none">
           <div
@@ -1171,10 +1171,10 @@ export default function CompaniesPage() {
           </div>
         </div>
       ) : null}
-      <div className="overflow-hidden min-w-0 xl:h-full flex flex-col bg-white">
+      <div className="min-w-[1080px]">
         {/* Toolbar */}
-        <div className="px-4 pt-2 pb-3">
-          <div className="flex items-center gap-2 pb-3 border-b border-(--card-border)">
+        <div className="px-5 pt-5 pb-2 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2 pb-4">
             <SearchBar
               value={search}
               onChange={(v) => {
@@ -1182,7 +1182,8 @@ export default function CompaniesPage() {
                 setPage(1);
               }}
               placeholder="Search companies..."
-              className="flex-1 min-w-0"
+              className="flex-1 min-w-0 overflow-hidden rounded-xl border-2 border-slate-300 bg-white"
+              inputClassName="rounded-[inherit] border-0 bg-transparent !shadow-none focus:!border-0 focus:!shadow-none"
             />
             <div className="ml-auto flex items-center gap-2 shrink-0">
               <button
@@ -1203,7 +1204,7 @@ export default function CompaniesPage() {
                   </span>
                 )}
               </button>
-              <div className="w-px h-5 bg-(--card-border) shrink-0" />
+              <div className="h-10 shrink-0 border-l-2 border-slate-300" />
               <button
                 className="btn btn-secondary btn-sm gap-1.5 shrink-0"
                 onClick={() => void handleExportCompanies()}
@@ -1245,7 +1246,7 @@ export default function CompaniesPage() {
 
           {/* Filter row */}
           {showFilters && (
-            <div className="flex items-center gap-2 pt-3 pb-0.5 w-full">
+            <div className="flex items-center gap-2 pt-0 pb-2 w-full">
               <FilterSelect
                 multiple
                 value={industryFilter}
@@ -1255,7 +1256,7 @@ export default function CompaniesPage() {
                 }}
                 options={INDUSTRY_OPTIONS}
                 placeholder="Industry"
-                className="flex-1 min-w-0"
+                className="flex-1 min-w-0 [&_button]:rounded-xl [&_button]:border-2! [&_button]:border-slate-300! [&_button]:bg-white"
               />
               <FilterSelect
                 multiple
@@ -1266,7 +1267,7 @@ export default function CompaniesPage() {
                 }}
                 options={PRIORITY_OPTIONS}
                 placeholder="Priority"
-                className="flex-1 min-w-0"
+                className="flex-1 min-w-0 [&_button]:rounded-xl [&_button]:border-2! [&_button]:border-slate-300! [&_button]:bg-white"
               />
               {activeFilterCount > 0 && (
                 <button
@@ -1285,7 +1286,7 @@ export default function CompaniesPage() {
         </div>
 
         {/* Table */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-visible px-5 pb-5 sm:px-6 lg:px-8">
           {loading ? (
             <CompaniesTableSkeleton />
           ) : listError ? (
@@ -1301,7 +1302,7 @@ export default function CompaniesPage() {
               description="Try adjusting your search or filters"
             />
           ) : (
-            <div className="m-4 overflow-hidden rounded-xl border-2 border-slate-300 bg-white">
+            <div className="overflow-hidden rounded-xl border-2 border-slate-300 bg-white">
               <table className="w-full text-sm min-w-160">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-200">

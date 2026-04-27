@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  ArrowLeft,
   ArrowRight,
   Building2,
   CheckCircle2,
@@ -1065,6 +1066,7 @@ export default function OutreachPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(
     null,
   );
+  const [viewMode, setViewMode] = useState<"list" | "details">("list");
   const [pendingReplyContext, setPendingReplyContext] =
     useState<ReplyContext | null>(null);
   const detailsCardRef = useRef<HTMLDivElement | null>(null);
@@ -1122,6 +1124,7 @@ export default function OutreachPage() {
 
     if (companyId) {
       setSelectedCompanyId(companyId);
+      setViewMode("details");
     }
 
     if (!messageId || !recipientEmail) {
@@ -1403,63 +1406,68 @@ export default function OutreachPage() {
 
   return (
     <div className="-mt-6 xl:mt-0 space-y-5 px-4 pb-6 animate-fade-in xl:h-full xl:overflow-y-auto hide-scrollbar">
-      <div className="relative z-0 pt-10">
-        <div
-          className="card relative overflow-hidden px-5 py-4 sm:px-6 sm:py-5"
-          style={{ background: "#FFFFFF", borderColor: "#DBEAFE" }}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-[#2563EB]">
-            Personal Outreach Desk
-          </p>
-          <h1 className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-            Hello {currentUserName}, check the tasks lined up for you.
-          </h1>
-          <p className="mt-1.5 text-sm font-bold text-[#2563EB]">
-            This page shows your assigned companies once, with all active
-            seasons you own under each card.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {[
-              { title: "Companies", value: stats.assigned, icon: Building2 },
-              { title: "Contacted", value: stats.contacted, icon: PhoneCall },
-              { title: "Pending", value: stats.pending, icon: Clock },
-              {
-                title: "Follow-ups Due",
-                value: stats.followUpsDue,
-                icon: CheckCircle2,
-              },
-            ].map((item) => (
-              <div
-                key={item.title}
-                className="rounded-xl border border-[#3B82F6] bg-[#3B82F6] px-3 py-2.5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-black">
-                      {item.title}
-                    </p>
-                    <p className="mt-1 text-2xl font-bold leading-none text-white">
-                      {item.value}
-                    </p>
+      {viewMode === "list" && (
+        <>
+          <div className="relative z-0 pt-6">
+            <div className="relative overflow-hidden px-5 py-4 sm:px-6 sm:py-5 rounded-lg border-2 border-slate-300 bg-white">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-600">
+                Personal Outreach Desk
+              </p>
+              <h1 className="mt-1 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+                Hello {currentUserName}, check the tasks lined up for you.
+              </h1>
+              <p className="mt-1.5 text-sm font-medium text-slate-600">
+                Track your outreach progress and manage company interactions
+                efficiently.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+                {[
+                  {
+                    title: "Companies",
+                    value: stats.assigned,
+                    icon: Building2,
+                  },
+                  {
+                    title: "Contacted",
+                    value: stats.contacted,
+                    icon: PhoneCall,
+                  },
+                  { title: "Pending", value: stats.pending, icon: Clock },
+                  {
+                    title: "Follow-ups Due",
+                    value: stats.followUpsDue,
+                    icon: CheckCircle2,
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    className="rounded-lg border border-[#BFDBFE] bg-[#3B82F6] px-3 py-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[12px] font-bold uppercase tracking-wide text-black">
+                          {item.title}
+                        </p>
+                        <p className="mt-2 text-2xl font-bold leading-none text-white">
+                          {item.value}
+                        </p>
+                      </div>
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
+                        <item.icon size={16} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#DBEAFE] bg-white">
-                    <item.icon size={20} color="#2563EB" />
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="card">
-        <div className="border-b border-(--card-border) px-4 py-3">
-          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center">
             <SearchBar
               value={search}
               onChange={setSearch}
               placeholder="Search by company, industry, or contact..."
-              className="flex-1 min-w-0"
+              className="flex-1 min-w-0 rounded-lg border-2 border-slate-300 bg-slate-50"
             />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:shrink-0">
               <FilterSelect
@@ -1468,7 +1476,7 @@ export default function OutreachPage() {
                 onChange={setStatusFilter}
                 options={STATUS_OPTIONS}
                 placeholder="Status"
-                className="w-full sm:w-40 md:w-44"
+                className="w-full rounded-lg border-2 border-slate-300 bg-slate-50 sm:w-40 md:w-44"
               />
               <FilterSelect
                 multiple
@@ -1476,25 +1484,25 @@ export default function OutreachPage() {
                 onChange={setSeasonFilter}
                 options={seasonOptions}
                 placeholder="Season"
-                className="w-full sm:w-44 md:w-52"
+                className="w-full rounded-lg border-2 border-slate-300 bg-slate-50 sm:w-44 md:w-52"
               />
             </div>
             {statusFilter.length + seasonFilter.length > 0 && (
               <button
-                className="btn btn-ghost btn-sm shrink-0 text-slate-500 hover:text-slate-700"
+                className="btn btn-ghost btn-sm shrink-0"
                 onClick={() => {
                   setStatusFilter([]);
                   setSeasonFilter([]);
                 }}
               >
-                Clear
+                Clear Filters
               </button>
             )}
           </div>
-        </div>
-      </div>
+        </>
+      )}
 
-      <div className="card p-4">
+      <div>
         {pageError ? (
           <EmptyState
             icon={Building2}
@@ -1514,54 +1522,47 @@ export default function OutreachPage() {
             description="Try clearing filters to see your complete outreach queue."
           />
         ) : (
-          <div className="overflow-x-auto pb-1">
-            <div className="grid min-w-[1040px] grid-cols-[420px_minmax(0,1fr)] items-start gap-4">
-              <div
-                className="card sticky top-4 flex min-h-0 flex-col overflow-hidden self-start"
-                style={{
-                  height: taskListHeight
-                    ? `${Math.ceil(taskListHeight)}px`
-                    : "calc(100vh - 9.5rem)",
-                }}
-              >
-                <div className="border-b border-(--card-border) px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <div className="w-full">
+            {viewMode === "list" ? (
+              <div className="rounded-lg border-2 border-slate-300 bg-slate-50 overflow-hidden">
+                <div className="border-b border-slate-300 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">
                     Tasks
                   </p>
                 </div>
-                <div className="schedule-scroll min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable] p-2">
-                  <div className="space-y-2">
+                <div className="schedule-scroll overflow-y-auto [scrollbar-gutter:stable] p-3">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {filtered.map((entry) => {
-                      const isSelected = entry.companyId === selectedCompanyId;
+                      const lastContact = formatDate(
+                        latestContacted(entry.seasons),
+                      );
                       return (
                         <button
                           key={entry.companyId}
                           type="button"
-                          onClick={() => setSelectedCompanyId(entry.companyId)}
-                          className={`w-full rounded-xl border px-4 py-3 text-left transition-all ${
-                            isSelected
-                              ? "border-[#93C5FD] bg-[#EFF6FF]"
-                              : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
-                          }`}
+                          onClick={() => {
+                            setSelectedCompanyId(entry.companyId);
+                            setViewMode("details");
+                          }}
+                          className="rounded-lg border border-slate-300 bg-white px-4 py-4 text-left transition-all hover:border-slate-400 hover:bg-slate-50"
                         >
                           <div className="flex items-start gap-3 min-w-0">
                             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#3B82F6] bg-[#3B82F6] text-sm font-semibold text-white">
                               {entry.companyName.charAt(0)}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="truncate text-sm font-semibold text-slate-900">
-                                    {entry.companyName}
-                                  </p>
-                                  <p className="mt-0.5 truncate text-xs text-slate-500">
-                                    {entry.industry}
-                                  </p>
-                                </div>
-                                <Badge size="sm" variant="gray">
-                                  {entry.seasons.length} seasons
-                                </Badge>
-                              </div>
+                              <p className="truncate text-sm font-semibold text-slate-900">
+                                {entry.companyName}
+                              </p>
+                              <p className="mt-1 truncate text-xs text-slate-500 leading-normal">
+                                {entry.industry}
+                              </p>
+                              <p className="mt-2 text-xs font-medium text-slate-600 truncate">
+                                Last contacted:{" "}
+                                <span className="text-sm font-semibold text-[#1D4ED8]">
+                                  {lastContact}
+                                </span>
+                              </p>
                             </div>
                           </div>
                         </button>
@@ -1570,356 +1571,369 @@ export default function OutreachPage() {
                   </div>
                 </div>
               </div>
+            ) : (
+              <div className="mt-5 space-y-3">
+                <div className="px-1">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button
+                      onClick={() => setViewMode("list")}
+                      className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
+                      aria-label="Back to task list"
+                    >
+                      <ArrowLeft size={13} />
+                    </button>
+                    <span className="text-slate-600">TASK LIST</span>
+                    <span>{"> "}</span>
+                    <span className="text-slate-700">
+                      {selectedEntry?.companyName ?? "Details"}
+                    </span>
+                  </div>
+                </div>
 
-              <div
-                ref={detailsCardRef}
-                className="card w-full max-w-full min-w-0 self-start overflow-hidden p-4"
-              >
-                {selectedEntry ? (
-                  <div className="flex flex-col space-y-4">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] text-base font-semibold text-[#1D4ED8]">
-                        {selectedEntry.companyName.charAt(0)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <Link
-                              href={`/companies/${selectedEntry.companyId}`}
-                              className="block truncate text-base font-semibold text-slate-900 hover:text-[#2563EB]"
-                            >
-                              {selectedEntry.companyName}
-                            </Link>
-                            <div className="mt-1 flex flex-wrap gap-2">
-                              <Badge size="sm" variant="gray">
-                                {selectedEntry.industry}
-                              </Badge>
-                              <Badge size="sm" variant="info">
-                                {selectedEntry.contacts.length} contacts
-                              </Badge>
+                <div
+                  ref={detailsCardRef}
+                  className="w-full max-w-full min-w-0 overflow-hidden rounded-lg bg-white p-4"
+                >
+                  {selectedEntry ? (
+                    <div className="flex flex-col space-y-4">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] text-base font-semibold text-[#1D4ED8]">
+                          {selectedEntry.companyName.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <Link
+                                href={`/companies/${selectedEntry.companyId}`}
+                                className="block truncate text-base font-semibold text-slate-900 hover:text-[#2563EB]"
+                              >
+                                {selectedEntry.companyName}
+                              </Link>
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                <Badge size="sm" variant="gray">
+                                  {selectedEntry.industry}
+                                </Badge>
+                                <Badge size="sm" variant="info">
+                                  {selectedEntry.contacts.length} contacts
+                                </Badge>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                          Last Contacted
-                        </p>
-                        <p className="mt-1 flex items-center gap-1 text-sm font-medium text-slate-700">
-                          <Clock
-                            size={12}
-                            className="shrink-0 text-slate-400"
-                          />
-                          {formatDate(latestContacted(selectedEntry.seasons))}
-                        </p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Last Contacted
+                          </p>
+                          <p className="mt-2 flex items-center gap-1 text-sm font-medium text-slate-900">
+                            <Clock
+                              size={12}
+                              className="shrink-0 text-slate-500"
+                            />
+                            {formatDate(latestContacted(selectedEntry.seasons))}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Next Follow-up
+                          </p>
+                          <p className="mt-2 flex items-center gap-1 text-sm font-medium text-slate-900">
+                            <CheckCircle2 size={12} className="shrink-0" />
+                            {formatDate(nearestFollowUp(selectedEntry.seasons))}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Active Seasons
+                          </p>
+                          <p className="mt-2 text-sm font-semibold text-slate-900">
+                            {selectedEntry.seasons.length}
+                          </p>
+                        </div>
                       </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                          Next Follow-up
-                        </p>
-                        <p className="mt-1 flex items-center gap-1 text-sm font-medium text-[#1D4ED8]">
-                          <CheckCircle2 size={12} className="shrink-0" />
-                          {formatDate(nearestFollowUp(selectedEntry.seasons))}
-                        </p>
-                      </div>
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                          Active Seasons
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-700">
-                          {selectedEntry.seasons.length}
-                        </p>
-                      </div>
-                    </div>
 
-                    <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(420px,1.15fr)_minmax(300px,0.85fr)]">
-                      <div
-                        ref={detailLeftColumnRef}
-                        className="flex flex-col space-y-4"
-                      >
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <h4 className="text-sm font-semibold text-slate-800">
-                              Contacts
-                            </h4>
-                            <Badge size="sm" variant="gray">
-                              {selectedEntry.contacts.length} total
-                            </Badge>
-                          </div>
-                          <div className="mt-3 space-y-3">
-                            {selectedEntry.contacts.length > 0 ? (
-                              selectedEntry.contacts.map((contact) => (
-                                <div
-                                  key={contact.id}
-                                  className="rounded-xl border border-white bg-white px-3 py-3"
-                                >
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                      <p className="text-sm font-semibold text-slate-800">
-                                        {contact.name}
-                                      </p>
-                                      <p className="text-xs text-slate-500">
-                                        {contact.designation}
-                                      </p>
+                      <div className="grid min-w-0 items-start gap-4">
+                        <div
+                          ref={detailLeftColumnRef}
+                          className="flex flex-col space-y-4"
+                        >
+                          <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <h4 className="text-sm font-semibold text-slate-900">
+                                Contacts
+                              </h4>
+                              <Badge size="sm" variant="gray">
+                                {selectedEntry.contacts.length} total
+                              </Badge>
+                            </div>
+                            <div className="mt-3 space-y-3">
+                              {selectedEntry.contacts.length > 0 ? (
+                                selectedEntry.contacts.map((contact) => (
+                                  <div
+                                    key={contact.id}
+                                    className="rounded-lg border border-slate-300 bg-white px-3 py-3"
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <p className="text-sm font-semibold text-slate-900">
+                                          {contact.name}
+                                        </p>
+                                        <p className="text-xs text-slate-600">
+                                          {contact.designation}
+                                        </p>
+                                      </div>
+                                      {contact.linkedin ? (
+                                        <a
+                                          href={contact.linkedin}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="text-xs font-medium text-slate-700 hover:underline"
+                                        >
+                                          LinkedIn
+                                        </a>
+                                      ) : null}
                                     </div>
-                                    {contact.linkedin ? (
-                                      <a
-                                        href={contact.linkedin}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-xs font-medium text-[#1D4ED8] hover:underline"
-                                      >
-                                        LinkedIn
-                                      </a>
-                                    ) : null}
-                                  </div>
-                                  <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
-                                    <div>
-                                      <p className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-slate-400">
-                                        Phones
-                                      </p>
-                                      <div className="space-y-1">
-                                        {contact.phones.length > 0 ? (
-                                          contact.phones.map((phone) => (
-                                            <a
-                                              key={phone}
-                                              href={`tel:${phone}`}
-                                              className="flex items-center gap-1.5 hover:text-[#1D4ED8]"
-                                            >
-                                              <Phone
-                                                size={12}
-                                                className="shrink-0"
-                                              />
-                                              {phone}
-                                            </a>
-                                          ))
-                                        ) : (
-                                          <p>-</p>
-                                        )}
+                                    <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-600">
+                                      <div>
+                                        <p className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-slate-500">
+                                          Phones
+                                        </p>
+                                        <div className="space-y-1">
+                                          {contact.phones.length > 0 ? (
+                                            contact.phones.map((phone) => (
+                                              <a
+                                                key={phone}
+                                                href={`tel:${phone}`}
+                                                className="flex items-center gap-1.5 hover:text-slate-900"
+                                              >
+                                                <Phone
+                                                  size={12}
+                                                  className="shrink-0"
+                                                />
+                                                {phone}
+                                              </a>
+                                            ))
+                                          ) : (
+                                            <p>-</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <p className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-slate-500">
+                                          Emails
+                                        </p>
+                                        <div className="space-y-1 break-all">
+                                          {contact.emails.length > 0 ? (
+                                            contact.emails.map((email) => (
+                                              <a
+                                                key={email}
+                                                href={`mailto:${email}`}
+                                                className="flex items-center gap-1.5 hover:text-slate-900"
+                                              >
+                                                <Mail
+                                                  size={12}
+                                                  className="shrink-0"
+                                                />
+                                                {email}
+                                              </a>
+                                            ))
+                                          ) : (
+                                            <p>-</p>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
-                                    <div>
-                                      <p className="mb-1 font-semibold uppercase tracking-wide text-[10px] text-slate-400">
-                                        Emails
-                                      </p>
-                                      <div className="space-y-1 break-all">
-                                        {contact.emails.length > 0 ? (
-                                          contact.emails.map((email) => (
-                                            <a
-                                              key={email}
-                                              href={`mailto:${email}`}
-                                              className="flex items-center gap-1.5 hover:text-[#1D4ED8]"
-                                            >
-                                              <Mail
-                                                size={12}
-                                                className="shrink-0"
-                                              />
-                                              {email}
-                                            </a>
-                                          ))
-                                        ) : (
-                                          <p>-</p>
-                                        )}
-                                      </div>
-                                    </div>
                                   </div>
+                                ))
+                              ) : (
+                                <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm text-slate-600">
+                                  No contacts added for this company yet.
                                 </div>
-                              ))
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="rounded-lg border border-slate-300 bg-white px-4 py-4">
+                            <div className="mb-4">
+                              <h4 className="text-sm font-semibold text-slate-900">
+                                Status and Actions
+                              </h4>
+                              <p className="mt-1 text-xs text-slate-600">
+                                Update season status, log interactions, or queue
+                                outreach.
+                              </p>
+                            </div>
+                            <ActionModals
+                              entry={selectedEntry}
+                              templates={templates}
+                              currentUser={currentUser}
+                              mailSubmitting={mailSubmitting}
+                              logSubmitting={logSubmitting}
+                              statusSubmitting={statusSubmitting}
+                              mailError={mailError}
+                              logError={logError}
+                              statusError={statusError}
+                              onQueueMail={handleQueueMail}
+                              onLog={handleLog}
+                              onUpdateStatus={handleStatusUpdate}
+                              replyContext={
+                                pendingReplyContext &&
+                                pendingReplyContext.recipientEmail &&
+                                selectedEntry.companyId === selectedCompanyId
+                                  ? pendingReplyContext
+                                  : null
+                              }
+                              onReplyContextConsumed={() =>
+                                setPendingReplyContext(null)
+                              }
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex min-h-0 min-w-0 flex-col gap-4 overflow-hidden">
+                          <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <h4 className="text-sm font-semibold text-slate-900">
+                                  Mail Tracker
+                                </h4>
+                                <p className="mt-1 text-xs text-slate-600">
+                                  Track inbound and outbound mail threads mapped
+                                  to this company.
+                                </p>
+                              </div>
+                              <Link
+                                href={`/outreach/${selectedEntry.companyId}/mails`}
+                                className="btn btn-primary btn-sm gap-1"
+                              >
+                                Show Mails
+                                <ArrowRight size={14} />
+                              </Link>
+                            </div>
+                          </div>
+
+                          <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-slate-300 bg-white px-4 py-4">
+                            <div className="flex items-center justify-between gap-3 pb-4">
+                              <div>
+                                <h4 className="text-sm font-semibold text-slate-900">
+                                  Activity Timeline
+                                </h4>
+                                <p className="mt-1 text-xs text-slate-600">
+                                  Calls, mails, and notes logged for this
+                                  company.
+                                </p>
+                              </div>
+                              <Badge size="sm" variant="gray">
+                                {selectedEntry.interactions.length}
+                              </Badge>
+                            </div>
+
+                            {selectedEntry.interactions.length > 0 ? (
+                              <div className="schedule-scroll min-h-0 flex-1 overflow-y-auto pr-1 border border-slate-300 bg-white rounded-lg p-3 -mx-1">
+                                <div className="space-y-0 pr-2">
+                                  {selectedEntry.interactions.map(
+                                    (interaction, index) => {
+                                      const meta = getInteractionMeta(
+                                        interaction.action,
+                                      );
+                                      const Icon = meta.icon;
+                                      const isLast =
+                                        index ===
+                                        selectedEntry.interactions.length - 1;
+
+                                      return (
+                                        <div
+                                          key={interaction.id}
+                                          className="flex gap-3"
+                                        >
+                                          <div className="flex shrink-0 flex-col items-center">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-slate-100">
+                                              <Icon
+                                                size={14}
+                                                className="text-slate-700"
+                                              />
+                                            </div>
+                                            {!isLast && (
+                                              <div className="my-1 w-0.5 flex-1 bg-slate-200" />
+                                            )}
+                                          </div>
+
+                                          <div
+                                            className={`${isLast ? "pb-0" : "pb-5"} min-w-0 flex-1`}
+                                          >
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <span
+                                                className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.badgeClass}`}
+                                              >
+                                                {meta.label}
+                                              </span>
+                                              <span className="text-[11px] text-slate-500">
+                                                {formatDateTime(
+                                                  interaction.createdAt,
+                                                )}
+                                              </span>
+                                            </div>
+                                            <p className="mt-2 text-sm font-medium text-slate-900">
+                                              {interaction.summary}
+                                            </p>
+                                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
+                                              {interaction.contactName ? (
+                                                <span className="rounded-full bg-slate-100 px-2 py-1">
+                                                  {interaction.contactName}
+                                                </span>
+                                              ) : null}
+                                              {interaction.season ? (
+                                                <span className="rounded-full bg-slate-100 px-2 py-1">
+                                                  {interaction.season}
+                                                </span>
+                                              ) : null}
+                                              {interaction.outcome ? (
+                                                <span className="rounded-full bg-slate-100 px-2 py-1">
+                                                  Outcome: {interaction.outcome}
+                                                </span>
+                                              ) : null}
+                                              {interaction.nextFollowUpAt ? (
+                                                <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-700">
+                                                  Follow-up:{" "}
+                                                  {formatDate(
+                                                    interaction.nextFollowUpAt,
+                                                  )}
+                                                </span>
+                                              ) : null}
+                                            </div>
+                                            <p className="mt-2 text-xs text-slate-500">
+                                              Logged by {interaction.createdBy}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      );
+                                    },
+                                  )}
+                                </div>
+                              </div>
                             ) : (
-                              <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-sm text-slate-500">
-                                No contacts added for this company yet.
+                              <div className="flex items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-sm text-slate-600">
+                                Logged outreach activity will appear here.
                               </div>
                             )}
                           </div>
                         </div>
-
-                        <div className="rounded-xl border border-slate-200 bg-white px-4 py-4">
-                          <div className="mb-4">
-                            <h4 className="text-sm font-semibold text-slate-800">
-                              Status and Actions
-                            </h4>
-                            <p className="mt-1 text-xs text-slate-500">
-                              Update season status, log interactions, or queue
-                              outreach.
-                            </p>
-                          </div>
-                          <ActionModals
-                            entry={selectedEntry}
-                            templates={templates}
-                            currentUser={currentUser}
-                            mailSubmitting={mailSubmitting}
-                            logSubmitting={logSubmitting}
-                            statusSubmitting={statusSubmitting}
-                            mailError={mailError}
-                            logError={logError}
-                            statusError={statusError}
-                            onQueueMail={handleQueueMail}
-                            onLog={handleLog}
-                            onUpdateStatus={handleStatusUpdate}
-                            replyContext={
-                              pendingReplyContext &&
-                              pendingReplyContext.recipientEmail &&
-                              selectedEntry.companyId === selectedCompanyId
-                                ? pendingReplyContext
-                                : null
-                            }
-                            onReplyContextConsumed={() =>
-                              setPendingReplyContext(null)
-                            }
-                          />
-                        </div>
-                      </div>
-
-                      <div
-                        className="flex min-h-0 min-w-0 flex-col gap-4 overflow-hidden rounded-xl border border-slate-200 bg-white px-4 py-4"
-                        style={{
-                          height: detailColumnsHeight
-                            ? `${Math.ceil(detailColumnsHeight)}px`
-                            : undefined,
-                        }}
-                      >
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <h4 className="text-sm font-semibold text-slate-800">
-                                Mail Tracker
-                              </h4>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Track inbound and outbound mail threads mapped
-                                to this company.
-                              </p>
-                            </div>
-                            <Link
-                              href={`/outreach/${selectedEntry.companyId}/mails`}
-                              className="btn btn-primary btn-sm gap-1"
-                            >
-                              Show Mails
-                              <ArrowRight size={14} />
-                            </Link>
-                          </div>
-                        </div>
-
-                        <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-slate-200 bg-slate-50 px-4 py-4">
-                          <div className="flex items-center justify-between gap-3 pb-4">
-                            <div>
-                              <h4 className="text-sm font-semibold text-slate-800">
-                                Activity Timeline
-                              </h4>
-                              <p className="mt-1 text-xs text-slate-500">
-                                Calls, mails, and notes logged for this company.
-                              </p>
-                            </div>
-                            <Badge size="sm" variant="gray">
-                              {selectedEntry.interactions.length}
-                            </Badge>
-                          </div>
-
-                          {selectedEntry.interactions.length > 0 ? (
-                            <div className="schedule-scroll min-h-0 flex-1 overflow-y-auto pr-1 border border-slate-200 bg-white rounded-lg p-3 -mx-1">
-                              <div className="space-y-0 pr-2">
-                                {selectedEntry.interactions.map(
-                                  (interaction, index) => {
-                                    const meta = getInteractionMeta(
-                                      interaction.action,
-                                    );
-                                    const Icon = meta.icon;
-                                    const isLast =
-                                      index ===
-                                      selectedEntry.interactions.length - 1;
-
-                                    return (
-                                      <div
-                                        key={interaction.id}
-                                        className="flex gap-3"
-                                      >
-                                        <div className="flex shrink-0 flex-col items-center">
-                                          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-[#DBEAFE] bg-[#EFF6FF]">
-                                            <Icon
-                                              size={14}
-                                              className="text-[#2563EB]"
-                                            />
-                                          </div>
-                                          {!isLast && (
-                                            <div className="my-1 w-0.5 flex-1 bg-slate-100" />
-                                          )}
-                                        </div>
-
-                                        <div
-                                          className={`${isLast ? "pb-0" : "pb-5"} min-w-0 flex-1`}
-                                        >
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            <span
-                                              className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${meta.badgeClass}`}
-                                            >
-                                              {meta.label}
-                                            </span>
-                                            <span className="text-[11px] text-slate-400">
-                                              {formatDateTime(
-                                                interaction.createdAt,
-                                              )}
-                                            </span>
-                                          </div>
-                                          <p className="mt-2 text-sm font-medium text-slate-800">
-                                            {interaction.summary}
-                                          </p>
-                                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
-                                            {interaction.contactName ? (
-                                              <span className="rounded-full bg-slate-100 px-2 py-1">
-                                                {interaction.contactName}
-                                              </span>
-                                            ) : null}
-                                            {interaction.season ? (
-                                              <span className="rounded-full bg-slate-100 px-2 py-1">
-                                                {interaction.season}
-                                              </span>
-                                            ) : null}
-                                            {interaction.outcome ? (
-                                              <span className="rounded-full bg-slate-100 px-2 py-1">
-                                                Outcome: {interaction.outcome}
-                                              </span>
-                                            ) : null}
-                                            {interaction.nextFollowUpAt ? (
-                                              <span className="rounded-full bg-[#EFF6FF] px-2 py-1 text-[#1D4ED8]">
-                                                Follow-up:{" "}
-                                                {formatDate(
-                                                  interaction.nextFollowUpAt,
-                                                )}
-                                              </span>
-                                            ) : null}
-                                          </div>
-                                          <p className="mt-2 text-xs text-slate-400">
-                                            Logged by {interaction.createdBy}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    );
-                                  },
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-white px-4 py-8 text-sm text-slate-500">
-                              Logged outreach activity will appear here.
-                            </div>
-                          )}
-                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center py-12">
-                    <EmptyState
-                      icon={Building2}
-                      title="Select a task"
-                      description="Choose a company from the list to view its full outreach details and actions."
-                    />
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex items-center justify-center py-12">
+                      <EmptyState
+                        icon={Building2}
+                        title="Select a task"
+                        description="Choose a company from the list to view its full outreach details and actions."
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>

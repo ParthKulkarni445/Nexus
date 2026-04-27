@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import Badge from "@/components/ui/Badge";
 import FilterSelect from "@/components/ui/FilterSelect";
 import Modal from "@/components/ui/Modal";
@@ -8,11 +8,16 @@ import RichTextEditor from "@/components/ui/RichTextEditor";
 import SearchBar from "@/components/ui/SearchBar";
 import {
   BookOpen,
+  AlertCircle,
+  CheckCircle2,
   CircleCheck,
   ShieldCheck,
+  Trash2,
   ThumbsDown,
   ThumbsUp,
   UserRound,
+  ChevronRight,
+  X,
 } from "lucide-react";
 
 type BlogSource = "student" | "tpo";
@@ -47,8 +52,18 @@ type BlogsPageClientProps = {
   initialModerationQueue: BlogPost[];
   initialCanViewModeration: boolean;
   allowCreate?: boolean;
+  allowDelete?: boolean;
   showModerationPanel?: boolean;
 };
+
+type ActionFlushbar = {
+  id: number;
+  tone: "warning" | "error" | "success";
+  message: string;
+  progress: number;
+};
+
+const WARNING_FLUSHBAR_DURATION_MS = 3500;
 
 function buildContent(content: string) {
   return content
@@ -92,6 +107,7 @@ export default function BlogsPageClient({
   initialModerationQueue,
   initialCanViewModeration,
   allowCreate = true,
+  allowDelete = false,
   showModerationPanel = true,
 }: BlogsPageClientProps) {
   const [blogs, setBlogs] = useState<BlogPost[]>(initialBlogs);
@@ -104,6 +120,10 @@ export default function BlogsPageClient({
   const [voteError, setVoteError] = useState<string | null>(null);
   const [activeBlogId, setActiveBlogId] = useState<string | null>(null);
   const [activeVoteBlogId, setActiveVoteBlogId] = useState<string | null>(null);
+  const [activeDeleteBlogId, setActiveDeleteBlogId] = useState<string | null>(
+    null,
+  );
+  const [blogToDelete, setBlogToDelete] = useState<BlogPost | null>(null);
   const [selectedBlog, setSelectedBlog] = useState<BlogPost | null>(null);
   const [reviewingBlog, setReviewingBlog] = useState<BlogPost | null>(null);
   const [reviewNote, setReviewNote] = useState("");
@@ -122,6 +142,68 @@ export default function BlogsPageClient({
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+  const [isModerationOpen, setIsModerationOpen] = useState(false);
+  const [actionFlushbar, setActionFlushbar] = useState<ActionFlushbar | null>(
+    null,
+  );
+  const actionFlushbarProgressTimerRef = useRef<number | null>(null);
+  const actionFlushbarHideTimerRef = useRef<number | null>(null);
+
+  const clearActionFlushbarTimers = useCallback(() => {
+    if (actionFlushbarProgressTimerRef.current !== null) {
+      window.clearTimeout(actionFlushbarProgressTimerRef.current);
+      actionFlushbarProgressTimerRef.current = null;
+    }
+
+    if (actionFlushbarHideTimerRef.current !== null) {
+      window.clearTimeout(actionFlushbarHideTimerRef.current);
+      actionFlushbarHideTimerRef.current = null;
+    }
+  }, []);
+
+  const dismissActionFlushbar = useCallback(() => {
+    clearActionFlushbarTimers();
+    setActionFlushbar(null);
+  }, [clearActionFlushbarTimers]);
+
+  const showActionFlushbar = useCallback(
+    (tone: "warning" | "error" | "success", message: string) => {
+      dismissActionFlushbar();
+
+      const id = Date.now() + Math.floor(Math.random() * 1000);
+      setActionFlushbar({ id, tone, message, progress: 100 });
+
+      actionFlushbarProgressTimerRef.current = window.setTimeout(() => {
+        setActionFlushbar((current) =>
+          current?.id === id ? { ...current, progress: 0 } : current,
+        );
+      }, 30);
+
+      actionFlushbarHideTimerRef.current = window.setTimeout(() => {
+        setActionFlushbar((current) => (current?.id === id ? null : current));
+      }, WARNING_FLUSHBAR_DURATION_MS + 30);
+    },
+    [dismissActionFlushbar],
+  );
+
+  const showActionError = useCallback(
+    (message: string) => {
+      showActionFlushbar("error", message);
+    },
+    [showActionFlushbar],
+  );
+
+  const showActionSuccess = useCallback(
+    (message: string) => {
+      showActionFlushbar("success", message);
+    },
+    [showActionFlushbar],
+  );
+
+  useEffect(
+    () => () => clearActionFlushbarTimers(),
+    [clearActionFlushbarTimers],
+  );
 
   const companyOptions = useMemo(
     () =>
@@ -180,7 +262,6 @@ export default function BlogsPageClient({
   const activeFilterCount = sourceFilter.length + companyFilter.length;
 
   async function approveBlog(blogId: string) {
-    setActionError(null);
     setActiveBlogId(blogId);
 
     try {
@@ -221,11 +302,12 @@ export default function BlogsPageClient({
       if (reviewingBlog?.id === blogId) {
         setReviewingBlog(null);
         setReviewNote("");
-        setReviewFormError(null);
       }
+
+      showActionSuccess("Blog approved successfully.");
     } catch (error) {
       console.error("Error approving blog:", error);
-      setActionError(
+      showActionError(
         error instanceof Error
           ? error.message
           : "Unable to approve this blog right now. Please try again.",
@@ -236,7 +318,6 @@ export default function BlogsPageClient({
   }
 
   async function rejectBlog(blogId: string, moderationNote: string) {
-    setActionError(null);
     setActiveBlogId(blogId);
 
     try {
@@ -261,12 +342,15 @@ export default function BlogsPageClient({
       if (reviewingBlog?.id === blogId) {
         setReviewingBlog(null);
         setReviewNote("");
-        setReviewFormError(null);
       }
+
+      showActionSuccess("Blog rejected successfully.");
     } catch (error) {
       console.error("Error submitting review:", error);
-      setActionError(
-        "Unable to submit this review right now. Please try again.",
+      showActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to submit this review right now. Please try again.",
       );
     } finally {
       setActiveBlogId(null);
@@ -274,7 +358,6 @@ export default function BlogsPageClient({
   }
 
   async function submitVote(blogId: string, voteType: VoteType) {
-    setVoteError(null);
     setActiveVoteBlogId(blogId);
 
     try {
@@ -317,17 +400,99 @@ export default function BlogsPageClient({
       );
     } catch (error) {
       console.error("Error voting on blog:", error);
-      setVoteError("Unable to update your vote right now. Please try again.");
+      showActionError(
+        "Unable to update your vote right now. Please try again.",
+      );
     } finally {
       setActiveVoteBlogId(null);
     }
   }
 
+  async function deleteBlog(blogId: string) {
+    if (!allowDelete) {
+      return;
+    }
+
+    setActiveDeleteBlogId(blogId);
+
+    try {
+      const response = await fetch(`/api/v1/blogs/${blogId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        let errorMessage = "Failed to delete blog";
+        try {
+          const errorData = (await response.json()) as {
+            error?: { message?: string };
+            message?: string;
+          };
+          errorMessage =
+            errorData.error?.message ?? errorData.message ?? errorMessage;
+        } catch {
+          errorMessage = response.statusText || errorMessage;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      setBlogs((current) => current.filter((blog) => blog.id !== blogId));
+      setModerationQueue((current) =>
+        current.filter((blog) => blog.id !== blogId),
+      );
+
+      if (selectedBlog?.id === blogId) {
+        setSelectedBlog(null);
+      }
+
+      if (blogToDelete?.id === blogId) {
+        setBlogToDelete(null);
+      }
+
+      if (reviewingBlog?.id === blogId) {
+        setReviewingBlog(null);
+      }
+
+      showActionSuccess("Blog deleted successfully.");
+    } catch (error) {
+      console.error("Error deleting blog:", error);
+      showActionError(
+        error instanceof Error
+          ? error.message
+          : "Unable to delete this blog right now. Please try again.",
+      );
+    } finally {
+      setActiveDeleteBlogId(null);
+    }
+  }
+
+  function requestDeleteBlog(blog: BlogPost) {
+    if (!allowDelete || activeDeleteBlogId) {
+      return;
+    }
+
+    setBlogToDelete(blog);
+  }
+
+  function closeDeleteConfirmModal() {
+    if (activeDeleteBlogId) {
+      return;
+    }
+
+    setBlogToDelete(null);
+  }
+
+  function submitDeleteFromModal() {
+    if (!blogToDelete) {
+      return;
+    }
+
+    void deleteBlog(blogToDelete.id);
+  }
+
   function openReviewModal(blog: BlogPost) {
     setReviewingBlog(blog);
     setReviewNote(blog.moderationNote ?? "");
-    setReviewFormError(null);
-    setActionError(null);
   }
 
   function closeReviewModal() {
@@ -337,7 +502,6 @@ export default function BlogsPageClient({
 
     setReviewingBlog(null);
     setReviewNote("");
-    setReviewFormError(null);
   }
 
   function submitRejectFromReview() {
@@ -347,17 +511,17 @@ export default function BlogsPageClient({
 
     const trimmedNote = reviewNote.trim();
     if (!trimmedNote) {
-      setReviewFormError("Review note is required to reject this blog.");
+      showActionFlushbar(
+        "warning",
+        "Review note is required to reject this blog.",
+      );
       return;
     }
 
-    setReviewFormError(null);
     void rejectBlog(reviewingBlog.id, trimmedNote);
   }
 
   function openCreateModal() {
-    setCreateError(null);
-    setCreateSuccess(null);
     setIsCreateModalOpen(true);
   }
 
@@ -379,22 +543,20 @@ export default function BlogsPageClient({
 
   async function submitCreateBlog() {
     if (!createCompanyId) {
-      setCreateError("Please select a company.");
+      showActionFlushbar("warning", "Please select a company.");
       return;
     }
 
     if (!createTitle.trim()) {
-      setCreateError("Please enter a title.");
+      showActionFlushbar("warning", "Please enter a title.");
       return;
     }
 
     if (!buildContent(createBody)) {
-      setCreateError("Please enter blog content.");
+      showActionFlushbar("warning", "Please enter blog content.");
       return;
     }
 
-    setCreateError(null);
-    setCreateSuccess(null);
     setIsCreating(true);
 
     try {
@@ -439,7 +601,7 @@ export default function BlogsPageClient({
         };
       };
 
-      setCreateSuccess(
+      showActionSuccess(
         payload.data?.moderationStatus === "approved"
           ? "Blog published successfully."
           : "Blog submitted for moderation.",
@@ -451,7 +613,7 @@ export default function BlogsPageClient({
       setCreateTags("");
     } catch (error) {
       console.error("Error creating blog:", error);
-      setCreateError(
+      showActionError(
         error instanceof Error
           ? error.message
           : "Unable to create blog right now. Please try again.",
@@ -463,100 +625,133 @@ export default function BlogsPageClient({
 
   return (
     <div className="-mt-6 xl:mt-0 space-y-5 px-4 pb-6 pt-6 xl:h-full xl:overflow-y-auto hide-scrollbar">
-      {createSuccess && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-          {createSuccess}
-        </div>
-      )}
-
-      <div
-        className={`grid grid-cols-1 gap-4 items-stretch ${
-          showModerationPanel
-            ? "xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]"
-            : "xl:grid-cols-1"
-        }`}
-      >
-        <div className="min-w-0 space-y-4">
-          <div className="card overflow-visible flex flex-col">
-            <div className="px-4 py-3 border-b border-(--card-border)">
-              <div className="flex flex-col gap-2 xl:flex-row xl:flex-wrap xl:items-center">
-                <SearchBar
-                  value={query}
-                  onChange={setQuery}
-                  placeholder="Search by title, company, or tag"
-                  className="min-w-0 xl:min-w-[320px] xl:flex-[1.2]"
+      {actionFlushbar ? (
+        <div className="flushbar-stack fixed right-4 bottom-4 z-50 w-[min(92vw,600px)] pointer-events-none">
+          <div
+            className={`flushbar flushbar-${actionFlushbar.tone} rounded-xl border shadow-lg`}
+          >
+            <div className="flushbar-progress-track h-1 w-full">
+              <div
+                className="flushbar-progress h-full"
+                style={{
+                  width: `${actionFlushbar.progress}%`,
+                  transition: `width ${WARNING_FLUSHBAR_DURATION_MS}ms linear`,
+                }}
+              />
+            </div>
+            <div className="flushbar-body flex items-start gap-2.5 px-3.5 py-3">
+              {actionFlushbar.tone === "success" ? (
+                <CheckCircle2
+                  size={36}
+                  className="flushbar-icon shrink-0 mt-0.5"
                 />
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:flex xl:w-auto xl:shrink-0">
-                  <FilterSelect
-                    multiple
-                    value={sourceFilter}
-                    onChange={setSourceFilter}
-                    placeholder="Source"
-                    className="z-20 w-full xl:w-44"
-                    options={[
-                      { label: "Student", value: "student" },
-                      { label: "TPO", value: "tpo" },
-                    ]}
-                  />
-                  <FilterSelect
-                    multiple
-                    value={companyFilter}
-                    onChange={setCompanyFilter}
-                    placeholder="Company"
-                    className="z-20 w-full xl:w-44"
-                    options={companyOptions}
-                  />
-                </div>
-
-                {activeFilterCount > 0 && (
-                  <button
-                    className="btn btn-ghost btn-sm shrink-0 self-start text-slate-500 hover:text-slate-700 xl:self-auto"
-                    onClick={() => {
-                      setSourceFilter([]);
-                      setCompanyFilter([]);
-                    }}
-                  >
-                    Clear all
-                  </button>
-                )}
+              ) : (
+                <AlertCircle
+                  size={36}
+                  className="flushbar-icon shrink-0 mt-0.5"
+                />
+              )}
+              <div className="flex-1 space-y-0.5 min-w-0">
+                <p className="m-0 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                  {actionFlushbar.tone === "error"
+                    ? "ERROR"
+                    : actionFlushbar.tone === "warning"
+                      ? "WARNING"
+                      : "SUCCESS"}
+                </p>
+                <p className="flushbar-message m-0 text-[14px] font-medium leading-[1.45] whitespace-normal wrap-break-word">
+                  {actionFlushbar.message}
+                </p>
               </div>
             </div>
           </div>
+        </div>
+      ) : null}
 
-          <section className="card overflow-hidden">
-            <div className="border-b border-(--card-border) px-4 py-3">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Latest Blogs
-                </h2>
+      <div className="grid grid-cols-1 gap-4 items-stretch xl:grid-cols-1 relative">
+        <div className="min-w-0 space-y-4">
+          <div className="flex flex-col gap-3 xl:flex-row xl:flex-wrap xl:items-center">
+            <SearchBar
+              value={query}
+              onChange={setQuery}
+              placeholder="Search by title, company, or tag"
+              className="min-w-0 flex-1 border border-slate-300 rounded-lg"
+            />
+            <div className="flex flex-wrap gap-2 items-center">
+              <div className="border border-slate-300 rounded-lg overflow-hidden">
+                <FilterSelect
+                  multiple
+                  value={sourceFilter}
+                  onChange={setSourceFilter}
+                  placeholder="Source"
+                  className="z-20 w-full sm:w-40 xl:w-40"
+                  options={[
+                    { label: "Student", value: "student" },
+                    { label: "TPO", value: "tpo" },
+                  ]}
+                />
+              </div>
+              <div className="border border-slate-300 rounded-lg overflow-hidden">
+                <FilterSelect
+                  multiple
+                  value={companyFilter}
+                  onChange={setCompanyFilter}
+                  placeholder="Company"
+                  className="z-20 w-full sm:w-40 xl:w-40"
+                  options={companyOptions}
+                />
+              </div>
+              {activeFilterCount > 0 && (
+                <button
+                  className="btn btn-ghost btn-sm shrink-0 text-slate-500 hover:text-slate-700 text-xs"
+                  onClick={() => {
+                    setSourceFilter([]);
+                    setCompanyFilter([]);
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <section className="overflow-hidden border-2 bg-slate-50 border-slate-300 rounded-lg">
+            <div className="px-4 py-4 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold text-slate-900">
+                Latest Blogs
+              </h2>
+              <div className="flex items-center gap-2">
+                {showModerationPanel && canViewModeration && (
+                  <button
+                    type="button"
+                    onClick={() => setIsModerationOpen(true)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors"
+                  >
+                    <ShieldCheck size={16} />
+                    Queue
+                    {moderationQueue.length > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-slate-300 text-xs font-bold text-slate-900">
+                        {moderationQueue.length}
+                      </span>
+                    )}
+                  </button>
+                )}
                 {allowCreate && (
                   <button
                     type="button"
                     onClick={openCreateModal}
-                    className="inline-flex items-center gap-2 rounded-xl border border-[#1D4ED8] bg-[#2563EB] px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#1D4ED8]"
+                    className="btn btn-primary inline-flex items-center gap-2"
                   >
                     <BookOpen size={16} />
-                    Create Blog
+                    Create
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="p-4 space-y-3">
-              {voteError && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-                  {voteError}
-                </div>
-              )}
-
-              {loadError && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
-                  {loadError}
-                </div>
-              )}
-
+            <div className="px-4 pb-4 pt-2 space-y-3">
               {!loadError && filteredBlogs.length === 0 && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                <div className="rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
                   No blogs found for the current filters.
                 </div>
               )}
@@ -564,7 +759,18 @@ export default function BlogsPageClient({
               {paginatedBlogs.map((blog) => (
                 <article
                   key={blog.id}
-                  className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_6px_16px_rgba(15,23,42,0.08)]"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    openBlogReader(blog);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openBlogReader(blog);
+                    }
+                  }}
+                  className="rounded-lg border border-slate-300 bg-white p-4 cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="space-y-1 min-w-0">
@@ -602,7 +808,8 @@ export default function BlogsPageClient({
                       type="button"
                       disabled={activeVoteBlogId === blog.id}
                       aria-label={`Upvote (${blog.upvoteCount})`}
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         void submitVote(blog.id, "upvote");
                       }}
                       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -619,7 +826,8 @@ export default function BlogsPageClient({
                       type="button"
                       disabled={activeVoteBlogId === blog.id}
                       aria-label={`Downvote (${blog.downvoteCount})`}
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         void submitVote(blog.id, "downvote");
                       }}
                       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
@@ -632,15 +840,22 @@ export default function BlogsPageClient({
                       <span className="tabular-nums">{blog.downvoteCount}</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        openBlogReader(blog);
-                      }}
-                      className="ml-auto inline-flex items-center gap-1 rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-2.5 py-1.5 text-xs font-medium text-[#1D4ED8] hover:bg-[#DBEAFE]"
-                    >
-                      Read full blog
-                    </button>
+                    {allowDelete && (
+                      <button
+                        type="button"
+                        disabled={activeDeleteBlogId === blog.id}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          requestDeleteBlog(blog);
+                        }}
+                        className="btn btn-secondary btn-sm ml-auto"
+                      >
+                        <Trash2 size={13} />
+                        {activeDeleteBlogId === blog.id
+                          ? "Deleting..."
+                          : "Delete"}
+                      </button>
+                    )}
                   </div>
                 </article>
               ))}
@@ -701,66 +916,73 @@ export default function BlogsPageClient({
           </section>
         </div>
 
-        {showModerationPanel && (
-          <aside className="card p-4 h-full">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Moderation Queue
-              </h2>
-              <Badge variant="danger" size="sm">
-                {moderationQueue.length} in queue
-              </Badge>
-            </div>
-
-            <div className="mt-3 space-y-3">
-              {actionError && (
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
-                  {actionError}
-                </div>
-              )}
-
-              {!canViewModeration && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                  You do not have permission to view moderation items.
-                </div>
-              )}
-
-              {canViewModeration && moderationQueue.length === 0 && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                  No pending blogs in moderation queue.
-                </div>
-              )}
-
-              {moderationQueue.map((blog) => (
-                <div
-                  key={blog.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+        {/* Moderation Queue Drawer - Right Overlay */}
+        {showModerationPanel && isModerationOpen && (
+          <div className="fixed inset-0 z-50">
+            <div
+              className="fixed inset-0 bg-black/30"
+              onClick={() => setIsModerationOpen(false)}
+            />
+            <div className="fixed right-0 top-0 bottom-0 w-full sm:w-96 bg-white border-l-2 border-slate-300 overflow-y-auto">
+              <div className="p-4 border-b border-slate-200 sticky top-0 bg-white flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Moderation Queue
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setIsModerationOpen(false)}
+                  className="text-slate-500 hover:text-slate-700"
                 >
-                  <p className="text-sm font-medium text-slate-900">
-                    {blog.title}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">{blog.company}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {blog.author} • {formatDate(blog.date)}
-                  </p>
+                  <X size={20} />
+                </button>
+              </div>
 
-                  <div className="mt-2 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      disabled={activeBlogId === blog.id}
-                      onClick={() => {
-                        openReviewModal(blog);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      <ShieldCheck size={13} />
-                      Review
-                    </button>
+              <div className="p-4 space-y-3">
+                {!canViewModeration && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    You do not have permission to view moderation items.
                   </div>
-                </div>
-              ))}
+                )}
+
+                {canViewModeration && moderationQueue.length === 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+                    No pending blogs in moderation queue.
+                  </div>
+                )}
+
+                {moderationQueue.map((blog) => (
+                  <div
+                    key={blog.id}
+                    className="rounded-lg border border-slate-300 bg-slate-50 p-3"
+                  >
+                    <p className="text-sm font-medium text-slate-900">
+                      {blog.title}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {blog.company}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {blog.author} • {formatDate(blog.date)}
+                    </p>
+
+                    <div className="mt-2 flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        disabled={activeBlogId === blog.id}
+                        onClick={() => {
+                          openReviewModal(blog);
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-600 hover:bg-slate-50 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <ShieldCheck size={13} />
+                        Review
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </aside>
+          </div>
         )}
       </div>
 
@@ -770,14 +992,30 @@ export default function BlogsPageClient({
         title={selectedBlog ? selectedBlog.title : "Blog"}
         size="xl"
         footer={
-          <button className="btn btn-secondary" onClick={closeBlogReader}>
-            Close
-          </button>
+          <>
+            <button className="btn btn-secondary" onClick={closeBlogReader}>
+              Close
+            </button>
+            {allowDelete && selectedBlog && (
+              <button
+                className="btn btn-secondary"
+                onClick={() => {
+                  requestDeleteBlog(selectedBlog);
+                }}
+                disabled={activeDeleteBlogId === selectedBlog.id}
+              >
+                <Trash2 size={14} />
+                {activeDeleteBlogId === selectedBlog.id
+                  ? "Deleting..."
+                  : "Delete Blog"}
+              </button>
+            )}
+          </>
         }
       >
         {selectedBlog && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
               <p className="text-sm font-medium text-slate-900">
                 {selectedBlog.company}
               </p>
@@ -789,7 +1027,7 @@ export default function BlogsPageClient({
                 {selectedBlog.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600"
+                    className="rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] text-slate-600"
                   >
                     #{tag}
                   </span>
@@ -797,7 +1035,7 @@ export default function BlogsPageClient({
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <div className="rounded-lg border border-slate-300 bg-white px-4 py-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Full Blog Content
               </p>
@@ -813,6 +1051,42 @@ export default function BlogsPageClient({
           </div>
         )}
       </Modal>
+
+      {allowDelete && (
+        <Modal
+          isOpen={Boolean(blogToDelete)}
+          onClose={closeDeleteConfirmModal}
+          title="Delete Blog"
+          size="md"
+          footer={
+            <>
+              <button
+                className="btn btn-ghost"
+                onClick={closeDeleteConfirmModal}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={submitDeleteFromModal}
+                disabled={
+                  !blogToDelete || activeDeleteBlogId === blogToDelete.id
+                }
+              >
+                <Trash2 size={14} />
+                {blogToDelete && activeDeleteBlogId === blogToDelete.id
+                  ? "Deleting..."
+                  : "Delete"}
+              </button>
+            </>
+          }
+        >
+          <p className="text-sm text-slate-700">
+            Delete <strong>{blogToDelete?.title}</strong>? This action cannot be
+            undone.
+          </p>
+        </Modal>
+      )}
 
       {allowCreate && (
         <Modal
@@ -839,7 +1113,7 @@ export default function BlogsPageClient({
           }
         >
           <div className="space-y-4">
-            <p className="rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] px-3 py-2 text-xs text-[#1D4ED8]">
+            <p className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-700">
               Student blogs require moderation, while TPO blogs are published
               directly.
             </p>
@@ -902,10 +1176,6 @@ export default function BlogsPageClient({
                 disabled={isCreating}
               />
             </div>
-
-            {createError && (
-              <p className="text-xs font-medium text-red-600">{createError}</p>
-            )}
           </div>
         </Modal>
       )}
@@ -1000,11 +1270,6 @@ export default function BlogsPageClient({
                   placeholder="Mention what should be changed before approval..."
                   disabled={activeBlogId === reviewingBlog.id}
                 />
-                {reviewFormError && (
-                  <p className="mt-1 text-xs font-medium text-red-600">
-                    {reviewFormError}
-                  </p>
-                )}
               </div>
             </div>
           )}

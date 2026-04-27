@@ -5,6 +5,7 @@ interface SearchBarProps {
   onChange: (v: string) => void;
   placeholder?: string;
   className?: string;
+  inputClassName?: string;
 }
 
 export default function SearchBar({
@@ -12,6 +13,7 @@ export default function SearchBar({
   onChange,
   placeholder = "Search...",
   className = "",
+  inputClassName = "",
 }: SearchBarProps) {
   return (
     <div className={`relative flex items-center ${className}`}>
@@ -24,7 +26,7 @@ export default function SearchBar({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="input-base"
+        className={`input-base ${inputClassName}`}
         style={{
           paddingLeft: "2.25rem",
           paddingRight: value ? "2rem" : undefined,

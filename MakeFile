@@ -1,6 +1,6 @@
 # ===== CONFIG =====
 SERVER = nexus@172.30.8.178
-APP_DIR = /home/Nexus/app
+APP_DIR = /home/nexus/app
 
 # ===== BUILD =====
 build:
@@ -8,17 +8,31 @@ build:
 
 # ===== DEPLOY =====
 deploy: build
-	scp -r .next/standalone $(SERVER):$(APP_DIR)
+	# Ensure directories exist
+	ssh $(SERVER) "mkdir -p $(APP_DIR)/.next"
+
+	# Clean old static (prevents stale UI bugs)
+	ssh $(SERVER) "rm -rf $(APP_DIR)/.next/static"
+
+	# Copy standalone SERVER FILES (flattened correctly)
+	scp -r .next/standalone/* $(SERVER):$(APP_DIR)
+
+	# Copy static assets (correct path)
 	scp -r .next/static $(SERVER):$(APP_DIR)/.next
+
+	# Copy public assets
 	scp -r public $(SERVER):$(APP_DIR) || true
 
-	ssh $(SERVER) "cd $(APP_DIR) && pm2 delete nexus-app || true"
+	# Restart app cleanly on fixed port
+	ssh $(SERVER) "pm2 delete nexus-app || true"
 	ssh $(SERVER) "cd $(APP_DIR) && PORT=3001 pm2 start server.js --name nexus-app"
 	ssh $(SERVER) "pm2 save"
 
-# ===== FIRST TIME SETUP (optional) =====
+# ===== FIRST TIME SETUP =====
 setup:
-	scp -r .next/standalone $(SERVER):$(APP_DIR)
+	ssh $(SERVER) "mkdir -p $(APP_DIR)/.next"
+
+	scp -r .next/standalone/* $(SERVER):$(APP_DIR)
 	scp -r .next/static $(SERVER):$(APP_DIR)/.next
 	scp -r public $(SERVER):$(APP_DIR) || true
 	scp -r prisma $(SERVER):$(APP_DIR)

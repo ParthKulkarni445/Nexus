@@ -10,6 +10,7 @@ type FilterSelectSingleProps = {
   options: Option[];
   placeholder?: string;
   className?: string;
+  inputClassName?: string;
 };
 
 type FilterSelectMultiProps = {
@@ -19,6 +20,7 @@ type FilterSelectMultiProps = {
   options: Option[];
   placeholder?: string;
   className?: string;
+  inputClassName?: string;
 };
 
 type FilterSelectProps = FilterSelectSingleProps | FilterSelectMultiProps;
@@ -31,6 +33,7 @@ export default function FilterSelect({
   options,
   placeholder = "All",
   className = "",
+  inputClassName = "",
 }: FilterSelectProps) {
   if (multiple) {
     return (
@@ -40,23 +43,30 @@ export default function FilterSelect({
         options={options}
         placeholder={placeholder}
         className={className}
+        inputClassName={inputClassName}
       />
     );
   }
 
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`input-base appearance-none cursor-pointer pr-8 bg-[url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394A3B8' d='M6 8L1 3h10z'/%3E%3C/svg%3E")] bg-no-repeat bg-position-[right_10px_center] ${className}`}
-    >
-      <option value="">{placeholder}</option>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <div className={`relative ${className}`}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`input-base appearance-none cursor-pointer pr-8 ${inputClassName}`}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown
+        size={14}
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500"
+      />
+    </div>
   );
 }
 
@@ -66,6 +76,7 @@ function MultiFilterSelect({
   options,
   placeholder = "All",
   className = "",
+  inputClassName = "",
 }: MultiFilterSelectProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -101,7 +112,7 @@ function MultiFilterSelect({
     <div className={`relative ${className}`} ref={containerRef}>
       <button
         type="button"
-        className="input-base h-9 w-full px-3 py-0 flex items-center justify-between gap-2"
+        className={`input-base h-9 w-full px-3 py-0 flex items-center justify-between gap-2 ${inputClassName}`}
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="listbox"

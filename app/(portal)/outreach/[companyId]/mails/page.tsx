@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ChevronRight, Mail } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { getCurrentUser } from "@/lib/api/auth";
 import { db } from "@/lib/db";
 import CompanyMailTrackerClient from "./CompanyMailTrackerClient";
+import { ScrollToTop } from "./ScrollToTop";
 
 function getThreadKey(email: { threadId: string | null; id: string }) {
   return email.threadId?.trim() || email.id;
@@ -119,7 +120,9 @@ export default async function CompanyMailTrackerPage({
   const emails = dedupeEmailsById([
     ...directlyMappedEmails,
     ...threadExpandedEmails,
-  ]).sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+  ]).sort(
+    (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+  );
 
   const threadMap = new Map<
     string,
@@ -182,7 +185,8 @@ export default async function CompanyMailTrackerPage({
       messages: thread.messages
         .sort((left, right) => {
           return (
-            new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime()
+            new Date(left.createdAt).getTime() -
+            new Date(right.createdAt).getTime()
           );
         })
         .map((message) => ({
@@ -218,52 +222,55 @@ export default async function CompanyMailTrackerPage({
   );
 
   return (
-    <div className="space-y-5 py-4">
-      <div className="rounded-2xl border border-[#DBEAFE] bg-white p-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/outreach"
-              className="btn btn-secondary btn-sm px-2"
-              aria-label="Back to outreach"
-            >
-              <ArrowLeft size={14} />
-            </Link>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-              <Link href="/outreach" className="hover:text-[#2563EB]">
-                Outreach
+    <>
+      <ScrollToTop />
+      <div className="-mt-6 xl:mt-0 space-y-5 px-4 pb-6 animate-fade-in xl:h-full xl:overflow-y-auto hide-scrollbar">
+        <div className="mt-5 space-y-3">
+          <div className="px-1">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
+              <Link
+                href={`/outreach?companyId=${company.id}`}
+                aria-label="Back to task list"
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-900 bg-slate-900 text-white hover:bg-slate-800"
+              >
+                <ArrowLeft size={13} />
               </Link>
-              <ChevronRight size={12} />
-              <span className="truncate">{company.name}</span>
-              <ChevronRight size={12} />
+              <span className="text-slate-600">TASK LIST</span>
+              <span>{"> "}</span>
+              <span className="text-slate-700">{company.name}</span>
+              <span>{"> "}</span>
               <span className="text-slate-700">Mail Tracker</span>
             </div>
           </div>
 
-          <div className="min-w-0">
-            <div className="mt-3 flex items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#DBEAFE] bg-[#EFF6FF] text-[#2563EB]">
-                <Mail size={18} />
-              </div>
+          <div className="w-full max-w-full min-w-0 overflow-hidden rounded-lg bg-white p-4">
+            <div className="flex flex-col gap-4">
               <div className="min-w-0">
-                <h1 className="text-lg font-semibold text-slate-900">
-                  {company.name} Mail Tracker
-                </h1>
-                <p className="mt-1 text-sm text-slate-500">
-                  Company-scoped mail threads expanded from direct company matches
-                  so the full mailbox thread stays visible here.
-                </p>
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]">
+                    <Mail size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <h1 className="text-lg font-semibold text-slate-900">
+                      {company.name} Mail Tracker
+                    </h1>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Company-scoped mail threads expanded from direct company
+                      matches so the full mailbox thread stays visible here.
+                    </p>
+                  </div>
+                </div>
               </div>
+
+              <CompanyMailTrackerClient
+                companyId={company.id}
+                trackedDomains={trackedDomains}
+                threads={threads}
+              />
             </div>
           </div>
         </div>
-
-        <CompanyMailTrackerClient
-          companyId={company.id}
-          trackedDomains={trackedDomains}
-          threads={threads}
-        />
       </div>
-    </div>
+    </>
   );
 }

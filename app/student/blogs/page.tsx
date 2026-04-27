@@ -107,7 +107,9 @@ export default async function StudentBlogsPage() {
     }),
   ]);
 
-  const initialBlogs = publishedBlogs.map((blog) => mapBlog(blog, currentUser?.id));
+  const initialBlogs = publishedBlogs.map((blog) =>
+    mapBlog(blog, currentUser?.id),
+  );
   const initialCompanies: ApiCompany[] = companies.map((company) => ({
     id: company.id,
     name: company.name,
@@ -120,6 +122,7 @@ export default async function StudentBlogsPage() {
       initialModerationQueue={[]}
       initialCanViewModeration={false}
       allowCreate={false}
+      allowDelete={false}
       showModerationPanel={false}
     />
   );

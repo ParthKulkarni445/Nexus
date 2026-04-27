@@ -4,15 +4,22 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   AlertCircle,
+  Calendar,
+  CalendarDays,
   Check,
+  ChevronDown,
+  ChevronUp,
   Download,
   KeyRound,
+  Pencil,
   RefreshCw,
   Save,
   Search,
   Shield,
+  Trash2,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 
 type OverviewResponse = {
@@ -100,6 +107,17 @@ type LogItem = {
     email: string;
     role: string;
   } | null;
+};
+
+type Season = {
+  id: string;
+  name: string;
+  seasonType: string;
+  academicYear: string;
+  isActive: boolean;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string;
 };
 
 type ApiEnvelope<T> = {
@@ -252,12 +270,18 @@ export default function AdminDashboardClient() {
     isActive: true,
   });
   const [creatingSeason, setCreatingSeason] = useState(false);
+  const [allSeasons, setAllSeasons] = useState<Season[]>([]);
+  const [deletingSeasonId, setDeletingSeasonId] = useState<string | null>(null);
+  const [updatingSeasonId, setUpdatingSeasonId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set(["Student"]));
   const [userSearch, setUserSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [groupBy, setGroupBy] = useState<"role" | "status" | "none">("role");
   const [showActiveSeasonsWindow, setShowActiveSeasonsWindow] = useState(false);
+  const [activeTab, setActiveTab] = useState<"schedule" | "users" | "seasons" | "logs" | "reports">("schedule");
 
   const load = useCallback(async (silent = false) => {
     if (!silent) {
@@ -266,16 +290,18 @@ export default function AdminDashboardClient() {
     setError(null);
 
     try {
-      const [overviewPayload, usersPayload, logsPayload] = await Promise.all([
+      const [overviewPayload, usersPayload, logsPayload, seasonsPayload] = await Promise.all([
         requestJson<OverviewResponse>("/api/v1/admin/overview"),
         requestJson<AdminUsersPayload>("/api/v1/admin/users"),
         requestJson<LogItem[]>("/api/v1/admin/system/logs?limit=25"),
+        requestJson<Season[]>("/api/v1/seasons"),
       ]);
 
       setOverview(overviewPayload);
       setUsersMeta(usersPayload.meta);
       setUsers(usersPayload.users);
       setLogs(logsPayload);
+      setAllSeasons(seasonsPayload);
       setEditStateByUserId(
         usersPayload.users.reduce<Record<string, EditableUserState>>((acc, user) => {
           acc[user.id] = toUserEditState(user, usersPayload.meta.permissionKeys);
@@ -363,7 +389,14 @@ export default function AdminDashboardClient() {
     }
 
     return Array.from(buckets.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
+      .sort(([a], [b]) => {
+        // Push "Student" group to the end
+        const aIsStudent = a.toLowerCase() === "student";
+        const bIsStudent = b.toLowerCase() === "student";
+        if (aIsStudent && !bIsStudent) return 1;
+        if (!aIsStudent && bIsStudent) return -1;
+        return a.localeCompare(b);
+      })
       .map(([label, grouped]) => ({
         label,
         users: grouped.sort((a, b) => a.name.localeCompare(b.name)),
@@ -390,6 +423,25 @@ export default function AdminDashboardClient() {
   );
 
   const selectedUserDraft = selectedUser ? editStateByUserId[selectedUser.id] : null;
+
+  const editingUser = useMemo(
+    () => users.find((user) => user.id === editingUserId) ?? null,
+    [users, editingUserId],
+  );
+
+  const editingUserDraft = editingUser ? editStateByUserId[editingUser.id] : null;
+
+  const toggleGroupCollapse = (label: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  };
 
   const groupedLogs = useMemo(() => {
     const buckets = new Map<string, LogItem[]>();
@@ -444,6 +496,44 @@ export default function AdminDashboardClient() {
       setError(seasonError instanceof Error ? seasonError.message : "Failed to create season");
     } finally {
       setCreatingSeason(false);
+    }
+  }
+
+  async function handleDeleteSeason(seasonId: string) {
+    if (!confirm("Are you sure you want to delete this season? This action cannot be undone.")) return;
+
+    setDeletingSeasonId(seasonId);
+    setError(null);
+
+    try {
+      await requestJson(`/api/v1/seasons/${seasonId}`, {
+        method: "DELETE",
+      });
+
+      await load(true);
+    } catch (seasonError) {
+      setError(seasonError instanceof Error ? seasonError.message : "Failed to delete season");
+    } finally {
+      setDeletingSeasonId(null);
+    }
+  }
+
+  async function handleToggleSeasonStatus(seasonId: string, currentStatus: boolean) {
+    setUpdatingSeasonId(seasonId);
+    setError(null);
+
+    try {
+      await requestJson(`/api/v1/seasons/${seasonId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: !currentStatus }),
+      });
+
+      await load(true);
+    } catch (seasonError) {
+      setError(seasonError instanceof Error ? seasonError.message : "Failed to update season status");
+    } finally {
+      setUpdatingSeasonId(null);
     }
   }
 
@@ -606,145 +696,122 @@ export default function AdminDashboardClient() {
 
   if (loading) {
     return (
-      <div className="px-6 py-8 text-sm text-slate-600">Loading admin dashboard...</div>
+      <div className="px-6 py-12 flex flex-col items-center gap-3">
+        <div className="shimmer h-8 w-64 rounded-xl" />
+        <div className="shimmer h-4 w-48 rounded-lg" />
+        <div className="mt-6 grid w-full max-w-4xl gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="rounded-lg border border-slate-300 bg-white p-5"><div className="shimmer h-16 w-full rounded-lg" /></div>
+          ))}
+        </div>
+      </div>
     );
   }
 
+  const tabList = [
+    { id: "schedule" as const, label: "Schedule", icon: CalendarDays },
+    { id: "users" as const, label: "Users & Permissions", icon: Users },
+    { id: "seasons" as const, label: "Seasons", icon: Calendar },
+    { id: "logs" as const, label: "Logs", icon: AlertCircle },
+    { id: "reports" as const, label: "Reports & Exports", icon: Download },
+  ];
+
   return (
-    <div className="px-4 pb-8 pt-6 md:px-8">
+    <div className="-mt-6 xl:mt-0 space-y-5 px-4 pb-6 pt-6 animate-fade-in">
+      {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Admin Control Center</h1>
-          <p className="text-sm text-slate-600">
+          <h1 className="text-2xl font-bold text-slate-900">Admin Control Center</h1>
+          <p className="mt-1 text-sm text-slate-500">
             Manage seasons, users, permissions, schedules, exports, and system logs.
           </p>
         </div>
         <button
           type="button"
           onClick={() => void load()}
-          className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+          className="btn btn-ghost"
         >
           <RefreshCw className="h-4 w-4" />
           Refresh
         </button>
       </div>
 
+      {/* Error */}
       {error ? (
-        <div className="mb-5 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+        <div className="mb-5 flex items-center gap-2 rounded-lg border-2 border-red-300 bg-red-50/60 px-4 py-3 text-sm font-medium text-red-700">
+          <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
       ) : null}
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs uppercase text-slate-500">Total Users</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{overview?.totals.totalUsers ?? 0}</p>
-          <p className="text-xs text-slate-500">
-            Admin: {overview?.totals.admins ?? 0} • Coordinator: {overview?.totals.coordinators ?? 0}
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs uppercase text-slate-500">Seasons</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{overview?.totals.seasons ?? 0}</p>
-          <p className="text-xs text-slate-500">Active now: {overview?.totals.activeSeasons ?? activeSeasons.length}</p>
-          <button
-            type="button"
-            className="mt-1 inline-block text-xs text-blue-700 hover:text-blue-900"
-            onClick={() => setShowActiveSeasonsWindow(true)}
-          >
-            Open active seasons window
-          </button>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs uppercase text-slate-500">Schedules</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">{overview?.totals.schedules ?? 0}</p>
-          <a
-            className="text-xs text-blue-700 hover:text-blue-900"
-            href={googleCreateUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Create event in Google Calendar
-          </a>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-xs uppercase text-slate-500">Permission Overrides</p>
-          <p className="mt-2 text-2xl font-semibold text-slate-900">
-            {overview?.totals.customPermissionOverrides ?? 0}
-          </p>
-          <p className="text-xs text-slate-500">Per-user access levels configured</p>
-        </div>
+      {/* Tab Navigation */}
+      <div className="mb-6 flex flex-wrap gap-1 border-b border-slate-200">
+        {tabList.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all ${isActive ? "border-blue-600 text-blue-600" : "border-transparent text-slate-500 hover:text-slate-700"}`}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        <form onSubmit={handleCreateSeason} className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Create New Season</h2>
-          <div className="grid gap-3 md:grid-cols-2">
-            <select
-              value={seasonForm.academicYear}
-              onChange={(event) =>
-                setSeasonForm((prev) => ({ ...prev, academicYear: event.target.value }))
-              }
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              {ACADEMIC_YEAR_OPTIONS.map((yearOption) => (
-                <option key={yearOption} value={yearOption}>
-                  {yearOption}
-                </option>
-              ))}
-            </select>
-            <select
-              value={seasonForm.seasonType}
-              onChange={(event) =>
-                setSeasonForm((prev) => ({
-                  ...prev,
-                  seasonType: event.target.value as "placement" | "intern",
-                }))
-              }
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            >
-              <option value="placement">Placement</option>
-              <option value="intern">Intern</option>
-            </select>
-            <label className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={seasonForm.isActive}
-                onChange={(event) =>
-                  setSeasonForm((prev) => ({ ...prev, isActive: event.target.checked }))
-                }
-              />
-              Active season
-            </label>
-            <input
-              type="date"
-              value={seasonForm.startDate}
-              onChange={(event) =>
-                setSeasonForm((prev) => ({ ...prev, startDate: event.target.value }))
-              }
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
-            <input
-              type="date"
-              value={seasonForm.endDate}
-              onChange={(event) =>
-                setSeasonForm((prev) => ({ ...prev, endDate: event.target.value }))
-              }
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-            />
+      {/* SCHEDULE TAB */}
+      {activeTab === "schedule" && (
+      <div className="animate-fade-in">
+        {/* Recent Schedules */}
+        <section className="overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-50">
+          <div className="px-4 py-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-900">Recent Schedules</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Latest schedule entries and timeline.</p>
+            </div>
+            <Link href="/calender" className="btn btn-primary btn-sm">
+              <CalendarDays className="h-3.5 w-3.5" />
+              View Calendar
+            </Link>
           </div>
-          <button
-            type="submit"
-            disabled={creatingSeason}
-            className="mt-3 inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-60"
-          >
-            <Check className="h-4 w-4" />
-            {creatingSeason ? "Creating..." : "Create Season"}
-          </button>
-        </form>
 
-        <form onSubmit={handleCreateUser} className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Manage User Accounts (Add)</h2>
+          <div className="px-4 pb-4 space-y-2">
+          {overview?.recentSchedules.length ? (
+              overview.recentSchedules.map((schedule) => (
+                <div key={schedule.id} className="flex items-start gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 transition-colors hover:bg-slate-50">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#EFF6FF]">
+                    <CalendarDays className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-900">{schedule.title}</p>
+                    <p className="text-xs text-slate-500">{schedule.company.name}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {formatDateTime(schedule.startTime)} â€“ {formatDateTime(schedule.endTime)}
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${schedule.status === "scheduled" ? "bg-blue-100 text-blue-700" : schedule.status === "completed" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                    {formatRole(schedule.status)}
+                  </span>
+                </div>
+              ))
+          ) : (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-white py-10 text-center text-sm text-slate-500">
+              No schedules found.
+            </div>
+          )}
+          </div>
+        </section>
+      </div>
+      )}
+
+      {/* USERS TAB */}
+      {activeTab === "users" && (
+      <div className="space-y-5 animate-fade-in">
+        <form onSubmit={handleCreateUser} className="overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-50 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Add New User</h2>
           <div className="grid gap-3 md:grid-cols-2">
             <input
               required
@@ -753,7 +820,7 @@ export default function AdminDashboardClient() {
                 setCreateUserForm((prev) => ({ ...prev, name: event.target.value }))
               }
               placeholder="Full name"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="input-base"
             />
             <input
               required
@@ -790,7 +857,7 @@ export default function AdminDashboardClient() {
                   role: event.target.value,
                 }))
               }
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+              className="input-base"
             >
               {usersMeta.roles.length === 0 ? <option value="">No roles found</option> : null}
               {usersMeta.roles.map((role) => (
@@ -808,7 +875,7 @@ export default function AdminDashboardClient() {
                   coordinatorType: event.target.value,
                 }))
               }
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
+              className="input-base disabled:opacity-50"
             >
               {usersMeta.coordinatorTypes.length === 0 ? (
                 <option value="">No coordinator types found</option>
@@ -819,7 +886,7 @@ export default function AdminDashboardClient() {
                 </option>
               ))}
             </select>
-            <label className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 md:col-span-2">
+            <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600 md:col-span-2">
               <input
                 type="checkbox"
                 checked={createUserForm.isActive}
@@ -833,407 +900,326 @@ export default function AdminDashboardClient() {
           <button
             type="submit"
             disabled={creatingUser}
-            className="mt-3 inline-flex items-center gap-2 rounded-md bg-blue-700 px-3 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-60"
+            className="btn btn-primary mt-3"
           >
             <UserPlus className="h-4 w-4" />
             {creatingUser ? "Creating..." : "Add User"}
           </button>
         </form>
-      </div>
 
-      <div className="mb-8 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-base font-semibold text-slate-900">Roles, Access Levels, and Password Reset</h2>
-        <p className="mb-4 text-sm text-slate-600">
-          Browse all people quickly with filters and groups, then edit one selected user on the right.
-        </p>
-        <div className="mb-4 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2 xl:grid-cols-5">
-          <div className="relative sm:col-span-2">
-            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              value={userSearch}
-              onChange={(event) => setUserSearch(event.target.value)}
-              placeholder="Search by name, email, role"
-              className="w-full rounded-md border border-slate-300 bg-white py-2 pl-8 pr-3 text-sm"
-            />
-          </div>
-          <select
-            value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value)}
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            <option value="all">All Roles</option>
-            {usersMeta.roles.map((role) => (
-              <option key={role} value={role}>
-                {formatRole(role)}
-              </option>
-            ))}
-          </select>
-          <select
-            value={statusFilter}
-            onChange={(event) =>
-              setStatusFilter(event.target.value as "all" | "active" | "inactive")
-            }
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <select
-            value={groupBy}
-            onChange={(event) =>
-              setGroupBy(event.target.value as "role" | "status" | "none")
-            }
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            <option value="role">Group by Role</option>
-            <option value="status">Group by Status</option>
-            <option value="none">No Group</option>
-          </select>
-        </div>
-
-        <div className="mb-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-            <p className="text-xs text-slate-500">Visible Users</p>
-            <p className="text-lg font-semibold text-slate-900">{filteredUsers.length}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-            <p className="text-xs text-slate-500">Active</p>
-            <p className="text-lg font-semibold text-emerald-700">
-              {filteredUsers.filter((user) => user.isActive).length}
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
-            <p className="text-xs text-slate-500">Inactive</p>
-            <p className="text-lg font-semibold text-rose-700">
-              {filteredUsers.filter((user) => !user.isActive).length}
-            </p>
-          </div>
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr]">
-          <div className="rounded-lg border border-slate-200">
-            <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2">
-              <p className="text-sm font-medium text-slate-900">User Directory</p>
-              <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-                <Users className="h-3.5 w-3.5" />
-                Scroll to view all
-              </span>
+        <div className="overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-50 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">User Directory</h2>
+          <p className="mb-4 text-sm text-slate-500">Browse users with filters and groups. Click the pencil to edit roles, permissions, or reset passwords.</p>
+          <div className="mb-4 grid gap-3 rounded-lg border border-slate-300 bg-white p-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div className="relative sm:col-span-2">
+              <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+              <input value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Search by name, email, role" className="input-base pl-9" />
             </div>
-            <div className="max-h-[34rem] space-y-3 overflow-y-auto p-3">
-              {groupedUsers.map((group) => (
-                <div key={group.label} className="rounded-md border border-slate-200 bg-slate-50 p-2">
-                  <div className="mb-2 flex items-center justify-between px-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</p>
-                    <span className="text-xs text-slate-500">{group.users.length}</span>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {group.users.map((user) => {
-                      const selected = user.id === selectedUserId;
-                      return (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() => setSelectedUserId(user.id)}
-                          className={`rounded-md border px-3 py-2 text-left transition ${
-                            selected
-                              ? "border-blue-300 bg-blue-50"
-                              : "border-slate-200 bg-white hover:border-slate-300"
-                          }`}
-                        >
-                          <p className="text-sm font-medium text-slate-900">{user.name}</p>
-                          <p className="truncate text-xs text-slate-600">{user.email}</p>
-                          <div className="mt-1 flex items-center gap-2 text-[11px]">
-                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-700">
-                              {formatRole(user.role)}
-                            </span>
-                            {user.coordinatorType ? (
-                              <span className="rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-700">
-                                {formatRole(user.coordinatorType)}
-                              </span>
-                            ) : null}
-                            <span
-                              className={`rounded px-1.5 py-0.5 ${
-                                user.isActive
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : "bg-rose-100 text-rose-700"
-                              }`}
-                            >
-                              {user.isActive ? "Active" : "Inactive"}
-                            </span>
+            <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)} className="input-base">
+              <option value="all">All Roles</option>
+              {usersMeta.roles.map((role) => (<option key={role} value={role}>{formatRole(role)}</option>))}
+            </select>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as "all" | "active" | "inactive")} className="input-base">
+              <option value="all">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+            <select value={groupBy} onChange={(event) => setGroupBy(event.target.value as "role" | "status" | "none")} className="input-base">
+              <option value="role">Group by Role</option>
+              <option value="status">Group by Status</option>
+              <option value="none">No Group</option>
+            </select>
+          </div>
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg border border-slate-300 bg-white px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Visible</p>
+              <p className="text-lg font-bold text-slate-900">{filteredUsers.length}</p>
+            </div>
+            <div className="rounded-lg border border-slate-300 bg-white px-4 py-3" style={{ borderLeft: "3px solid #10b981" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Active</p>
+              <p className="text-lg font-bold text-emerald-600">{filteredUsers.filter((u) => u.isActive).length}</p>
+            </div>
+            <div className="rounded-lg border border-slate-300 bg-white px-4 py-3" style={{ borderLeft: "3px solid #ef4444" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Inactive</p>
+              <p className="text-lg font-bold text-red-600">{filteredUsers.filter((u) => !u.isActive).length}</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {groupedUsers.map((group) => {
+              const isCollapsed = collapsedGroups.has(group.label);
+              return (
+                <div key={group.label} className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                  <button type="button" onClick={() => toggleGroupCollapse(group.label)} className="flex w-full items-center justify-between bg-slate-50 px-4 py-3 text-left transition-colors hover:bg-slate-100">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">{group.label}</p>
+                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700">{group.users.length}</span>
+                    </div>
+                    {isCollapsed ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-400" />}
+                  </button>
+                  {!isCollapsed && (
+                    <div className="grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {group.users.map((user) => (
+                        <div key={user.id} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 transition-colors hover:border-slate-300">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-slate-900">{user.name}</p>
+                            <p className="truncate text-xs text-slate-500">{user.email}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px]">
+                              {user.coordinatorType ? (<span className="rounded bg-indigo-100 px-1.5 py-0.5 text-indigo-700">{formatRole(user.coordinatorType)}</span>) : null}
+                              <span className={`rounded px-1.5 py-0.5 ${user.isActive ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700"}`}>{user.isActive ? "Active" : "Inactive"}</span>
+                            </div>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          <button type="button" onClick={() => setEditingUserId(user.id)} className="shrink-0 rounded-lg border border-slate-200 p-2 text-slate-400 transition-colors hover:border-slate-400 hover:text-slate-700" title="Edit user">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
-              {filteredUsers.length === 0 ? (
-                <p className="rounded-md border border-dashed border-slate-300 bg-white px-3 py-8 text-center text-sm text-slate-500">
-                  No users match your filters.
-                </p>
-              ) : null}
-            </div>
+              );
+            })}
+            {filteredUsers.length === 0 ? (<p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-8 text-center text-sm text-slate-500">No users match your filters.</p>) : null}
           </div>
+        </div>
 
-          <div className="rounded-lg border border-slate-200 p-3">
-            {!selectedUser || !selectedUserDraft ? (
-              <p className="text-sm text-slate-500">Select a user from the directory to edit details.</p>
-            ) : (
-              <>
-                <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">{selectedUser.name}</p>
-                    <p className="text-xs text-slate-600">{selectedUser.email}</p>
-                    <p className="text-xs text-slate-500">Created: {formatDateTime(selectedUser.createdAt)}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => void handleSaveUser(selectedUser.id)}
-                      disabled={savingUserId === selectedUser.id}
-                      className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-60"
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleResetPassword(selectedUser.id)}
-                      disabled={savingUserId === selectedUser.id}
-                      className="inline-flex items-center gap-1 rounded-md border border-amber-300 px-2.5 py-1.5 text-xs text-amber-700 hover:bg-amber-50 disabled:opacity-60"
-                    >
-                      <KeyRound className="h-3.5 w-3.5" />
-                      Reset Password
-                    </button>
-                  </div>
+        {/* Edit User Overlay */}
+        {editingUser && editingUserDraft ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={() => setEditingUserId(null)}>
+            <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[#E2E8F0] bg-white shadow-xl animate-scale-up" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between border-b border-[#E2E8F0] px-5 py-4">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">{editingUser.name}</h3>
+                  <p className="text-xs text-slate-500">{editingUser.email} Â· Created {formatDateTime(editingUser.createdAt)}</p>
                 </div>
-
-                {resetPasswordByUserId[selectedUser.id] ? (
-                  <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    Temporary password: <span className="font-semibold">{resetPasswordByUserId[selectedUser.id]}</span>
-                  </div>
+                <button type="button" onClick={() => setEditingUserId(null)} className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="space-y-4 px-5 py-4">
+                {resetPasswordByUserId[editingUser.id] ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">Temporary password: <span className="font-semibold">{resetPasswordByUserId[editingUser.id]}</span></div>
                 ) : null}
-
-                <div className="grid gap-3 md:grid-cols-2">
-                  <input
-                    value={selectedUserDraft.name}
-                    onChange={(event) =>
-                      setEditStateByUserId((prev) => ({
-                        ...prev,
-                        [selectedUser.id]: { ...selectedUserDraft, name: event.target.value },
-                      }))
-                    }
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                  <input
-                    value={selectedUserDraft.phone}
-                    onChange={(event) =>
-                      setEditStateByUserId((prev) => ({
-                        ...prev,
-                        [selectedUser.id]: { ...selectedUserDraft, phone: event.target.value },
-                      }))
-                    }
-                    placeholder="Phone"
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                  <select
-                    value={selectedUserDraft.role}
-                    onChange={(event) => {
-                      const nextRole = event.target.value;
-                      setEditStateByUserId((prev) => ({
-                        ...prev,
-                        [selectedUser.id]: {
-                          ...selectedUserDraft,
-                          role: nextRole,
-                          coordinatorType:
-                            nextRole === usersMeta.coordinatorRole
-                              ? selectedUserDraft.coordinatorType ?? usersMeta.coordinatorTypes[0] ?? null
-                              : null,
-                        },
-                      }));
-                    }}
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  >
-                      {usersMeta.roles.length === 0 ? <option value="">No roles found</option> : null}
-                    {usersMeta.roles.map((role) => (
-                      <option key={role} value={role}>
-                        {formatRole(role)}
-                      </option>
-                    ))}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <input value={editingUserDraft.name} onChange={(event) => setEditStateByUserId((prev) => ({ ...prev, [editingUser.id]: { ...editingUserDraft, name: event.target.value } }))} className="input-base" placeholder="Name" />
+                  <input value={editingUserDraft.phone} onChange={(event) => setEditStateByUserId((prev) => ({ ...prev, [editingUser.id]: { ...editingUserDraft, phone: event.target.value } }))} placeholder="Phone" className="input-base" />
+                  <select value={editingUserDraft.role} onChange={(event) => { const r = event.target.value; setEditStateByUserId((prev) => ({ ...prev, [editingUser.id]: { ...editingUserDraft, role: r, coordinatorType: r === usersMeta.coordinatorRole ? editingUserDraft.coordinatorType ?? usersMeta.coordinatorTypes[0] ?? null : null } })); }} className="input-base">
+                    {usersMeta.roles.length === 0 ? <option value="">No roles found</option> : null}
+                    {usersMeta.roles.map((role) => (<option key={role} value={role}>{formatRole(role)}</option>))}
                   </select>
-                  <select
-                    value={selectedUserDraft.coordinatorType ?? usersMeta.coordinatorTypes[0] ?? ""}
-                    disabled={selectedUserDraft.role !== usersMeta.coordinatorRole}
-                    onChange={(event) =>
-                      setEditStateByUserId((prev) => ({
-                        ...prev,
-                        [selectedUser.id]: {
-                          ...selectedUserDraft,
-                          coordinatorType: event.target.value,
-                        },
-                      }))
-                    }
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100"
-                  >
-                    {usersMeta.coordinatorTypes.length === 0 ? (
-                      <option value="">No coordinator types found</option>
-                    ) : null}
-                    {usersMeta.coordinatorTypes.map((type) => (
-                      <option key={type} value={type}>
-                        {formatRole(type)}
-                      </option>
-                    ))}
+                  <select value={editingUserDraft.coordinatorType ?? usersMeta.coordinatorTypes[0] ?? ""} disabled={editingUserDraft.role !== usersMeta.coordinatorRole} onChange={(event) => setEditStateByUserId((prev) => ({ ...prev, [editingUser.id]: { ...editingUserDraft, coordinatorType: event.target.value } }))} className="input-base disabled:opacity-50">
+                    {usersMeta.coordinatorTypes.length === 0 ? (<option value="">No coordinator types</option>) : null}
+                    {usersMeta.coordinatorTypes.map((type) => (<option key={type} value={type}>{formatRole(type)}</option>))}
                   </select>
                 </div>
-
-                <label className="mt-3 inline-flex items-center gap-2 text-xs text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={selectedUserDraft.isActive}
-                    onChange={(event) =>
-                      setEditStateByUserId((prev) => ({
-                        ...prev,
-                        [selectedUser.id]: { ...selectedUserDraft, isActive: event.target.checked },
-                      }))
-                    }
-                  />
+                <label className="inline-flex items-center gap-2 text-xs text-slate-600">
+                  <input type="checkbox" checked={editingUserDraft.isActive} onChange={(event) => setEditStateByUserId((prev) => ({ ...prev, [editingUser.id]: { ...editingUserDraft, isActive: event.target.checked } }))} />
                   Active account
                 </label>
-
-                <div className="mt-3 grid gap-2">
-                  {usersMeta.permissionKeys.length === 0 ? (
-                    <p className="rounded-md border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500">
-                      No permission keys found in database yet.
-                    </p>
-                  ) : null}
-                  {usersMeta.permissionKeys.map((permissionKey) => (
-                    <label
-                      key={permissionKey}
-                      className="inline-flex items-center gap-2 rounded-md border border-slate-200 px-2 py-1.5 text-xs text-slate-700"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={Boolean(selectedUserDraft.permissions[permissionKey])}
-                        onChange={(event) =>
-                          setEditStateByUserId((prev) => ({
-                            ...prev,
-                            [selectedUser.id]: {
-                              ...selectedUserDraft,
-                              permissions: {
-                                ...selectedUserDraft.permissions,
-                                [permissionKey]: event.target.checked,
-                              },
-                            },
-                          }))
-                        }
-                      />
-                      {formatRole(permissionKey.replace("can_", "").replaceAll("_", " "))}
-                    </label>
-                  ))}
+                <div className="space-y-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Permissions</p>
+                  {usersMeta.permissionKeys.length === 0 ? (<p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500">No permission keys found.</p>) : null}
+                  <div className="flex flex-wrap gap-2">
+                    {usersMeta.permissionKeys.map((pk) => (
+                      <label key={pk} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-700">
+                        <input type="checkbox" checked={Boolean(editingUserDraft.permissions[pk])} onChange={(event) => setEditStateByUserId((prev) => ({ ...prev, [editingUser.id]: { ...editingUserDraft, permissions: { ...editingUserDraft.permissions, [pk]: event.target.checked } } }))} />
+                        {formatRole(pk.replace("can_", "").replaceAll("_", " "))}
+                      </label>
+                    ))}
+                  </div>
                 </div>
-              </>
-            )}
+              </div>
+              <div className="flex items-center justify-between border-t border-[#E2E8F0] px-5 py-4">
+                <button type="button" onClick={() => void handleResetPassword(editingUser.id)} disabled={savingUserId === editingUser.id} className="inline-flex items-center gap-1 rounded-md border border-amber-300 px-2.5 py-1.5 text-xs text-amber-700 hover:bg-amber-50 disabled:opacity-60"><KeyRound className="h-3.5 w-3.5" /> Reset Password</button>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setEditingUserId(null)} className="rounded-lg px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100">Cancel</button>
+                  <button type="button" onClick={() => { void handleSaveUser(editingUser.id); setEditingUserId(null); }} disabled={savingUserId === editingUser.id} className="btn btn-primary btn-sm"><Save className="h-3.5 w-3.5" /> Save</button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
+      )}
 
-      <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Export Reports and Backup</h2>
-          <p className="mb-3 text-sm text-slate-600">
-            Export users, seasons, and schedules as CSV. Generate JSON backup snapshot for critical entities.
-          </p>
-          <div className="flex flex-wrap gap-2">
+      {/* SEASONS TAB */}
+      {activeTab === "seasons" && (
+      <div className="space-y-5 animate-fade-in">
+        <div className="overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-50 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">Create New Season</h2>
+          <p className="mb-4 text-sm text-slate-500">Add a new season (placement or internship) with start and end dates.</p>
+          <form onSubmit={handleCreateSeason} className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <select
+                value={seasonForm.academicYear}
+                onChange={(event) =>
+                  setSeasonForm((prev) => ({ ...prev, academicYear: event.target.value }))
+                }
+                className="input-base"
+              >
+                {ACADEMIC_YEAR_OPTIONS.map((yearOption) => (
+                  <option key={yearOption} value={yearOption}>
+                    {yearOption}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={seasonForm.seasonType}
+                onChange={(event) =>
+                  setSeasonForm((prev) => ({
+                    ...prev,
+                    seasonType: event.target.value as "placement" | "intern",
+                  }))
+                }
+                className="input-base"
+              >
+                <option value="placement">Placement</option>
+                <option value="intern">Internship</option>
+              </select>
+              <input
+                type="date"
+                value={seasonForm.startDate}
+                onChange={(event) =>
+                  setSeasonForm((prev) => ({ ...prev, startDate: event.target.value }))
+                }
+                className="input-base"
+              />
+              <input
+                type="date"
+                value={seasonForm.endDate}
+                onChange={(event) =>
+                  setSeasonForm((prev) => ({ ...prev, endDate: event.target.value }))
+                }
+                className="input-base"
+              />
+              <label className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={seasonForm.isActive}
+                  onChange={(event) =>
+                    setSeasonForm((prev) => ({ ...prev, isActive: event.target.checked }))
+                  }
+                />
+                Active season
+              </label>
+            </div>
             <button
-              type="button"
-              onClick={() => void handleExport("users")}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+              type="submit"
+              disabled={creatingSeason}
+              className="btn btn-primary"
             >
-              <Download className="h-4 w-4" />
-              Export Users
+              {creatingSeason ? "Creating..." : "Create Season"}
             </button>
-            <button
-              type="button"
-              onClick={() => void handleExport("seasons")}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
-            >
-              <Download className="h-4 w-4" />
-              Export Seasons
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleExport("schedules")}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
-            >
-              <Download className="h-4 w-4" />
-              Export Schedules
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleBackup()}
-              className="inline-flex items-center gap-2 rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-800"
-            >
-              <Shield className="h-4 w-4" />
-              Generate Backup
-            </button>
-          </div>
+          </form>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="mb-3 text-base font-semibold text-slate-900">Schedules and Timeline</h2>
-          <p className="mb-3 text-sm text-slate-600">
-            Latest schedule entries and quick jump to full schedule management.
-          </p>
-          <div className="space-y-2">
-            {overview?.recentSchedules.length ? (
-              overview.recentSchedules.map((schedule) => (
-                <div key={schedule.id} className="rounded-md border border-slate-200 px-3 py-2 text-sm">
-                  <p className="font-medium text-slate-900">{schedule.title}</p>
-                  <p className="text-xs text-slate-600">{schedule.company.name}</p>
-                  <p className="text-xs text-slate-500">
-                    {formatDateTime(schedule.startTime)} - {formatDateTime(schedule.endTime)} ({schedule.status})
-                  </p>
+        <div className="overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-50 p-4">
+          <h2 className="mb-3 text-sm font-semibold text-slate-900">All Seasons</h2>
+          <p className="mb-4 text-sm text-slate-500">View and manage all recruitment seasons.</p>
+
+          <div className="space-y-3">
+            {allSeasons.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-8 text-center text-sm text-slate-500">
+                No seasons found.
+              </p>
+            ) : (
+              allSeasons.map((season) => (
+                <div key={season.id} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-4 py-3 transition-colors hover:border-slate-300">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-900">{season.name}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                      <span className="capitalize">{season.seasonType}</span>
+                      <span>·</span>
+                      <span>{season.academicYear}</span>
+                      {season.startDate && season.endDate ? (
+                        <>
+                          <span>·</span>
+                          <span>
+                            {new Date(season.startDate).toLocaleDateString()} - {new Date(season.endDate).toLocaleDateString()}
+                          </span>
+                        </>
+                      ) : null}
+                      <span className={`ml-2 rounded px-1.5 py-0.5 ${season.isActive ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
+                        {season.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleToggleSeasonStatus(season.id, season.isActive)}
+                      disabled={updatingSeasonId === season.id}
+                      className={`btn btn-sm shrink-0 ${season.isActive ? "btn-secondary" : "btn-primary"}`}
+                      title={season.isActive ? "Deactivate season" : "Activate season"}
+                    >
+                      {season.isActive ? "Deactivate" : "Activate"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDeleteSeason(season.id)}
+                      disabled={deletingSeasonId === season.id}
+                      className="shrink-0 rounded-lg border border-rose-200 p-2 text-rose-500 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                      title="Delete season"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))
-            ) : (
-              <p className="text-sm text-slate-500">No schedules found.</p>
             )}
           </div>
-          <Link
-            href="/calender"
-            className="mt-3 inline-flex items-center gap-2 rounded-md border border-blue-300 px-3 py-2 text-sm text-blue-700 hover:bg-blue-50"
-          >
-            View Admin Calendar
-          </Link>
         </div>
       </div>
+      )}
 
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+      {/* REPORTS TAB */}
+      {activeTab === "reports" && (
+      <div className="overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-50 p-4 animate-fade-in">
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Export Reports & Backup</h2>
+        <p className="mb-4 text-sm text-slate-500">
+          Export users, seasons, and schedules as CSV. Generate a JSON backup snapshot.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button type="button" onClick={() => void handleExport("users")} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors">
+            <Download className="h-4 w-4" /> Export Users
+          </button>
+          <button type="button" onClick={() => void handleExport("seasons")} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors">
+            <Download className="h-4 w-4" /> Export Seasons
+          </button>
+          <button type="button" onClick={() => void handleExport("schedules")} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 transition-colors">
+            <Download className="h-4 w-4" /> Export Schedules
+          </button>
+          <button type="button" onClick={() => void handleBackup()} className="btn btn-primary">
+            <Shield className="h-4 w-4" /> Generate Backup
+          </button>
+        </div>
+      </div>
+      )}
+
+      {/* LOGS TAB */}
+      {activeTab === "logs" && (
+      <div className="overflow-hidden rounded-lg border-2 border-slate-300 bg-slate-50 p-4 animate-fade-in">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">System Logs</h2>
-            <p className="text-sm text-slate-600">Grouped timeline of recent administrative actions.</p>
+            <h2 className="text-sm font-semibold text-slate-900">System Audit Logs</h2>
+            <p className="mt-0.5 text-sm text-slate-500">Grouped timeline of recent administrative actions.</p>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <span className="rounded-full bg-slate-100 px-2 py-1 text-slate-700">{logs.length} events</span>
-            <span className="rounded-full bg-blue-100 px-2 py-1 text-blue-700">{groupedLogs.length} day groups</span>
-            <span className="rounded-full bg-violet-100 px-2 py-1 text-violet-700">{uniqueActors} actors</span>
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">{logs.length} events</span>
+            <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700">{groupedLogs.length} days</span>
+            <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">{uniqueActors} actors</span>
           </div>
         </div>
 
-        <div className="max-h-[30rem] space-y-3 overflow-y-auto pr-1">
+        <div className="space-y-3">
           {groupedLogs.length ? (
             groupedLogs.map((group) => (
-              <div key={group.dateKey} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{group.label}</p>
-                  <span className="text-xs text-slate-500">{group.logs.length} event{group.logs.length === 1 ? "" : "s"}</span>
+              <div key={group.dateKey} className="rounded-lg border border-slate-200 bg-white p-3">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{group.label}</p>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{group.logs.length} event{group.logs.length === 1 ? "" : "s"}</span>
                 </div>
 
                 <div className="space-y-2">
                   {group.logs.map((log) => (
-                    <div key={log.id} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div key={log.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${logActionTone(log.action)}`}>
                           {formatRole(log.action)}
@@ -1243,7 +1229,7 @@ export default function AdminDashboardClient() {
                       <p className="mt-1 text-xs text-slate-600">
                         {log.actor ? `${log.actor.name} (${log.actor.email})` : "System"}
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-slate-400">
                         Target: {log.targetType ?? "n/a"} {log.targetId ?? ""}
                       </p>
                     </div>
@@ -1252,18 +1238,19 @@ export default function AdminDashboardClient() {
               </div>
             ))
           ) : (
-            <div className="inline-flex items-center gap-2 text-sm text-slate-500">
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
               <AlertCircle className="h-4 w-4" />
               No audit logs available.
             </div>
           )}
         </div>
       </div>
+      )}
 
       {showActiveSeasonsWindow ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-          <div className="max-h-[80vh] w-full max-w-3xl overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="max-h-[80vh] w-full max-w-3xl overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-xl animate-scale-up">
+            <div className="flex items-center justify-between border-b border-[#E2E8F0] px-5 py-4">
               <div>
                 <h3 className="text-base font-semibold text-slate-900">Active Seasons</h3>
                 <p className="text-xs text-slate-500">
@@ -1273,23 +1260,23 @@ export default function AdminDashboardClient() {
               <button
                 type="button"
                 onClick={() => setShowActiveSeasonsWindow(false)}
-                className="rounded-md border border-slate-300 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                className="rounded-lg px-3 py-1.5 text-xs text-slate-700 transition-colors hover:bg-slate-100"
               >
                 Close
               </button>
             </div>
 
-            <div className="max-h-[64vh] space-y-2 overflow-y-auto p-4">
+            <div className="max-h-[64vh] space-y-2 overflow-y-auto p-5">
               {activeSeasons.length === 0 ? (
-                <p className="rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500">
+                <p className="rounded-lg border border-dashed border-slate-300 px-3 py-8 text-center text-sm text-slate-500">
                   No active seasons found.
                 </p>
               ) : (
                 activeSeasons.map((season) => (
-                  <div key={season.id} className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div key={season.id} className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                     <p className="text-sm font-medium text-slate-900">{season.name}</p>
-                    <p className="text-xs text-slate-600">
-                      {formatRole(season.seasonType)} • {season.academicYear}
+                    <p className="text-xs text-slate-500">
+                      {formatRole(season.seasonType)} Â· {season.academicYear}
                     </p>
                   </div>
                 ))

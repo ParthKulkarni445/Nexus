@@ -73,6 +73,9 @@ function mapBlog(blog: BlogRecord, currentUserId?: string): BlogPost {
 
 export default async function BlogsPage() {
   const currentUser = await getCurrentUser();
+  const canDeleteBlogs = currentUser
+    ? hasRole(currentUser, ["tpo_admin"])
+    : false;
 
   const [publishedBlogs, companies] = await Promise.all([
     db.blog.findMany({
@@ -126,6 +129,7 @@ export default async function BlogsPage() {
       initialCompanies={initialCompanies}
       initialModerationQueue={moderationQueue}
       initialCanViewModeration={canViewModeration}
+      allowDelete={canDeleteBlogs}
     />
   );
 }

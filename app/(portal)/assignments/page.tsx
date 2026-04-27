@@ -525,15 +525,11 @@ export default function AssignmentsPage() {
       setUnassignedCycles(response.unassignedCycles);
       setCompanies(response.companies);
       setSelectedSeasonId((current) => {
-        if (current && seasonList.some((season) => season.id === current)) {
+        const activeSeasons = seasonList.filter((s) => s.isActive);
+        if (current && activeSeasons.some((season) => season.id === current)) {
           return current;
         }
-
-        return (
-          seasonList.find((season) => season.isActive)?.id ??
-          seasonList[0]?.id ??
-          ""
-        );
+        return activeSeasons[0]?.id ?? "";
       });
     } catch (error) {
       setLoadError(
@@ -609,10 +605,12 @@ export default function AssignmentsPage() {
 
   const seasonOptions = useMemo(
     () =>
-      seasons.map((season) => ({
-        value: season.id,
-        label: `${season.name} (${season.academicYear})`,
-      })),
+      seasons
+        .filter((season) => season.isActive)
+        .map((season) => ({
+          value: season.id,
+          label: `${season.name} (${season.academicYear})`,
+        })),
     [seasons],
   );
 
@@ -1047,7 +1045,7 @@ export default function AssignmentsPage() {
   return (
     <div className="-mt-6 xl:mt-0 space-y-5 pl-4 pr-4 pb-6 animate-fade-in">
       {loadError && (
-        <div className="card px-4 py-3 border border-red-200 bg-red-50/60">
+        <div className="px-4 py-3 border-2 border-red-300 bg-red-50/60 rounded-lg">
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium text-red-700">{loadError}</p>
             <button
@@ -1062,27 +1060,22 @@ export default function AssignmentsPage() {
 
       <div className="flex flex-col gap-5 pt-6 xl:flex-row xl:items-start">
         <div className="min-w-0 flex-1 space-y-5">
-          <div className="card overflow-visible flex flex-col">
-            <div className="px-4 py-3 border-b border-(--card-border)">
-              <div
-                className={`flex gap-2 items-center ${
-                  tab === "assigned" ? "flex-col xl:flex-row xl:flex-wrap" : ""
-                }`}
-              >
-                <select
-                  className={`input-base min-w-0 ${
-                    tab === "assigned" ? "xl:min-w-65 xl:max-w-80" : "flex-1"
-                  }`}
+          <div className="overflow-visible flex flex-col">
+            <div className="px-0 py-0">
+              {/* Primary controls row */}
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center mb-3">
+                <FilterSelect
                   value={selectedSeasonId}
-                  onChange={(event) => setSelectedSeasonId(event.target.value)}
-                >
-                  <option value="">Select season</option>
-                  {seasonOptions.map((season) => (
-                    <option key={season.value} value={season.value}>
-                      {season.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSelectedSeasonId}
+                  options={seasonOptions}
+                  placeholder="Select season"
+                  className="w-full"
+                  inputClassName="border-2! border-slate-200!"
+                />
+              </div>
+
+              {/* Secondary controls row */}
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:gap-2">
                 <SearchBar
                   value={search}
                   onChange={setSearch}
@@ -1093,105 +1086,117 @@ export default function AssignmentsPage() {
                         ? "Search inactive company..."
                         : "Search company..."
                   }
-                  className={`min-w-0 ${
-                    tab === "assigned"
-                      ? "xl:min-w-[320px] xl:flex-[1.2]"
-                      : "flex-1"
-                  }`}
+                  className="min-w-0 w-full sm:flex-1"
+                  inputClassName="border-2! border-slate-200!"
                 />
 
-                {tab === "assigned" && (
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:flex xl:w-auto xl:shrink-0">
-                    <FilterSelect
-                      multiple
-                      value={statusFilter}
-                      onChange={setStatusFilter}
-                      options={STATUS_OPTIONS}
-                      placeholder="Status"
-                      className="z-20 w-full xl:w-44"
-                    />
-                    <FilterSelect
-                      multiple
-                      value={coordinatorFilter}
-                      onChange={setCoordinatorFilter}
-                      options={coordinatorOptions}
-                      placeholder="Coordinator"
-                      className="z-20 w-full xl:w-44"
-                    />
+                <div className="flex w-full items-center gap-2 sm:w-auto sm:shrink-0">
+                  {tab === "assigned" && (
+                    <>
+                      <FilterSelect
+                        multiple
+                        value={statusFilter}
+                        onChange={setStatusFilter}
+                        options={STATUS_OPTIONS}
+                        placeholder="Status"
+                        className="z-20 w-full sm:w-36"
+                        inputClassName="border-2! border-slate-200!"
+                      />
+                      <FilterSelect
+                        multiple
+                        value={coordinatorFilter}
+                        onChange={setCoordinatorFilter}
+                        options={coordinatorOptions}
+                        placeholder="Coordinator"
+                        className="z-20 w-full sm:w-36"
+                        inputClassName="border-2! border-slate-200!"
+                      />
+                      {activeFilterCount > 0 && (
+                        <button
+                          className="btn btn-ghost btn-sm shrink-0 text-slate-500 hover:text-slate-700 text-xs"
+                          onClick={() => {
+                            setStatusFilter([]);
+                            setCoordinatorFilter([]);
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </>
+                  )}
+
+                  {tab === "inactive" && (
+                    <>
+                      <FilterSelect
+                        multiple
+                        value={priorityFilter}
+                        onChange={setPriorityFilter}
+                        options={PRIORITY_OPTIONS}
+                        placeholder="Priority"
+                        className="z-20 w-full sm:w-36"
+                        inputClassName="border-2! border-slate-200!"
+                      />
+                      {activeFilterCount > 0 && (
+                        <button
+                          className="btn btn-ghost btn-sm shrink-0 text-slate-500 hover:text-slate-700 text-xs"
+                          onClick={() => {
+                            setPriorityFilter([]);
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {(tab === "unassigned" && selectedUnassigned.size > 0) ||
+                (tab === "inactive" && selectedInactive.size > 0) ? (
+                  <div className="flex w-full gap-2 sm:ml-auto sm:w-auto sm:shrink-0">
+                    {tab === "unassigned" && selectedUnassigned.size > 0 && (
+                      <button
+                        className="btn btn-secondary btn-sm gap-1 flex-1 sm:flex-none"
+                        onClick={() =>
+                          setAssignModal({
+                            companies: unassignedCycles.filter((company) =>
+                              selectedUnassigned.has(
+                                company.companySeasonCycleId,
+                              ),
+                            ),
+                            bulk: selectedUnassigned.size > 1,
+                          })
+                        }
+                      >
+                        <UserPlus size={14} />
+                        Bulk Assign ({selectedUnassigned.size})
+                      </button>
+                    )}
+
+                    {tab === "inactive" && selectedInactive.size > 0 && (
+                      <button
+                        className="btn btn-secondary btn-sm gap-1 flex-1 sm:flex-none"
+                        disabled={!selectedSeasonId || isBulkActivateSubmitting}
+                        onClick={() =>
+                          void handleActivate(
+                            Array.from(selectedInactive),
+                            "bulk",
+                          )
+                        }
+                      >
+                        <Power size={14} />
+                        {isBulkActivateSubmitting
+                          ? "Activating..."
+                          : `Bulk Activate (${selectedInactive.size})`}
+                      </button>
+                    )}
                   </div>
-                )}
-
-                {tab === "inactive" && (
-                  <FilterSelect
-                    multiple
-                    value={priorityFilter}
-                    onChange={setPriorityFilter}
-                    options={PRIORITY_OPTIONS}
-                    placeholder="Priority"
-                    className="z-20 w-full sm:w-44 xl:shrink-0"
-                  />
-                )}
-
-                {tab === "assigned" && activeFilterCount > 0 && (
-                  <button
-                    className="btn btn-ghost btn-sm shrink-0 self-start text-slate-500 hover:text-slate-700 xl:self-auto"
-                    onClick={() => {
-                      setStatusFilter([]);
-                      setCoordinatorFilter([]);
-                    }}
-                  >
-                    Clear all
-                  </button>
-                )}
-
-                {tab === "inactive" && activeFilterCount > 0 && (
-                  <button
-                    className="btn btn-ghost btn-sm shrink-0 self-start text-slate-500 hover:text-slate-700 xl:self-auto"
-                    onClick={() => {
-                      setPriorityFilter([]);
-                    }}
-                  >
-                    Clear all
-                  </button>
-                )}
-
-                {tab === "unassigned" && selectedUnassigned.size > 0 && (
-                  <button
-                    className="btn btn-secondary btn-sm gap-1 shrink-0"
-                    onClick={() =>
-                      setAssignModal({
-                        companies: unassignedCycles.filter((company) =>
-                          selectedUnassigned.has(company.companySeasonCycleId),
-                        ),
-                        bulk: selectedUnassigned.size > 1,
-                      })
-                    }
-                  >
-                    <UserPlus size={14} />
-                    Bulk Assign ({selectedUnassigned.size})
-                  </button>
-                )}
-
-                {tab === "inactive" && selectedInactive.size > 0 && (
-                  <button
-                    className="btn btn-secondary btn-sm gap-1 shrink-0"
-                    disabled={!selectedSeasonId || isBulkActivateSubmitting}
-                    onClick={() =>
-                      void handleActivate(Array.from(selectedInactive), "bulk")
-                    }
-                  >
-                    <Power size={14} />
-                    {isBulkActivateSubmitting
-                      ? "Activating..."
-                      : `Bulk Activate (${selectedInactive.size})`}
-                  </button>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
 
-          <div className="card overflow-hidden">
-            <div className="border-b border-[#DBEAFE] flex items-center justify-between px-4">
+          <div className="overflow-hidden rounded-lg border-2 border-slate-200 bg-slate-50/70">
+            <div className="border-b border-slate-200 flex items-center justify-between px-4 bg-slate-100/80">
               <div className="flex">
                 {tabs.map((tabItem) => (
                   <button
@@ -1200,8 +1205,8 @@ export default function AssignmentsPage() {
                     className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all
                       ${
                         tab === tabItem.key
-                          ? "border-[#2563EB] text-[#2563EB]"
-                          : "border-transparent text-slate-500 hover:text-slate-800"
+                          ? "border-[#2563EB] bg-white/90 text-[#2563EB]"
+                          : "border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300"
                       }`}
                   >
                     {tabItem.label}
@@ -1241,7 +1246,7 @@ export default function AssignmentsPage() {
             </div>
 
             {tab === "assigned" && (
-              <div className="p-4 space-y-3">
+              <div className="bg-slate-50/70 p-4 space-y-3">
                 {isLoading ? (
                   <AssignedGroupsSkeleton groups={5} rowsPerGroup={3} />
                 ) : Object.keys(groupedByCoordinator).length === 0 ? (
@@ -1266,10 +1271,10 @@ export default function AssignmentsPage() {
                         return (
                           <div
                             key={coordinatorName}
-                            className="border border-[#DBEAFE] rounded-xl overflow-hidden"
+                            className="overflow-hidden rounded-xl border border-slate-200 bg-white/90"
                           >
                             <button
-                              className="w-full flex items-center justify-between px-4 py-3 bg-slate-100 transition-colors"
+                              className="w-full flex items-center justify-between px-4 py-3 bg-slate-100/80 hover:bg-slate-200/70 transition-colors"
                               onClick={() => toggleGroup(coordinatorName)}
                             >
                               <div className="flex items-center gap-3 min-w-0">
@@ -1315,13 +1320,13 @@ export default function AssignmentsPage() {
                             </button>
 
                             {expandedGroups.has(coordinatorName) && (
-                              <div className="divide-y divide-[#EFF6FF]">
+                              <div className="divide-y divide-slate-200">
                                 {entries.map((assignment) => (
                                   <div
                                     key={assignment.companySeasonCycleId}
-                                    className="flex items-center gap-5 px-4 py-3 hover:bg-[#F5F9FF] transition-colors"
+                                    className="flex items-center gap-5 px-4 py-3 hover:bg-slate-50 transition-colors"
                                   >
-                                    <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 text-xs font-semibold shrink-0">
                                       {assignment.companyName.charAt(0)}
                                     </div>
                                     <div className="flex-1 min-w-0">
@@ -1385,7 +1390,7 @@ export default function AssignmentsPage() {
                   filteredUnassigned.map((company) => (
                     <div
                       key={company.companySeasonCycleId}
-                      className="flex items-center gap-4 p-3 border border-[#DBEAFE] rounded-xl hover:bg-[#F5F9FF] transition-colors group"
+                      className="flex items-center gap-4 p-3 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors group"
                     >
                       <button
                         onClick={() =>
@@ -1401,7 +1406,7 @@ export default function AssignmentsPage() {
                           <div className="w-4 h-4 rounded border border-slate-300 group-hover:border-[#3B82F6]" />
                         )}
                       </button>
-                      <div className="w-8 h-8 rounded-lg bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-[#1D4ED8] text-xs font-semibold shrink-0">
                         {company.companyName.charAt(0)}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -1452,7 +1457,7 @@ export default function AssignmentsPage() {
             {tab === "inactive" && (
               <div className="p-4 space-y-2">
                 {isLoading ? (
-                  <UnassignedListSkeleton />
+                  <UnassignedListSkeleton/>
                 ) : !selectedSeasonId ? (
                   <EmptyState
                     icon={Users}
@@ -1541,11 +1546,10 @@ export default function AssignmentsPage() {
           className="w-full xl:w-80 xl:self-start xl:sticky"
           style={{ top: `${stickyTop}px` }}
         >
-          <div className="card overflow-hidden border border-(--card-border)">
+          <div className="overflow-hidden rounded-lg border-2 border-slate-200">
             <div
-              className="px-4 py-3 border-b"
+              className="px-4 py-3 border-b border-slate-200"
               style={{
-                borderColor: "var(--card-border)",
                 background: "#2563EB",
               }}
             >
@@ -1572,7 +1576,7 @@ export default function AssignmentsPage() {
             ) : (
               <>
                 <div className="xl:hidden">
-                  <div className="grid grid-cols-1 divide-y divide-(--card-border)">
+                  <div className="grid grid-cols-1 divide-y divide-slate-200">
                     <div className="flex flex-col items-center justify-center gap-2 py-4">
                       <div className="relative flex items-center justify-center">
                         <svg width="116" height="116" viewBox="0 0 116 116">
@@ -1669,36 +1673,38 @@ export default function AssignmentsPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-col divide-y divide-(--card-border)">
-                    {statsCardItems.map(({ label, value }) => (
-                      <div
-                        key={`${label}-mobile`}
-                        className="flex items-center gap-2 px-3 py-2.5 flex-1"
-                      >
+                  <div className="flex flex-col divide-y divide-slate-200">
+                    {statsCardItems.map(({ label, value }) => {
+                      return (
                         <div
-                          className="w-1 self-stretch rounded-full shrink-0 my-0.5"
-                          style={{ background: "#2563EB" }}
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className="text-[12px] font-bold uppercase tracking-wider leading-none"
-                            style={{ color: "#2563EB" }}
-                          >
-                            {label}
-                          </p>
-                        </div>
-                        <span
-                          className="text-xl font-extrabold shrink-0"
-                          style={{ color: "#2563EB" }}
+                          key={`${label}-mobile`}
+                          className="flex items-center gap-2 px-3 py-2.5 flex-1 bg-slate-100"
                         >
-                          {value}
-                        </span>
-                      </div>
-                    ))}
+                          <div
+                            className="w-1 self-stretch rounded-full shrink-0 my-0.5"
+                            style={{ background: "#2563EB" }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p
+                              className="text-[12px] font-bold uppercase tracking-wider leading-none"
+                              style={{ color: "#334155" }}
+                            >
+                              {label}
+                            </p>
+                          </div>
+                          <span
+                            className="text-xl font-extrabold shrink-0"
+                            style={{ color: "#334155" }}
+                          >
+                            {value}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="hidden xl:flex flex-col items-center pt-6 pb-5 px-4 gap-1 border-b border-(--card-border)">
+                <div className="hidden xl:flex flex-col items-center pt-6 pb-5 px-4 gap-1 border-b border-slate-200">
                   <div className="relative flex items-center justify-center">
                     <svg width="116" height="116" viewBox="0 0 116 116">
                       <circle cx="58" cy="58" r={r + 6} fill="#EFF6FF" />
@@ -1794,39 +1800,31 @@ export default function AssignmentsPage() {
                   </p>
                 </div>
 
-                <div className="hidden xl:flex xl:flex-col xl:flex-1 gap-5 px-3 pb-3">
-                  {statsCardItems.map(({ label, value, sub }) => (
-                    <div
-                      key={label}
-                      className="flex items-center gap-3 px-3 flex-1 rounded-lg"
-                      style={{ background: "#3B82F6" }}
-                    >
+                <div className="hidden xl:flex xl:flex-col xl:flex-1 gap-3 px-3 pb-3">
+                  {statsCardItems.map(({ label, value, sub }) => {
+                    return (
                       <div
-                        className="w-1 self-stretch rounded-full shrink-0 my-3"
-                        style={{ background: "#FFFFFF" }}
-                      />
-                      <div className="flex-1 min-w-0 py-3">
-                        <p
-                          className="text-[18px] font-bold uppercase tracking-wider leading-none"
-                          style={{ color: "#FFFFFF" }}
-                        >
-                          {label}
-                        </p>
-                        <p
-                          className="text-[13px] font-bold mt-0.5"
-                          style={{ color: "#000000" }}
-                        >
-                          {sub}
-                        </p>
-                      </div>
-                      <span
-                        className="text-2xl font-extrabold shrink-0"
-                        style={{ color: "#FFFFFF" }}
+                        key={label}
+                        className="flex items-center gap-3 px-3 flex-1 rounded-lg border border-slate-200 transition-colors bg-slate-100"
                       >
-                        {value}
-                      </span>
-                    </div>
-                  ))}
+                        <div
+                          className="w-1 self-stretch rounded-full shrink-0 my-3"
+                          style={{ background: "#2563EB" }}
+                        />
+                        <div className="flex-1 min-w-0 py-3">
+                          <p className="text-[12px] font-bold uppercase tracking-wider leading-none text-slate-700">
+                            {label}
+                          </p>
+                          <p className="text-[12px] font-medium mt-0.5 text-slate-700">
+                            {sub}
+                          </p>
+                        </div>
+                        <span className="text-2xl font-extrabold shrink-0 text-slate-700">
+                          {value}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </>
             )}

@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import TopNav from "./Sidebar";
+import { useState } from "react";
+import PortalSidebar, { PortalTopBar } from "./Sidebar";
 
 type ShellUser = {
   id: string;
@@ -17,12 +18,25 @@ export default function Shell({
   children: React.ReactNode;
   currentUser: ShellUser;
 }) {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <TopNav currentUser={currentUser} />
-      <main className="flex-1 overflow-y-auto flex flex-col w-full max-w-screen-2xl mx-auto px-4 lg:px-6 pt-6 pb-6 xl:pt-0 xl:pb-0">
-        {children}
-      </main>
+    <div className="min-h-screen lg:flex">
+      <PortalSidebar
+        currentUser={currentUser}
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+      />
+      <div
+        className={`ml-18 flex min-w-0 flex-1 flex-col transition-[margin-left] duration-200 ${
+          sidebarCollapsed ? "lg:ml-18" : "lg:ml-72"
+        }`}
+      >
+        <PortalTopBar currentUser={currentUser} />
+        <main className="flex-1 overflow-y-auto flex flex-col w-full px-4 lg:px-6">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

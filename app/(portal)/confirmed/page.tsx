@@ -857,7 +857,7 @@ export default function ConfirmedPage() {
 
   const seasonOptions = useMemo(
     () =>
-      seasons.map((season) => ({
+      seasons.filter((season) => season.isActive).map((season) => ({
         value: season.id,
         label: `${season.name} (${season.academicYear})`,
       })),

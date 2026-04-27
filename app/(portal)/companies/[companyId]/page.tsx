@@ -285,7 +285,7 @@ function ContactCard({
   onDelete: () => void;
 }) {
   return (
-    <div className="card p-4 space-y-3">
+    <div className="space-y-3 py-4 border-b border-slate-200 last:border-b-0">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-semibold text-sm shrink-0">
@@ -309,7 +309,7 @@ function ContactCard({
           </button>
           <button
             onClick={onDelete}
-            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-blue-500"
+            className="btn btn-ghost btn-sm btn-icon text-slate-400 hover:text-red-500"
           >
             <Trash2 size={14} />
           </button>
@@ -361,8 +361,8 @@ function ContactCard({
         )}
       </div>
 
-      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+      <div className="flex items-center justify-between pt-2">
+        <div className="flex items-center gap-1.5 text-xs text-slate-500">
           <Clock size={11} />
           <span>
             Last contacted:{" "}
@@ -387,7 +387,7 @@ function ContactCard({
       </div>
 
       {contact.notes && (
-        <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+        <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100 mt-2">
           {contact.notes}
         </p>
       )}
@@ -397,16 +397,14 @@ function ContactCard({
 
 function DetailPageSkeleton() {
   return (
-    <div className="space-y-5 animate-fade-in p-4 lg:p-6 xl:h-full xl:overflow-y-auto">
-      <div className="card inline-flex w-fit items-center gap-2 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="shimmer h-4 w-24 rounded-full" />
-          <div className="shimmer h-4 w-4 rounded-full" />
-          <div className="shimmer h-4 w-36 rounded-full" />
-        </div>
+    <div className="space-y-5 animate-fade-in bg-white px-5 py-5 sm:px-6 lg:px-8 xl:h-full xl:overflow-y-auto">
+      <div className="flex items-center gap-2 text-sm pb-4 border-b border-slate-200">
+        <div className="shimmer h-4 w-24 rounded-full" />
+        <div className="shimmer h-4 w-4 rounded-full" />
+        <div className="shimmer h-4 w-36 rounded-full" />
       </div>
 
-      <div className="card p-5 sm:p-6">
+      <div className="pb-6 border-b border-slate-200">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="shimmer h-14 w-14 rounded-2xl" />
           <div className="flex-1 space-y-3">
@@ -426,15 +424,18 @@ function DetailPageSkeleton() {
         </div>
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="flex gap-4 border-b border-slate-100 px-5 py-4">
+      <div>
+        <div className="flex gap-4 border-b border-slate-200 pb-4 mb-6">
           <div className="shimmer h-5 w-24 rounded-full" />
           <div className="shimmer h-5 w-28 rounded-full" />
           <div className="shimmer h-5 w-24 rounded-full" />
         </div>
-        <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3 sm:p-5">
-          {Array.from({ length: 6 }, (_, index) => (
-            <div key={index} className="card p-4 space-y-3">
+        <div className="space-y-4">
+          {Array.from({ length: 3 }, (_, index) => (
+            <div
+              key={index}
+              className="space-y-3 py-4 border-b border-slate-200"
+            >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="shimmer h-10 w-10 rounded-full" />
@@ -448,9 +449,7 @@ function DetailPageSkeleton() {
               <div className="space-y-2">
                 <div className="shimmer h-4 w-40 rounded-full" />
                 <div className="shimmer h-4 w-32 rounded-full" />
-                <div className="shimmer h-4 w-36 rounded-full" />
               </div>
-              <div className="shimmer h-12 w-full rounded-xl" />
             </div>
           ))}
         </div>
@@ -869,7 +868,7 @@ export default function CompanyDetailPage() {
 
   if (pageError || !company) {
     return (
-      <div className="p-6">
+      <div className="bg-white px-5 py-6 sm:px-6 lg:px-8">
         <EmptyState
           icon={AlertTriangle}
           title="Unable to load company"
@@ -886,47 +885,46 @@ export default function CompanyDetailPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6 space-y-5 animate-fade-in xl:h-full xl:overflow-y-auto">
-      <div className="card inline-flex w-fit items-center gap-2 px-4 py-3 text-sm text-slate-500">
-        <div className="flex items-center gap-2">
-          <Link
-            href="/companies"
-            className="hover:text-[#2563EB] transition-colors flex items-center gap-1"
-          >
-            <ArrowLeft size={14} />
-            Companies
-          </Link>
-          <ChevronRight size={14} />
-          <span className="text-slate-900 font-medium">{company.name}</span>
-        </div>
+    <div className="animate-fade-in space-y-5 bg-white px-5 py-5 sm:px-6 lg:px-8 xl:h-full xl:overflow-y-auto">
+      <div className="flex items-center gap-2 text-sm pb-4 border-b border-slate-200">
+        <Link
+          href="/companies"
+          className="text-[#2563EB] hover:underline font-medium flex items-center gap-1"
+        >
+          <ArrowLeft size={14} />
+          Companies
+        </Link>
+        <ChevronRight size={14} className="text-slate-400" />
+        <span className="text-slate-900 font-medium">{company.name}</span>
       </div>
 
-      <div className="card p-5 sm:p-6">
+      <div className="pb-6 border-b border-slate-200">
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
           <div className="w-14 h-14 rounded-2xl bg-[#EFF6FF] border border-[#DBEAFE] flex items-center justify-center text-[#1D4ED8] font-bold text-xl shrink-0">
             {company.name.charAt(0)}
           </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-wrap">
+            <div className="space-y-2">
               <h2 className="text-xl font-bold text-slate-900">
                 {company.name}
               </h2>
-              <StatusBadge status={company.status} />
-              <Badge
-                variant={
-                  company.priority === "high"
-                    ? "danger"
-                    : company.priority === "medium"
-                      ? "warning"
-                      : "gray"
-                }
-                size="sm"
-              >
-                {company.priority.charAt(0).toUpperCase() +
-                  company.priority.slice(1)}{" "}
-                Priority
-              </Badge>
+              <div className="flex w-fit items-center gap-2">
+                <StatusBadge status={company.status} />
+                <Badge
+                  variant={
+                    company.priority === "high"
+                      ? "danger"
+                      : company.priority === "medium"
+                        ? "warning"
+                        : "gray"
+                  }
+                  size="sm"
+                >
+                  {company.priority.charAt(0).toUpperCase() +
+                    company.priority.slice(1)}
+                </Badge>
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-4 mt-3">
@@ -981,8 +979,8 @@ export default function CompanyDetailPage() {
         </div>
       </div>
 
-      <div className="card overflow-hidden">
-        <div className="border-b border-slate-100 flex overflow-x-auto">
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80">
+        <div className="flex overflow-x-auto border-b border-slate-200 bg-slate-100/80">
           {TABS.map((item) => (
             <button
               key={item.key}
@@ -990,8 +988,8 @@ export default function CompanyDetailPage() {
               className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition-all
                 ${
                   tab === item.key
-                    ? "border-[#2563EB] text-[#2563EB]"
-                    : "border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-200"
+                    ? "border-[#2563EB] bg-white/90 text-[#2563EB]"
+                    : "border-transparent text-slate-600 hover:text-slate-800 hover:border-slate-300"
                 }`}
             >
               {item.label}
@@ -1006,10 +1004,10 @@ export default function CompanyDetailPage() {
         </div>
 
         {tab === "contacts" && (
-          <div className="p-4 sm:p-5 space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="bg-slate-50/70 p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-6">
               <p className="text-sm font-medium text-slate-700">
-                HR & Recruitment Contacts
+                Contact List
               </p>
               <button
                 className="btn btn-primary btn-sm"
@@ -1031,7 +1029,7 @@ export default function CompanyDetailPage() {
                 description="Add the first recruiter contact for this company"
               />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="space-y-0 divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white/90 px-4">
                 {contacts.map((contact) => (
                   <ContactCard
                     key={contact.id}
@@ -1054,7 +1052,7 @@ export default function CompanyDetailPage() {
         )}
 
         {tab === "history" && (
-          <div className="p-4 sm:p-5">
+          <div className="bg-slate-50/70 p-4 sm:p-5">
             {statusHistory.length === 0 ? (
               <EmptyState
                 icon={Clock}
@@ -1062,7 +1060,7 @@ export default function CompanyDetailPage() {
                 description="Status transitions will appear here"
               />
             ) : (
-              <div className="space-y-0">
+              <div className="space-y-0 rounded-xl border border-slate-200 bg-white/90 p-4">
                 {statusHistory.map((history, index) => {
                   const Icon = ICON_MAP[history.status] ?? Clock;
                   const isLast = index === statusHistory.length - 1;
@@ -1122,29 +1120,19 @@ export default function CompanyDetailPage() {
         )}
 
         {tab === "assignments" && (
-          <div className="p-4 sm:p-5 space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-              <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-100">
-                <p className="text-sm font-medium text-slate-700">
-                  Season Owners
-                </p>
-                <span className="text-xs text-slate-500">
-                  {assignments.length} coordinator
-                  {assignments.length === 1 ? "" : "s"}
-                </span>
-              </div>
+          <div className="bg-slate-50/70 p-3 sm:p-4">
 
-              {assignments.length === 0 ? (
-                <div className="px-4 sm:px-6 py-4 sm:py-5">
-                  <EmptyState
-                    icon={Users}
-                    title="No season owners"
-                    description="Season-cycle ownership will appear here"
-                  />
-                </div>
-              ) : (
-                <>
-                  <div className="hidden xl:grid xl:grid-cols-[minmax(230px,1.15fr)_minmax(190px,0.95fr)_minmax(260px,1.15fr)_minmax(230px,1fr)_minmax(120px,0.6fr)] xl:gap-6 xl:px-6 xl:py-3 xl:text-xs xl:font-semibold xl:uppercase xl:tracking-wide xl:text-slate-500 border-b border-slate-100">
+
+            {assignments.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title="No coordinators"
+                description="Season-cycle ownership will appear here"
+              />
+            ) : (
+              <>
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white/90">
+                  <div className="hidden border-b border-slate-200 bg-slate-100/90 xl:grid xl:grid-cols-[minmax(190px,1.15fr)_minmax(140px,0.9fr)_minmax(220px,1fr)_minmax(170px,0.9fr)_minmax(100px,0.55fr)] xl:gap-4 xl:px-3 xl:py-3 xl:text-xs xl:font-semibold xl:uppercase xl:tracking-wide xl:text-slate-500">
                     <span>Coordinator</span>
                     <span className="justify-self-center text-center">
                       Seasons
@@ -1160,11 +1148,11 @@ export default function CompanyDetailPage() {
                     </span>
                   </div>
 
-                  <div className="px-4 sm:px-6 pb-2 sm:pb-3">
-                    {assignments.map((assignment, index) => (
+                  <div className="space-y-0 divide-y divide-slate-200">
+                    {assignments.map((assignment) => (
                       <div
                         key={assignment.id}
-                        className={`grid grid-cols-1 xl:grid-cols-[minmax(230px,1.15fr)_minmax(190px,0.95fr)_minmax(260px,1.15fr)_minmax(230px,1fr)_minmax(120px,0.6fr)] gap-4 xl:gap-6 items-start xl:items-center py-4 ${index === 0 ? "" : "border-t border-slate-100"}`}
+                        className="grid grid-cols-1 xl:grid-cols-[minmax(190px,1.15fr)_minmax(140px,0.9fr)_minmax(220px,1fr)_minmax(170px,0.9fr)_minmax(100px,0.55fr)] gap-4 xl:gap-4 items-start xl:items-center px-3 py-4"
                       >
                         <div className="min-w-0">
                           <div className="flex items-center gap-3">
@@ -1235,12 +1223,12 @@ export default function CompanyDetailPage() {
                             {copiedFieldKey === `${assignment.id}:email` ? (
                               <>
                                 <Check size={12} />
-                                Copied
+                                
                               </>
                             ) : (
                               <>
                                 <Copy size={12} />
-                                Copy
+                                
                               </>
                             )}
                           </button>
@@ -1271,12 +1259,12 @@ export default function CompanyDetailPage() {
                             {copiedFieldKey === `${assignment.id}:phone` ? (
                               <>
                                 <Check size={12} />
-                                Copied
+                                
                               </>
                             ) : (
                               <>
                                 <Copy size={12} />
-                                Copy
+                                
                               </>
                             )}
                           </button>
@@ -1298,7 +1286,7 @@ export default function CompanyDetailPage() {
                             ) : (
                               <>
                                 <Copy size={12} />
-                                Copy Details
+                                Details
                               </>
                             )}
                           </button>
@@ -1306,9 +1294,9 @@ export default function CompanyDetailPage() {
                       </div>
                     ))}
                   </div>
-                </>
-              )}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
