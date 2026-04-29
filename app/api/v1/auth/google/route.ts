@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { googleHdHint } from "@/lib/api/domain";
+import { addBasePath } from "@/lib/base-path";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { origin, searchParams } = new URL(request.url);
-    const redirectUri = `${origin}/api/v1/auth/google/callback`;
+    const redirectUri = `${origin}${addBasePath("/api/v1/auth/google/callback")}`;
     const from = searchParams.get("from") ?? "";
 
     const params = new URLSearchParams({

@@ -1,0 +1,7 @@
+ssh nexus@172.30.8.178 "rm -rf /home/nexus/app/*"
+ssh nexus@172.30.8.178 "mkdir -p /home/nexus/app/.next/static"
+
+scp -r .next/standalone/. nexus@172.30.8.178:/home/nexus/app/
+scp -r .next/static/. nexus@172.30.8.178:/home/nexus/app/.next/static/
+scp -r public/. nexus@172.30.8.178:/home/nexus/app/public/
+scp -r prisma/. nexus@172.30.8.178:/home/nexus/app/prisma/

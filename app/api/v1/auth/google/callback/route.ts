@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createToken } from "@/lib/api/session";
 import { isEmailAllowed } from "@/lib/api/domain";
+import { addBasePath } from "@/lib/base-path";
 const COOKIE_NAME = "nexus_session";
 const MAX_AGE = 7 * 24 * 60 * 60;
 
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     const oauthError = searchParams.get("error");
 
     const baseUrl = origin;
-    const redirectUri = `${origin}/api/v1/auth/google/callback`;
+    const redirectUri = `${origin}${addBasePath("/api/v1/auth/google/callback")}`;
 
     if (oauthError || !code) {
         return errorRedirect("Google sign-in was cancelled or failed.", baseUrl);

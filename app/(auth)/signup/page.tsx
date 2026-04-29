@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Mail,
 } from "lucide-react";
+import { addBasePath } from "@/lib/base-path";
 
 const ALLOWED_DOMAIN = "iitrpr.ac.in";
 
@@ -276,7 +277,7 @@ export default function SignupPage() {
             <>
               {/* Google signup button */}
               <a
-                href="/api/v1/auth/google"
+                href={addBasePath("/api/v1/auth/google")}
                 className="flex items-center justify-center gap-2.5 w-full py-2.5 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] transition-colors text-sm font-medium text-[#0F172A] mb-5"
               >
                 <GoogleIcon />

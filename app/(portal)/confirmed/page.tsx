@@ -373,17 +373,17 @@ async function requestJson<T>(url: string, init?: RequestInit) {
 
 function ConfirmedToolbarSkeleton() {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-none">
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_1.1fr_0.8fr]">
         <div className="space-y-2">
           <div className="shimmer h-3 w-24 rounded-full" />
-          <div className="shimmer h-11 rounded-2xl" />
+          <div className="shimmer h-11 rounded-lg" />
         </div>
         <div className="space-y-2">
           <div className="shimmer h-3 w-36 rounded-full" />
-          <div className="shimmer h-11 rounded-2xl" />
+          <div className="shimmer h-11 rounded-lg" />
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="shimmer h-3 w-28 rounded-full" />
           <div className="mt-3 shimmer h-8 w-16 rounded-full" />
         </div>
@@ -394,7 +394,7 @@ function ConfirmedToolbarSkeleton() {
 
 function ConfirmedCompanyCardSkeleton() {
   return (
-    <article className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-none">
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2">
@@ -404,27 +404,27 @@ function ConfirmedCompanyCardSkeleton() {
           <div className="shimmer h-7 w-20 rounded-full" />
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="shimmer h-16 rounded-2xl" />
-          <div className="shimmer h-16 rounded-2xl" />
-          <div className="shimmer h-16 rounded-2xl" />
-          <div className="shimmer h-16 rounded-2xl" />
+          <div className="shimmer h-16 rounded-lg" />
+          <div className="shimmer h-16 rounded-lg" />
+          <div className="shimmer h-16 rounded-lg" />
+          <div className="shimmer h-16 rounded-lg" />
         </div>
         <div className="space-y-2">
           <div className="shimmer h-3 w-24 rounded-full" />
-          <div className="shimmer h-10 rounded-xl" />
+          <div className="shimmer h-10 rounded-lg" />
         </div>
         <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="shimmer h-10 rounded-xl" />
-          <div className="shimmer h-10 rounded-xl" />
-          <div className="shimmer h-10 rounded-xl" />
-          <div className="shimmer h-10 rounded-xl" />
+          <div className="shimmer h-10 rounded-lg" />
+          <div className="shimmer h-10 rounded-lg" />
+          <div className="shimmer h-10 rounded-lg" />
+          <div className="shimmer h-10 rounded-lg" />
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
           <div className="shimmer h-3 w-32 rounded-full" />
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            <div className="shimmer h-8 rounded-xl" />
-            <div className="shimmer h-8 rounded-xl" />
-            <div className="shimmer h-8 rounded-xl" />
+            <div className="shimmer h-8 rounded-lg" />
+            <div className="shimmer h-8 rounded-lg" />
+            <div className="shimmer h-8 rounded-lg" />
           </div>
         </div>
       </div>
@@ -1843,7 +1843,7 @@ export default function ConfirmedPage() {
       {actionFlushbar ? (
         <div className="flushbar-stack fixed right-4 bottom-4 z-50 w-[min(92vw,600px)] pointer-events-none">
           <div
-            className={`flushbar flushbar-${actionFlushbar.tone} rounded-xl border shadow-lg`}
+            className={`flushbar flushbar-${actionFlushbar.tone} rounded-lg border shadow-lg`}
           >
             <div className="flushbar-progress-track h-1 w-full">
               <div
@@ -1883,7 +1883,7 @@ export default function ConfirmedPage() {
         </div>
       ) : null}
 
-      <section className="rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,#ffffff_0%,#f8fbff_48%,#eef5ff_100%)] p-5 shadow-sm space-y-4">
+      <section className="rounded-lg border border-slate-200 bg-[radial-gradient(circle_at_top_left,#ffffff_0%,#f8fbff_48%,#eef5ff_100%)] p-5 shadow-none space-y-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
             Confirmed Companies
@@ -1919,7 +1919,7 @@ export default function ConfirmedPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-[#4A86E8] bg-[#4A86E8] px-4 py-3 flex items-center justify-between shadow-[0_8px_18px_rgba(74,134,232,0.28)] md:min-w-64 transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer">
+          <div className="rounded-lg border border-[#4A86E8] bg-[#4A86E8] px-4 py-3 flex items-center justify-between shadow-[0_8px_18px_rgba(74,134,232,0.28)] md:min-w-64 transition-all duration-200 hover:scale-105 hover:shadow-lg cursor-pointer">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.12em] text-black">
                 Companies
@@ -1928,14 +1928,14 @@ export default function ConfirmedPage() {
                 {filteredCompanies.length}
               </p>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-[#F8FAFF] flex items-center justify-center shadow-[0_2px_6px_rgba(15,23,42,0.1)]">
-              <Building2 size={18} className="text-[#2563EB]" />
+            <div className="w-11 h-11 rounded-lg bg-[#F8FAFF] flex items-center justify-center shadow-[0_2px_6px_rgba(15,23,42,0.1)]">
+              <Building2 size={18} className="text-blue-600" />
             </div>
           </div>
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_42%)] p-4 shadow-sm md:p-5">
+      <section className="p-4 md:p-5">
         <input
           ref={companyUploadInputRef}
           type="file"
@@ -1945,7 +1945,7 @@ export default function ConfirmedPage() {
         />
 
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-          <div className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="min-w-0 flex-1 p-3">
             <p className="mb-1 text-xs font-semibold text-slate-600">
               Search companies
             </p>
@@ -1957,7 +1957,7 @@ export default function ConfirmedPage() {
             />
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-3 lg:w-[18rem]">
+          <div className="p-3 lg:w-[18rem]">
             <p className="mb-1 text-xs font-semibold text-slate-600">
               Upload placement data
             </p>
@@ -1984,11 +1984,11 @@ export default function ConfirmedPage() {
               <ConfirmedCompanyCardSkeleton />
             </section>
           ) : loadingError ? (
-            <section className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+            <section className="rounded-lg border border-rose-200 bg-rose-50 p-4">
               <p className="text-sm text-rose-700">{loadingError}</p>
             </section>
           ) : filteredCompanies.length === 0 ? (
-            <section className="rounded-2xl border border-slate-200 bg-white">
+            <section>
               <EmptyState
                 icon={Search}
                 title="No companies found"
@@ -2007,10 +2007,10 @@ export default function ConfirmedPage() {
                   <article
                     key={company.companySeasonCycleId}
                     onClick={() => setSelectedCompanyId(company.companyId)}
-                    className={`rounded-[26px] border bg-[linear-gradient(135deg,#ffffff,#fbfdff)] p-4 shadow-sm transition md:p-5 ${
+                    className={`rounded-lg border border-slate-200 bg-white p-4 transition md:p-5 ${
                       isActive
-                        ? "border-slate-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
-                        : "border-slate-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+                        ? "border-slate-300"
+                        : "border-slate-200 hover:border-slate-300"
                     }`}
                   >
                     <div className="space-y-3">
@@ -2034,13 +2034,13 @@ export default function ConfirmedPage() {
                       </div>
 
                       {/* <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-2xl bg-slate-50 p-3">
+                        <div className="rounded-lg bg-slate-50 p-3">
                           <p className="text-xs text-slate-500">Contacts</p>
                           <p className="mt-1 text-sm font-semibold text-slate-900">
                             {company.contacts.length}
                           </p>
                         </div>
-                        <div className="rounded-2xl bg-slate-50 p-3">
+                        <div className="rounded-lg bg-slate-50 p-3">
                           <p className="text-xs text-slate-500">Students</p>
                           <p className="mt-1 text-sm font-semibold text-slate-900">
                             {company.studentEntryNumbers.length}
@@ -2049,8 +2049,8 @@ export default function ConfirmedPage() {
                       </div> */}
 
                       {company.drives.length > 0 ? (
-                        <div className="rounded-xl border border-slate-200 bg-white">
-                          <div className="grid grid-cols-1 gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide md:grid-cols-[1.9fr_1fr_0.8fr_1.1fr] md:items-center">
+                        <div className="rounded-lg border border-slate-200">
+                          <div className="grid grid-cols-1 gap-2 border-b border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 uppercase tracking-wide md:grid-cols-[1.9fr_1fr_0.8fr_1.1fr] md:items-center">
                             <p>Role</p>
                             <div className="flex items-center justify-center">
                               <p>
@@ -2129,7 +2129,7 @@ export default function ConfirmedPage() {
                                     {isEditingCompensation ? (
                                       <>
                                         <input
-                                          className="input-base w-20 sm:w-24 border-2 border-[#93C5FD] bg-white text-center font-semibold text-slate-900 focus:border-[#2563EB]"
+                                          className="input-base w-20 sm:w-24 border-2 border-slate-300 bg-white text-center font-semibold text-slate-900 focus:border-blue-600"
                                           value={draftCompensationText}
                                           onChange={(event) =>
                                             setStipendDraftByDrive((prev) => ({
@@ -2140,7 +2140,7 @@ export default function ConfirmedPage() {
                                           placeholder="0"
                                         />
                                         <select
-                                          className="input-base w-16 sm:w-20 border-2 border-[#93C5FD] bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 focus:border-[#2563EB]"
+                                          className="input-base w-16 sm:w-20 border-2 border-slate-300 bg-white px-2 py-1.5 text-xs font-semibold text-slate-700 focus:border-blue-600"
                                           value={selectedUnit}
                                           onChange={(event) => {
                                             const nextUnit =
@@ -2503,7 +2503,7 @@ export default function ConfirmedPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
                           No drives available for this company-season cycle.
                         </div>
                       )}
@@ -2861,7 +2861,7 @@ export default function ConfirmedPage() {
                 key={type}
                 type="button"
                 onClick={() => setMailRequestType(type)}
-                className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium ${mailRequestType === type ? "border-[#2563EB] bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 bg-white text-slate-600"}`}
+                className={`flex-1 rounded-lg border px-4 py-2.5 text-sm font-medium ${mailRequestType === type ? "border-blue-600 bg-[#EFF6FF] text-[#1D4ED8]" : "border-slate-200 bg-white text-slate-600"}`}
               >
                 {type === "template" ? "Template" : "Custom"}
               </button>
@@ -3293,7 +3293,7 @@ export default function ConfirmedPage() {
             Download the template first if you want a clean file with the
             supported columns for confirmed-company processing.
           </p>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <p className="font-semibold text-slate-900">Supported columns</p>
             <p className="mt-1 text-xs text-slate-600">
               Required: <span className="font-semibold">Roll Number</span> and{" "}
@@ -3411,7 +3411,7 @@ export default function ConfirmedPage() {
                     return (
                       <div
                         key={company.uploadedCompanyName}
-                        className="rounded-2xl border border-slate-200 bg-white p-4"
+                        className="rounded-lg border border-slate-200 bg-white p-4"
                       >
                         <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                           <div>
@@ -3445,7 +3445,7 @@ export default function ConfirmedPage() {
                                   event.target.value,
                                 )
                               }
-                              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-[#4A86E8] focus:ring-2 focus:ring-[#4A86E8]/20"
+                              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/20"
                             >
                               <option value="">Select company</option>
                               {confirmedCompanyOptions.map((option) => (
@@ -3474,7 +3474,7 @@ export default function ConfirmedPage() {
                                 }
                                 className={`rounded-full border px-3 py-1 text-xs transition ${
                                   selectedCompanyId === suggestion.companyId
-                                    ? "border-[#4A86E8] bg-[#EAF2FF] text-[#1D4ED8]"
+                                    ? "border-blue-600 bg-blue-50 text-blue-700"
                                     : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300"
                                 }`}
                                 title={suggestion.reason}
@@ -3491,18 +3491,18 @@ export default function ConfirmedPage() {
                 </div>
               </div>
             ) : (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
                 All uploaded company names were auto-matched to existing
                 confirmed companies.
               </div>
             )}
 
             {companyUploadPreview.matchedCompanies.length > 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
                 <h3 className="text-sm font-semibold text-slate-900">
                   Auto-matched companies
                 </h3>
-                <div className="mt-3 max-h-56 overflow-auto rounded-xl border border-slate-200 bg-white">
+                <div className="mt-3 max-h-56 overflow-auto rounded-lg border border-slate-200 bg-white">
                   <table className="w-full text-xs">
                     <thead className="border-b border-slate-200 bg-slate-50">
                       <tr>

@@ -8,6 +8,7 @@ import {
 import { verifySessionToken } from "@/lib/auth/session-edge";
 
 const SESSION_COOKIE = "nexus_session";
+const BASE_PATH = "/cdpc-nexus";
 
 function isAuthPage(pathname: string) {
   return (
@@ -30,39 +31,77 @@ function isOpenAuthApi(pathname: string) {
   return openPaths.some((p) => pathname === p || pathname.startsWith(p));
 }
 
-function loginRedirect(request: NextRequest) {
-  const url = request.nextUrl.clone();
-  url.pathname = "/login";
-  const nextPath = `${request.nextUrl.pathname}${request.nextUrl.search}`;
-  url.searchParams.set("next", nextPath);
-  return NextResponse.redirect(url);
+function stripBasePath(pathname: string) {
+  let current = pathname || "/";
+
+  while (current === BASE_PATH || current.startsWith(`${BASE_PATH}/`)) {
+    current = current === BASE_PATH ? "/" : current.slice(BASE_PATH.length) || "/";
+  }
+
+  return current;
 }
 
-function unauthorizedRedirect(request: NextRequest) {
-  const url = request.nextUrl.clone();
-  url.pathname = "/unauthorized";
-  url.searchParams.set("from", request.nextUrl.pathname);
-  return NextResponse.redirect(url);
+function toPublicPath(pathname: string) {
+  const internalPath = stripBasePath(pathname);
+
+  if (internalPath === "/") return BASE_PATH;
+  return `${BASE_PATH}${internalPath.startsWith("/") ? "" : "/"}${internalPath}`;
+}
+
+function redirectTo(request: NextRequest, pathname: string) {
+  return NextResponse.redirect(new URL(toPublicPath(pathname), request.url), 307);
+}
+
+function loginRedirect(request: NextRequest, requestPath: string) {
+  const nextPath = stripBasePath(`${requestPath}${request.nextUrl.search}`);
+
+  return NextResponse.redirect(
+    new URL(
+      `${toPublicPath("/login")}?next=${encodeURIComponent(nextPath)}`,
+      request.url,
+    ),
+    307,
+  );
+}
+
+function unauthorizedRedirect(request: NextRequest, requestPath: string) {
+  return NextResponse.redirect(
+    new URL(
+      `${toPublicPath("/unauthorized")}?from=${encodeURIComponent(requestPath)}`,
+      request.url,
+    ),
+    307,
+  );
 }
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const rawPathname = request.nextUrl.pathname;
+  const requestPath = stripBasePath(rawPathname);
+
   const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
   const claims = await verifySessionToken(sessionToken);
   const isAuthenticated = Boolean(claims?.userId);
 
-  if (isAuthPage(pathname)) {
+  if (isAuthPage(requestPath)) {
     if (isAuthenticated) {
-      const url = request.nextUrl.clone();
-      url.pathname = claims?.role === "student" ? "/student/blogs" : "/companies";
-      url.search = "";
-      return NextResponse.redirect(url);
+      const targetPath =
+        claims?.role === "student" ? "/student/blogs" : "/companies";
+      return redirectTo(request, targetPath);
     }
     return NextResponse.next();
   }
 
-  if (pathname.startsWith("/api/v1")) {
-    if (isOpenAuthApi(pathname)) {
+  if (requestPath === "/") {
+    if (isAuthenticated) {
+      const targetPath =
+        claims?.role === "student" ? "/student/blogs" : "/companies";
+      return redirectTo(request, targetPath);
+    }
+    return redirectTo(request, "/login");
+  }
+
+  if (requestPath.startsWith("/api/v1")) {
+    if (isOpenAuthApi(requestPath)) {
       return NextResponse.next();
     }
 
@@ -73,7 +112,7 @@ export async function proxy(request: NextRequest) {
       );
     }
 
-    if (!canAccessApiPath(pathname, claims)) {
+    if (!canAccessApiPath(requestPath, claims)) {
       return NextResponse.json(
         { error: { message: "Insufficient permissions" } },
         { status: 403 },
@@ -83,16 +122,16 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (!isProtectedAppPath(pathname)) {
+  if (!isProtectedAppPath(requestPath)) {
     return NextResponse.next();
   }
 
   if (!isAuthenticated) {
-    return loginRedirect(request);
+    return loginRedirect(request, requestPath);
   }
 
-  if (!canAccessAppPath(pathname, claims)) {
-    return unauthorizedRedirect(request);
+  if (!canAccessAppPath(requestPath, claims)) {
+    return unauthorizedRedirect(request, requestPath);
   }
 
   return NextResponse.next();

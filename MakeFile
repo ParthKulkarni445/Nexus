@@ -25,7 +25,7 @@ deploy: build
 
 	# Restart app cleanly on fixed port
 	ssh $(SERVER) "pm2 delete nexus-app || true"
-	ssh $(SERVER) "cd $(APP_DIR) && PORT=3001 pm2 start server.js --name nexus-app"
+	ssh $(SERVER) "cd $(APP_DIR) pm2 start server.js --name nexus-app"
 	ssh $(SERVER) "pm2 save"
 
 # ===== FIRST TIME SETUP =====

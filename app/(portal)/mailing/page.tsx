@@ -527,25 +527,25 @@ function StatCard({
   active?: boolean;
   onClick?: () => void;
 }) {
-  const className = `rounded-2xl border px-4 py-4 text-left transition-all ${
+  const className = `rounded-lg border px-4 py-4 text-left transition-all ${
     active
-      ? "border-[#2563EB] bg-[#EFF6FF] shadow-sm"
-      : "border-[#DBEAFE] bg-white hover:border-[#BFDBFE] hover:bg-[#F8FBFF]"
+      ? "border-[#2563EB] bg-blue-50 shadow-sm"
+      : "border-slate-300 bg-white hover:border-slate-400 hover:bg-slate-50"
   }`;
 
   const content = (
     <div className="flex items-center gap-3">
       <div
-        className={`flex h-10 w-10 items-center justify-center rounded-xl ${
-          active ? "bg-[#2563EB]" : "bg-[#EFF6FF]"
+        className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+          active ? "bg-[#2563EB]" : "bg-blue-50"
         }`}
       >
-        <Icon size={18} className={active ? "text-white" : "text-[#2563EB]"} />
+        <Icon size={18} className={active ? "text-white" : "text-blue-600"} />
       </div>
       <div className="min-w-0">
         <p
           className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
-            active ? "text-[#1D4ED8]" : "text-slate-500"
+            active ? "text-blue-700" : "text-slate-500"
           }`}
         >
           {label}
@@ -582,7 +582,7 @@ function SectionSkeleton({
         {Array.from({ length: cards }).map((_, index) => (
           <div
             key={index}
-            className="w-full rounded-2xl border border-[#DBEAFE] bg-white p-4"
+            className="w-full rounded-lg border border-slate-300 bg-white p-4"
           >
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
               <div className="flex min-w-0 flex-1 gap-3">
@@ -621,12 +621,12 @@ function SectionSkeleton({
         ))}
       </div>
       {detail && (
-        <div className="rounded-2xl border border-[#DBEAFE] bg-white p-5">
+        <div className="rounded-lg border border-slate-300 bg-white p-5">
           <div className="space-y-3">
             <div className="shimmer h-5 w-40 rounded-full" />
             <div className="shimmer h-4 w-full rounded-full" />
             <div className="shimmer h-4 w-5/6 rounded-full" />
-            <div className="shimmer h-32 w-full rounded-2xl" />
+            <div className="shimmer h-32 w-full rounded-lg" />
           </div>
         </div>
       )}
@@ -777,7 +777,7 @@ function PreviewModal({
     >
       <div className="space-y-3">
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               To
             </p>
@@ -786,7 +786,7 @@ function PreviewModal({
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               From
             </p>
@@ -796,7 +796,7 @@ function PreviewModal({
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             CC
           </p>
@@ -814,7 +814,7 @@ function PreviewModal({
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Subject
           </p>
@@ -848,8 +848,8 @@ function PreviewModal({
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2">
+          <div className="overflow-hidden rounded-lg border border-slate-300">
+            <div className="flex items-center gap-2 border-b border-slate-300 bg-slate-50 px-4 py-2">
               <div className="h-3 w-3 rounded-full bg-blue-400" />
               <div className="h-3 w-3 rounded-full bg-amber-400" />
               <div className="h-3 w-3 rounded-full bg-emerald-400" />
@@ -869,7 +869,7 @@ function PreviewModal({
         )}
 
         {attachments.length > 0 && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Attachments ({attachments.length})
             </p>
@@ -884,7 +884,7 @@ function PreviewModal({
         )}
 
         {currentMail.status === "pending" && !isEditing && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Review Note
             </label>
@@ -902,7 +902,7 @@ function PreviewModal({
         )}
 
         {errorMessage && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
             {errorMessage}
           </div>
         )}
@@ -992,7 +992,7 @@ function MailboxReplyModal({
     >
       <div className="space-y-4">
         {isReply ? (
-          <div className="rounded-xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-sm text-[#1D4ED8]">
+          <div className="rounded-lg border border-slate-400 bg-blue-50 px-4 py-3 text-sm text-blue-700">
             This reply will stay in the same mailbox thread.
           </div>
         ) : null}
@@ -1102,7 +1102,7 @@ function ThreadCompanyMappingModal({
       }
     >
       <div className="space-y-4">
-        <div className="rounded-xl border border-[#DBEAFE] bg-[#F8FBFF] px-4 py-3 text-sm text-slate-700">
+        <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-700">
           Current: {currentCompanyName || "Not mapped"}
         </div>
         <div>
@@ -1119,7 +1119,7 @@ function ThreadCompanyMappingModal({
           />
         </div>
         {showResults ? (
-          <div className="rounded-xl border border-slate-200 bg-slate-50">
+          <div className="rounded-lg border border-slate-300 bg-slate-50">
             {loading ? (
               <p className="px-4 py-3 text-sm text-slate-500">
                 Searching companies...
@@ -1224,8 +1224,8 @@ function TemplateEditorFields({
           Add variable names here, then click a chip to insert placeholders like{" "}
           <code>{"{{company_name}}"}</code> into the editor.
         </p>
-        <div className="mt-3 rounded-xl border border-[#DBEAFE] bg-[#F8FBFF] px-4 py-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#2563EB]">
+        <div className="mt-3 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
             Predefined Variables
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -1233,7 +1233,7 @@ function TemplateEditorFields({
               <button
                 key={variable.key}
                 type="button"
-                className="rounded-full border border-[#BFDBFE] bg-white px-3 py-1.5 text-xs font-medium text-[#1D4ED8] transition-colors hover:border-[#2563EB]"
+                className="rounded-full border border-slate-400 bg-white px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:border-[#2563EB]"
                 onClick={() =>
                   onChange(
                     "variables",
@@ -1260,7 +1260,7 @@ function TemplateEditorFields({
               <button
                 key={variable}
                 type="button"
-                className="rounded-full border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-1.5 text-xs font-medium text-[#1D4ED8] transition-colors hover:border-[#2563EB] hover:bg-white"
+                className="rounded-full border border-slate-400 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition-colors hover:border-[#2563EB] hover:bg-white"
                 onClick={() => editorRef.current?.insertText(`{{${variable}}}`)}
               >
                 {variable}
@@ -1292,7 +1292,7 @@ function TemplateEditorFields({
           maxFiles={6}
         />
       </div>
-      <details className="sm:col-span-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
+      <details className="sm:col-span-2 rounded-lg border border-slate-300 bg-white px-4 py-3">
         <summary className="cursor-pointer text-sm font-medium text-slate-700">
           Advanced options
         </summary>
@@ -1311,7 +1311,7 @@ function TemplateEditorFields({
               placeholder="Optional plain text version for previews and fallback clients"
             />
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          <div className="rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
             The editor stores rich email content directly. Use this section only
             if you want to customize the plain-text fallback.
           </div>
@@ -1475,7 +1475,7 @@ function TemplateDetailsModal({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Creator
             </p>
@@ -1483,7 +1483,7 @@ function TemplateDetailsModal({
               {template.creator?.name ?? "-"}
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Approved By
             </p>
@@ -1491,7 +1491,7 @@ function TemplateDetailsModal({
               {template.approver?.name ?? "-"}
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Last Updated
             </p>
@@ -1501,7 +1501,7 @@ function TemplateDetailsModal({
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="rounded-lg border border-slate-300 bg-slate-50 px-4 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Subject
           </p>
@@ -1548,8 +1548,8 @@ function TemplateDetailsModal({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-slate-200">
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+        <div className="overflow-hidden rounded-lg border border-slate-300">
+          <div className="border-b border-slate-300 bg-slate-50 px-4 py-2 text-xs text-slate-500">
             Template preview
           </div>
           <div
@@ -1837,19 +1837,11 @@ export default function MailingPage() {
       selectedTemplateId &&
       filteredTemplates.some((item) => item.id === selectedTemplateId);
 
-    if (isWideTemplateViewport) {
-      if (!hasSelected) {
-        setSelectedTemplateId(filteredTemplates[0].id);
-      }
-      setTemplateDetailsOpen(false);
-      return;
-    }
-
     if (!hasSelected) {
       setSelectedTemplateId(null);
       setTemplateDetailsOpen(false);
     }
-  }, [filteredTemplates, isWideTemplateViewport, selectedTemplateId]);
+  }, [filteredTemplates, selectedTemplateId]);
 
   const selectedTemplate =
     filteredTemplates.find((template) => template.id === selectedTemplateId) ??
@@ -2363,17 +2355,16 @@ export default function MailingPage() {
     }
   }
 
-  const showInlineTemplateEditor =
-    mode === "templates" && templateEditorOpen && isWideTemplateViewport;
-  const showTemplateDetailPane =
-    mode === "templates" && isWideTemplateViewport && Boolean(selectedTemplate);
+  const showInlineTemplateEditor = false;
+  const isTemplateDetailsView =
+    mode === "templates" && Boolean(selectedTemplate) && !templateEditorOpen;
 
   return (
-    <div className="-mt-6 relative z-10 space-y-5 px-4 pb-6 pt-6 xl:mt-0 xl:h-full xl:overflow-y-auto hide-scrollbar">
-      <div className="card overflow-hidden">
-        <div className="border-b border-(--card-border) px-4 py-3">
+    <div className="space-y-5 px-4 sm:px-6 py-6">
+      
+        <div className="pb-4">
           <div className="flex justify-center">
-            <div className="flex overflow-x-auto rounded-2xl bg-slate-100 p-1">
+            <div className="flex overflow-x-auto rounded-lg bg-slate-100 p-1">
               {VIEW_OPTIONS.map((option) => {
                 const Icon = option.icon;
                 const isActive = option.value === mode;
@@ -2382,10 +2373,10 @@ export default function MailingPage() {
                     key={option.value}
                     type="button"
                     onClick={() => setMode(option.value)}
-                    className={`flex min-w-fit items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                    className={`flex min-w-fit items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
                       isActive
                         ? "bg-[#2563EB] text-white shadow-sm"
-                        : "text-slate-500 hover:text-slate-700"
+                        : "text-slate-600 hover:text-slate-900"
                     }`}
                   >
                     <Icon size={16} />
@@ -2397,14 +2388,14 @@ export default function MailingPage() {
           </div>
         </div>
 
-        <div className="px-4 py-3">
-          <div
-            className={`flex gap-2 ${
-              mode === "mailbox"
-                ? "flex-row items-center"
-                : "flex-col xl:flex-row xl:flex-wrap xl:items-center"
-            }`}
-          >
+      {!(mode === "mailbox" && selectedMailboxThread) && !isTemplateDetailsView && (
+        <div
+          className={`flex gap-2 ${
+            mode === "mailbox"
+              ? "flex-row items-center"
+              : "flex-col xl:flex-row xl:flex-wrap xl:items-center"
+          }`}
+        >
             <SearchBar
               value={search}
               onChange={setSearch}
@@ -2416,17 +2407,32 @@ export default function MailingPage() {
                     : "Search mailbox threads by sender, recipient, company, or subject..."
               }
               className={`min-w-0 ${mode === "templates" ? "xl:min-w-[320px] xl:flex-[1.2]" : "flex-1"}`}
+              inputClassName="!border-slate-300 hover:!border-slate-400 focus:!border-slate-400"
             />
 
             {mode === "mailbox" && (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm shrink-0 gap-1"
-                onClick={() => void loadMailbox(mailboxBucket, mailboxPage)}
-              >
-                <RefreshCw size={14} />
-                Refresh
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm gap-1"
+                  onClick={() => void handleSyncInbound()}
+                  disabled={mailboxSyncing}
+                >
+                  <RefreshCw
+                    size={14}
+                    className={mailboxSyncing ? "animate-spin" : undefined}
+                  />
+                  {mailboxSyncing ? "Syncing..." : "Sync"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm gap-1"
+                  onClick={() => setMailboxComposeOpen(true)}
+                >
+                  <Plus size={14} />
+                  Compose
+                </button>
+              </div>
             )}
 
             {mode === "queue" && (
@@ -2438,6 +2444,7 @@ export default function MailingPage() {
                   options={QUEUE_TYPE_OPTIONS}
                   placeholder="Type"
                   className="z-20 w-full xl:w-36"
+                  inputClassName="!border-slate-300 hover:!border-slate-400 focus:!border-slate-400"
                 />
                 <FilterSelect
                   multiple
@@ -2446,6 +2453,7 @@ export default function MailingPage() {
                   options={coordinatorOptions}
                   placeholder="Coordinator"
                   className="z-20 w-full xl:w-44"
+                  inputClassName="!border-slate-300 hover:!border-slate-400 focus:!border-slate-400"
                 />
               </div>
             )}
@@ -2466,7 +2474,7 @@ export default function MailingPage() {
               (queueTypeFilter.length > 0 ||
                 queueCoordinatorFilter.length > 0) && (
                 <button
-                  className="btn btn-ghost btn-sm shrink-0 self-start text-slate-500 hover:text-slate-700 xl:self-auto"
+                  className="btn btn-ghost btn-sm shrink-0 self-start text-slate-600 hover:text-slate-900 xl:self-auto"
                   onClick={() => {
                     setQueueTypeFilter([]);
                     setQueueCoordinatorFilter([]);
@@ -2475,19 +2483,17 @@ export default function MailingPage() {
                   Clear all
                 </button>
               )}
-          </div>
         </div>
-      </div>
+      )}
 
       {pageMessage && (
-        <div className="rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-sm font-medium text-[#1D4ED8]">
+        <div className="rounded-lg border border-slate-400 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
           {pageMessage}
         </div>
       )}
 
       {mode === "queue" && (
-        <div className="card overflow-hidden">
-          <div className="space-y-4 p-4">
+        <div className="space-y-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <StatCard
                 icon={Inbox}
@@ -2552,7 +2558,7 @@ export default function MailingPage() {
                   return (
                     <div
                       key={mail.id}
-                      className="rounded-2xl border border-[#DBEAFE] bg-white p-4 transition-all hover:border-[#BFDBFE]"
+                      className="rounded-lg border border-slate-300 bg-slate-50 p-4 transition-colors hover:border-slate-400 hover:bg-slate-100"
                     >
                       <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
                         <div className="flex min-w-0 flex-1 gap-3">
@@ -2630,7 +2636,7 @@ export default function MailingPage() {
                                 Requested {formatDateTime(mail.createdAt)}
                               </span>
                               {mail.template?.name && (
-                                <span className="flex items-center gap-1 text-[#2563EB]">
+                                <span className="flex items-center gap-1 text-blue-600">
                                   <LayoutTemplate size={12} />
                                   {mail.template.name}
                                 </span>
@@ -2650,7 +2656,7 @@ export default function MailingPage() {
                             </div>
 
                             {mail.reviewNote && (
-                              <div className="flex gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                              <div className="flex gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
                                 <AlertCircle
                                   size={12}
                                   className="mt-0.5 shrink-0"
@@ -2680,7 +2686,6 @@ export default function MailingPage() {
               </div>
             )}
           </div>
-        </div>
       )}
 
       {mode === "templates" && (
@@ -2698,7 +2703,7 @@ export default function MailingPage() {
           {templatesLoading ? (
             <SectionSkeleton />
           ) : templatesError ? (
-            <div className="card overflow-hidden p-4">
+            <div>
               <EmptyState
                 icon={AlertCircle}
                 title="Unable to load templates"
@@ -2713,9 +2718,9 @@ export default function MailingPage() {
                 }
               />
             </div>
-          ) : filteredTemplates.length === 0 && !showInlineTemplateEditor ? (
+          ) : filteredTemplates.length === 0 && !selectedTemplate ? (
             <div className="grid gap-4">
-              <div className="card flex min-h-[620px] items-center justify-center border border-[#DBEAFE] p-4">
+              <div>
                 <EmptyState
                   icon={LayoutTemplate}
                   title="No templates found"
@@ -2723,329 +2728,189 @@ export default function MailingPage() {
                 />
               </div>
             </div>
-          ) : (
-            <div
-              className={`grid gap-4 ${
-                showInlineTemplateEditor || showTemplateDetailPane
-                  ? "xl:grid-cols-[minmax(0,0.95fr)_minmax(320px,0.9fr)]"
-                  : "grid-cols-1"
-              }`}
-            >
-              <div className="card min-h-[620px] border border-[#DBEAFE] p-4">
-                <div className="flex h-full flex-col">
-                  {filteredTemplates.length === 0 ? (
-                    <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-[#BFDBFE] bg-[#F8FBFF] px-5 py-10 text-center">
-                      <div>
-                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-[#2563EB] shadow-sm">
-                          <LayoutTemplate size={22} />
-                        </div>
-                        <p className="mt-4 text-base font-semibold text-slate-800">
-                          Start your first template
-                        </p>
-                        <p className="mt-1 text-sm text-slate-500">
-                          The editor is open on the right. Fill in the details
-                          and save when ready.
-                        </p>
-                      </div>
-                    </div>
+          ) : selectedTemplate ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm gap-1"
+                  onClick={() => {
+                    setSelectedTemplateId(null);
+                    setTemplateDetailsOpen(false);
+                  }}
+                >
+                  <ArrowLeft size={14} />
+                  Back to templates
+                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="btn btn-secondary btn-sm gap-1"
+                    onClick={() => openEditTemplate(selectedTemplate)}
+                  >
+                    <Pencil size={14} />
+                    Edit
+                  </button>
+                  <button
+                    className="btn btn-danger btn-sm gap-1"
+                    onClick={() => setTemplateDeleteOpen(true)}
+                  >
+                    <Trash2 size={14} />
+                    Delete
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-300 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {selectedTemplate.name}
+                  </h3>
+                  <StatusBadge status={selectedTemplate.status} size="sm" />
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedTemplate.slug}
+                </p>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg border border-slate-300 bg-white px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Creator
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-slate-800">
+                    {selectedTemplate.creator?.name ?? "-"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-300 bg-white px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Approved By
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-slate-800">
+                    {selectedTemplate.approver?.name ?? "-"}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-slate-300 bg-white px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Last Updated
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-slate-800">
+                    {formatDateTime(selectedTemplate.updatedAt)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-slate-300 bg-white px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Subject
+                </p>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {selectedTemplate.subject}
+                </p>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-slate-300 bg-white px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Variables
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedTemplate.variables.length > 0 ? (
+                    selectedTemplate.variables.map((variable) => (
+                      <Badge key={variable} variant="gray" size="sm">
+                        {variable}
+                      </Badge>
+                    ))
                   ) : (
-                    <div className="space-y-3">
-                      {filteredTemplates.map((template) => {
-                        const selected =
-                          isWideTemplateViewport &&
-                          template.id === selectedTemplateId;
-                        return (
-                          <button
-                            key={template.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedTemplateId(template.id);
-                              if (!isWideTemplateViewport) {
-                                setTemplateDetailsOpen(true);
-                              }
-                            }}
-                            className={`w-full rounded-2xl border p-4 text-left transition-all ${
-                              selected
-                                ? "border-[#2563EB] bg-[#EFF6FF]"
-                                : "border-[#DBEAFE] bg-white hover:border-[#BFDBFE]"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="font-semibold text-slate-900">
-                                    {template.name}
-                                  </p>
-                                  <StatusBadge
-                                    status={template.status}
-                                    size="sm"
-                                  />
-                                </div>
-                                <p className="mt-1 line-clamp-2 text-sm text-slate-600">
-                                  {template.subject}
-                                </p>
-                              </div>
-                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#2563EB]">
-                                <span className="text-sm font-bold">
-                                  {getInitials(template.name) || "TM"}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                              <Badge variant="info" size="sm">
-                                {template._count?.versions ?? 0} versions
-                              </Badge>
-                              <Badge variant="gray" size="sm">
-                                {template._count?.mailRequests ?? 0} requests
-                              </Badge>
-                              <span>
-                                Updated {formatDate(template.updatedAt)}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <span className="text-sm text-slate-500">
+                      No dynamic variables configured.
+                    </span>
                   )}
                 </div>
               </div>
 
-              {(showInlineTemplateEditor || showTemplateDetailPane) && (
-                <div className="card min-h-[620px] border border-[#DBEAFE] p-5">
-                  {showInlineTemplateEditor ? (
-                    <>
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-lg font-semibold text-slate-900">
-                              {templateEditorMode === "create"
-                                ? "Create Template"
-                                : "Update Template"}
-                            </h3>
-                            <Badge variant="info" size="sm">
-                              Inline editor
-                            </Badge>
-                          </div>
-                          <p className="mt-1 text-sm text-slate-500">
-                            Editing stays inside the right panel on wide
-                            screens.
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setTemplateEditorOpen(false)}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => void handleSubmitTemplate()}
-                            disabled={
-                              templateSubmitting ||
-                              !templateForm.name.trim() ||
-                              !templateForm.slug.trim() ||
-                              !templateForm.subject.trim() ||
-                              !htmlToPlainText(templateForm.contentHtml).trim()
-                            }
-                          >
-                            {templateSubmitting
-                              ? templateEditorMode === "create"
-                                ? "Creating..."
-                                : "Saving..."
-                              : templateEditorMode === "create"
-                                ? "Create"
-                                : "Save Changes"}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
-                        <TemplateEditorFields
-                          mode={templateEditorMode}
-                          form={templateForm}
-                          submitting={templateSubmitting}
-                          onChange={updateTemplateForm}
-                        />
-                      </div>
-                    </>
+              <div className="mt-4 rounded-lg border border-slate-300 bg-white px-4 py-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Default Attachments
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedTemplate.attachments &&
+                  selectedTemplate.attachments.length > 0 ? (
+                    selectedTemplate.attachments.map((attachment) => (
+                      <Badge
+                        key={attachment.storagePath}
+                        variant="gray"
+                        size="sm"
+                      >
+                        {attachment.fileName}
+                      </Badge>
+                    ))
                   ) : (
-                    <>
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-lg font-semibold text-slate-900">
-                              {selectedTemplate!.name}
-                            </h3>
-                            <StatusBadge
-                              status={selectedTemplate!.status}
-                              size="sm"
-                            />
-                          </div>
-                          <p className="mt-1 text-sm text-slate-500">
-                            {selectedTemplate!.slug}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            className="btn btn-secondary btn-sm gap-1"
-                            onClick={() => openEditTemplate(selectedTemplate!)}
-                          >
-                            <Pencil size={14} />
-                            Edit
-                          </button>
-                          <button
-                            className="btn btn-danger btn-sm gap-1"
-                            onClick={() => setTemplateDeleteOpen(true)}
-                          >
-                            <Trash2 size={14} />
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Creator
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-slate-800">
-                            {selectedTemplate!.creator?.name ?? "-"}
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Approved By
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-slate-800">
-                            {selectedTemplate!.approver?.name ?? "-"}
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Last Updated
-                          </p>
-                          <p className="mt-1 text-sm font-medium text-slate-800">
-                            {formatDateTime(selectedTemplate!.updatedAt)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Subject
-                        </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {selectedTemplate!.subject}
-                        </p>
-                      </div>
-
-                      <div className="mt-4">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Variables
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedTemplate!.variables.length > 0 ? (
-                            selectedTemplate!.variables.map((variable) => (
-                              <Badge key={variable} variant="gray" size="sm">
-                                {variable}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-sm text-slate-500">
-                              No dynamic variables configured.
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-4">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          Default Attachments
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {selectedTemplate!.attachments &&
-                          selectedTemplate!.attachments.length > 0 ? (
-                            selectedTemplate!.attachments.map((attachment) => (
-                              <Badge
-                                key={attachment.storagePath}
-                                variant="gray"
-                                size="sm"
-                              >
-                                {attachment.fileName}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-sm text-slate-500">
-                              No default attachments configured.
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-                        <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
-                          Template preview
-                        </div>
-                        <div
-                          className="prose prose-sm max-w-none p-4"
-                          dangerouslySetInnerHTML={{
-                            __html: selectedTemplate!.bodyHtml,
-                          }}
-                        />
-                      </div>
-                    </>
+                    <span className="text-sm text-slate-500">
+                      No default attachments configured.
+                    </span>
                   )}
                 </div>
-              )}
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-lg border border-slate-300 bg-white">
+                <div className="border-b border-slate-300 bg-white px-4 py-2 text-xs text-slate-500">
+                  Template preview
+                </div>
+                <div
+                  className="prose prose-sm max-w-none p-4"
+                  dangerouslySetInnerHTML={{
+                    __html: selectedTemplate.bodyHtml,
+                  }}
+                />
+              </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredTemplates.map((template) => (
+                <button
+                  key={template.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTemplateId(template.id);
+                    setTemplateDetailsOpen(false);
+                  }}
+                  className="w-full rounded-lg border border-slate-300 bg-slate-50 p-4 text-left transition-colors hover:border-slate-400 hover:bg-slate-100"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-slate-900">
+                          {template.name}
+                        </p>
+                        <StatusBadge status={template.status} size="sm" />
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-sm text-slate-600">
+                        {template.subject}
+                      </p>
+                    </div>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                      <span className="text-sm font-bold">
+                        {getInitials(template.name) || "TM"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <Badge variant="info" size="sm">
+                      {template._count?.versions ?? 0} versions
+                    </Badge>
+                    <Badge variant="gray" size="sm">
+                      {template._count?.mailRequests ?? 0} requests
+                    </Badge>
+                    <span>Updated {formatDate(template.updatedAt)}</span>
+                  </div>
+                </button>
+              ))}
             </div>
           )}
         </div>
       )}
 
       {mode === "mailbox" && (
-        <div className="card overflow-hidden">
-          <div className="space-y-4 p-4">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <div className="flex flex-wrap items-center gap-3">
-                {selectedMailboxThread ? (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm px-2"
-                    onClick={() => setSelectedMailboxId(null)}
-                    aria-label="Back to mailbox"
-                  >
-                    <ArrowLeft size={14} />
-                  </button>
-                ) : null}
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <span>Mailbox</span>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2 self-start">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm gap-1"
-                  onClick={() => void handleSyncInbound()}
-                  disabled={mailboxSyncing}
-                >
-                  <RefreshCw
-                    size={14}
-                    className={mailboxSyncing ? "animate-spin" : undefined}
-                  />
-                  {mailboxSyncing ? "Syncing..." : "Sync"}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm gap-1"
-                  onClick={() => setMailboxComposeOpen(true)}
-                >
-                  <Plus size={14} />
-                  Compose
-                </button>
-              </div>
-            </div>
-
+        <div className="space-y-4">
             {mailboxLoading ? (
               <SectionSkeleton detail={false} />
             ) : mailboxError ? (
@@ -3072,14 +2937,19 @@ export default function MailingPage() {
               <div className="space-y-4">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div className="min-w-0">
-                    <h3 className="truncate text-lg font-semibold text-slate-900">
-                      {selectedMailboxThread.latest.subject || "No subject"}
-                    </h3>
-                    <p className="text-sm text-slate-500">
-                      {selectedMailboxThread.emails.length} mail
-                      {selectedMailboxThread.emails.length > 1 ? "s" : ""} in
-                      this thread
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm px-2"
+                        onClick={() => setSelectedMailboxId(null)}
+                        aria-label="Back to mailbox"
+                      >
+                        <ArrowLeft size={14} />
+                      </button>
+                      <h3 className="truncate text-lg font-semibold text-slate-900">
+                        {selectedMailboxThread.latest.subject || "No subject"}
+                      </h3>
+                    </div>
                   </div>
                   <button
                     type="button"
@@ -3101,7 +2971,7 @@ export default function MailingPage() {
                   {selectedMailboxThread.emails.map((email) => (
                     <div
                       key={email.id}
-                      className="rounded-2xl border border-[#DBEAFE] bg-white p-5"
+                      className="rounded-lg border border-slate-300 bg-slate-100 p-5"
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-2">
@@ -3131,7 +3001,7 @@ export default function MailingPage() {
                       </div>
 
                       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="rounded-lg border border-slate-300 bg-white px-4 py-3">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             To
                           </p>
@@ -3141,7 +3011,7 @@ export default function MailingPage() {
                               : "-"}
                           </p>
                         </div>
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="rounded-lg border border-slate-300 bg-white px-4 py-3">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             From
                           </p>
@@ -3149,7 +3019,7 @@ export default function MailingPage() {
                             {email.fromEmail || "-"}
                           </p>
                         </div>
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="rounded-lg border border-slate-300 bg-white px-4 py-3">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                             {email.direction === "inbound"
                               ? "Received"
@@ -3162,7 +3032,7 @@ export default function MailingPage() {
                       </div>
 
                       {email.ccEmails && email.ccEmails.length > 0 && (
-                        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                        <div className="mt-4 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700">
                           <p>
                             <strong>CC:</strong> {email.ccEmails.join(", ")}
                           </p>
@@ -3170,7 +3040,7 @@ export default function MailingPage() {
                       )}
 
                       {/* {email.classification && (
-                          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-4">
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                               Classification
                             </p>
@@ -3180,8 +3050,8 @@ export default function MailingPage() {
                           </div>
                         )} */}
 
-                      <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-                        <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
+                      <div className="mt-4 overflow-hidden rounded-lg border border-slate-300 bg-white">
+                        <div className="border-b border-slate-300 bg-slate-100 px-4 py-2 text-xs text-slate-500">
                           Message body
                         </div>
                         {email.htmlBody ? (
@@ -3235,10 +3105,10 @@ export default function MailingPage() {
                       key={thread.key}
                       type="button"
                       onClick={() => setSelectedMailboxId(thread.key)}
-                      className="w-full rounded-2xl border border-[#DBEAFE] bg-white p-4 text-left transition-all hover:border-[#BFDBFE]"
+                      className="w-full rounded-lg border border-slate-300 bg-slate-50 p-4 text-left transition-colors hover:border-slate-400 hover:bg-slate-100"
                     >
                       <div className="flex items-start gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EFF6FF] text-[#2563EB]">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                           <Mail size={18} />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -3300,7 +3170,7 @@ export default function MailingPage() {
                   ))}
                 </div>
 
-                <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 rounded-lg border border-slate-300 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-slate-600">
                     Page {mailboxMeta.page} of {mailboxMeta.totalPages}
                     {" · "}
@@ -3336,7 +3206,6 @@ export default function MailingPage() {
                 </div>
               </div>
             )}
-          </div>
         </div>
       )}
 
